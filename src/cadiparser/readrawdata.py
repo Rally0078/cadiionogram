@@ -4,6 +4,8 @@ import struct
 import datetime
 from datetime import timezone
 from time import strptime
+import joblib
+import timeit
 
 import numpy as np
 
@@ -226,6 +228,7 @@ class MDreader(DataReader):
         all_heights, all_freqs, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float64), np.array([], dtype=np.float32), np.empty(shape=(0,4), dtype=np.complex128)
         all_metadata = dict()
         lpointer = 0
+
         for idy, input_file in enumerate(Path(input_dir).glob(f"*.{extension}")):
             if input_file.exists():
                 metadata, heights, freqs, dop_shifts, sensors = self.read_raw_data(input_file)
@@ -256,4 +259,54 @@ class MDreader(DataReader):
                 all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
                 all_sensors = np.append(all_sensors, sensors, axis=0)
                 lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
+        return all_metadata, all_heights, all_freqs, all_dopshifts, all_sensors
+    
+    def read_raw_mt_helper(self, input_files):
+        for input_file in input_files:
+            return self.read_raw_data(input_file)
+    def read_raw_data_mt_dir(self, input_dir: Path, extension: str):
+        """
+        Reads raw data from a folder containing data for an entire day. Reads both md3 and md4 extensions, switchable with argument.
+
+        Returns metadata, and the arrays containing height, frequency, and signals from the receivers.
+
+        TODO: Description
+        """
+        all_heights, all_freqs, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float64), np.array([], dtype=np.float32), np.empty(shape=(0,4), dtype=np.complex128)
+        all_metadata = dict()
+        lpointer = 0
+        files_list = list(Path(input_dir).glob(f"*.{extension}"))
+        
+        with joblib.Parallel(n_jobs=12, backend='multiprocessing', verbose=True) as parallel:
+            arg_batches = np.array_split(files_list, 12, axis=0)
+            results = parallel(joblib.delayed(self.read_raw_mt_helper)(arg_batch) for arg_batch in arg_batches)
+        for idy, result in enumerate(results):
+            metadata, heights, freqs, dop_shifts, sensors = result
+            #Todo: Read metadata first, and then have fixed size arrays
+            time_partitions = metadata['timepartitions']
+            new_timepartition = dict()
+            for minute, idz in time_partitions.items():
+                new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}"
+                new_timepartition[new_timepartition_key] = idz + lpointer
+
+            if(idy == 0):
+                obs_datetime: datetime.datetime = metadata['datetime']
+                obs_dateonly = datetime.datetime(year=obs_datetime.year, month=obs_datetime.month, 
+                                                day=obs_datetime.day, tzinfo=obs_datetime.tzinfo,
+                                                hour=0,minute=0,second=0)
+                all_metadata['site'] = metadata['site']
+                all_metadata['datetime'] = obs_dateonly
+
+                all_metadata['source'] = input_dir.name
+                all_metadata['extension'] = extension
+                all_metadata['noofreceivers'] = metadata['noofreceivers']
+                all_metadata['timepartitions'] = dict()
+
+            all_metadata['timepartitions'] |= new_timepartition
+            #Avoid appending, run two passes of the iteration
+            all_heights = np.append(all_heights, heights, axis=0)
+            all_freqs = np.append(all_freqs, freqs, axis=0)
+            all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
+            all_sensors = np.append(all_sensors, sensors, axis=0)
+            lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
         return all_metadata, all_heights, all_freqs, all_dopshifts, all_sensors
