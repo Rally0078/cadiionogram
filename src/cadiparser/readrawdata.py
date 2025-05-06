@@ -1,3 +1,6 @@
+import multiprocessing
+multiprocessing.freeze_support()
+
 import copy
 from pathlib import Path
 import struct
@@ -5,12 +8,14 @@ import datetime
 from datetime import timezone
 from time import strptime
 import joblib
-import timeit
-import multiprocessing
 
+from src.errorhandlers.errorhandling import FolderNotContainingData
 import numpy as np
 
+
 type time_partition_dict = dict[int, int]
+
+
 
 #Base class for data readers
 class DataReader:
@@ -213,12 +218,19 @@ class MDreader(DataReader):
             "site": site,
             "datetime": datetime_init_observation,
             "source": filename.name,
+            "ndops": ndops,
+            "filetype": filetype,
+            "nfreqs": nfreqs,
+            "minheight": minheight,
+            "maxheight": maxheight,
+            "pps": pps,
+            "dtime": dtime,
             "extension": filename.suffix.replace('.',''),
             "noofreceivers": noofreceivers,
             "timepartitions": time_partitions,
         }), height, frequency, dop_shifts, complex_signal
 
-    def read_raw_data_dir(self, input_dir: Path, extension: str, multithread=False):
+    def read_raw_data_dir(self, input_dir: Path, extension: str, multithread=False, backend='threading'):
         """
         Reads raw data from a folder containing data for an entire day. Reads both md3 and md4 extensions, switchable with argument.
 
@@ -228,11 +240,13 @@ class MDreader(DataReader):
         """
         all_heights, all_freqs, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float64), np.array([], dtype=np.float32), np.empty(shape=(0,4), dtype=np.complex128)
         all_metadata = dict()
+        files_list = list(Path(input_dir).glob(f"*.{extension}"))
+        if len(files_list) == 0:
+            raise FolderNotContainingData(input_dir)
         lpointer = 0
         if multithread:
             cpu_count = multiprocessing.cpu_count()
-            files_list = list(Path(input_dir).glob(f"*.{extension}"))
-            with joblib.Parallel(n_jobs=cpu_count, verbose=True) as parallel:
+            with joblib.Parallel(n_jobs=cpu_count, backend=backend, verbose=True) as parallel:
                 results = parallel(joblib.delayed(self.read_raw_data)(files) for files in files_list)
             for idy, result in enumerate(results):
                 metadata, heights, freqs, dop_shifts, sensors = result
@@ -247,13 +261,12 @@ class MDreader(DataReader):
                     obs_dateonly = datetime.datetime(year=obs_datetime.year, month=obs_datetime.month, 
                                                     day=obs_datetime.day, tzinfo=obs_datetime.tzinfo,
                                                     hour=0,minute=0,second=0)
-                    all_metadata['site'] = metadata['site']
+                    all_metadata = metadata
                     all_metadata['datetime'] = obs_dateonly
-
                     all_metadata['source'] = input_dir.name
                     all_metadata['extension'] = extension
-                    all_metadata['noofreceivers'] = metadata['noofreceivers']
                     all_metadata['timepartitions'] = dict()
+                    
 
                 all_metadata['timepartitions'] |= new_timepartition
                 all_heights = np.append(all_heights, heights, axis=0)
@@ -263,7 +276,7 @@ class MDreader(DataReader):
                 lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
 
         else:
-            for idy, input_file in enumerate(Path(input_dir).glob(f"*.{extension}")):
+            for idy, input_file in enumerate(files_list):
                 if input_file.exists():
                     metadata, heights, freqs, dop_shifts, sensors = self.read_raw_data(input_file)
                     #Todo: Read metadata first, and then have fixed size arrays
@@ -278,12 +291,10 @@ class MDreader(DataReader):
                         obs_dateonly = datetime.datetime(year=obs_datetime.year, month=obs_datetime.month, 
                                                         day=obs_datetime.day, tzinfo=obs_datetime.tzinfo,
                                                         hour=0,minute=0,second=0)
-                        all_metadata['site'] = metadata['site']
+                        all_metadata = metadata
                         all_metadata['datetime'] = obs_dateonly
-
                         all_metadata['source'] = input_dir.name
                         all_metadata['extension'] = extension
-                        all_metadata['noofreceivers'] = metadata['noofreceivers']
                         all_metadata['timepartitions'] = dict()
 
                     all_metadata['timepartitions'] |= new_timepartition

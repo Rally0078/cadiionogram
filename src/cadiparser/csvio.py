@@ -1,4 +1,4 @@
-from .readrawdata import DataReader
+from src.cadiparser.readrawdata import DataReader
 import pandas as pd
 import numpy as np
 from pathlib import Path, PosixPath, WindowsPath
@@ -59,15 +59,16 @@ class CSVtools:
             json.dump(metadata, f, indent=4, default=str)
         return metadata, obs_output_path
 
-    def write_csv_day(self, input_dir: Path, extension_str: str, output_dir: str | Path, raw_reader: DataReader, multithread=False):
+    def write_csv_day(self, input_dir: Path, extension_str: str, output_dir: str | Path, raw_reader: DataReader, multithread=False, backend='threading'):
         """
         Writes a single CSV from a folder containing data for an entire day. Reads both md3 and md4 to write CSV and metadata files for 
         each format.
 
         TODO: Description
         """
+        all_metadata = dict()
         all_heights, all_freqs, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float64), np.array([],dtype=np.float64), np.empty(shape=(0,4), dtype=np.complex128)
-        all_metadata, all_heights, all_freqs, all_dopshifts, all_sensors = raw_reader.read_raw_data_dir(input_dir, extension_str, multithread)
+        all_metadata, all_heights, all_freqs, all_dopshifts, all_sensors = raw_reader.read_raw_data_dir(input_dir, extension_str, multithread, backend)
 
         obs_datetime: datetime.datetime = all_metadata['datetime']
         obs_dir_name = f"{obs_datetime.day:02d}{obs_datetime.month:02d}{obs_datetime.year:04d}"
