@@ -1,6 +1,6 @@
 def pytest_collection_modifyitems(items):
     """Modifies test items in place to ensure test classes run in a given order."""
-    CLASS_ORDER = ["TestCADIIO"]
+    CLASS_ORDER = ["TestCADIIO", "TestCADIcsv"]
     sorted_items = items.copy()
       # read the class names from default items
     class_mapping = {item: item.cls.__name__ for item in items}
