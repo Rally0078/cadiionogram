@@ -13,15 +13,21 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QMenu,
     QDialog,
+    QTableWidget,
+    QTableWidgetItem,
     QDialogButtonBox,
     QFileDialog,
-    QHBoxLayout
+    QHBoxLayout,
+    QSizePolicy,
+    QSpacerItem,
+    QAbstractScrollArea
 )
 from PySide6.QtGui import QFont
 from PySide6.QtCore import QSize, Qt
 from src.cadiparser import readrawdata, csvio
 import sys
 import time
+from datetime import datetime
 import configparser
 from pathlib import Path
 from itertools import starmap
@@ -49,7 +55,7 @@ class CADIreader(QMainWindow):
     def _setup_ui(self):
         self.setWindowTitle("CADI reader")
         self.setMinimumSize(QSize(1024, 576))
-        self.move(150, 80)
+        self.move(300, 85)
         self.layout = QVBoxLayout()
         self.layout_h = QHBoxLayout()
         self.read_button = QPushButton('Read from folder')
@@ -98,6 +104,16 @@ class CADIreader(QMainWindow):
         self.layout.setContentsMargins(25, 0, 100, 0)
         self.layout.setSpacing(0)
         self.layout_h.addLayout(self.layout)
+
+        self.layout_tables = [QVBoxLayout(), QVBoxLayout()]
+        for layout_table in self.layout_tables:
+            layout_table.setContentsMargins(0, 0, 0, 0)
+            layout_table.setSpacing(0)
+            self.layout_h.addLayout(layout_table)
+        self.layout_h.setContentsMargins(0, 10, 0, 0)
+        self.layout_h.setSpacing(0)
+        self.layout_h.addStretch()
+
         #self.layout_h.addWidget(QPushButton("Test"), alignment=Qt.AlignCenter)
         self.container = QWidget()
         
@@ -132,12 +148,58 @@ class CADIreader(QMainWindow):
             raw_reader = readrawdata.MDreader()
             args = []
             if self.md3_checkbox.isChecked():
-                args.append((Path(self.directory), 'md3', Path(self.output_dir), raw_reader, True))
+                args.append((Path(self.directory), 'md3', Path(self.output_dir), raw_reader, True, 'loky'))
             if self.md4_checkbox.isChecked():
-                args.append((Path(self.directory), 'md4', Path(self.output_dir), raw_reader, True))
+                args.append((Path(self.directory), 'md4', Path(self.output_dir), raw_reader, True, 'loky'))
             start_time = time.perf_counter()
             results = list(starmap(csv_writer.write_csv_day, args))
             end_time = time.perf_counter()
+            keys_list = ['site', 'datetime', 'extension', 'ndops', 'filetype', 'nfreqs', 'minheight', 'maxheight', 'pps', 'dtime']
+            print(len(self.layout_tables))
+            for idx, result in enumerate(results):
+                metadata, path = result
+                metadata_table = QTableWidget()
+                metadata_table.setRowCount(len(keys_list))
+                metadata_table.setColumnCount(2)
+                metadata_table.setHorizontalHeaderLabels(['Property', 'Value'])
+                metadata_table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+                #metadata_table.setSizePolicy(QSizePolicy.Expanding, QAbstractScrollArea.AdjustToContents)
+                for idy, key in enumerate(keys_list):
+                    header_key = QTableWidgetItem(key)
+                    if type(metadata[key]) == datetime:
+                        header_value = QTableWidgetItem(metadata[key].strftime("%Y-%m-%d"))
+                    else:
+                        header_value = QTableWidgetItem(str(metadata[key]))
+                    metadata_table.setItem(idy, 0, header_key)
+                    metadata_table.setItem(idy, 1, header_value)
+                metadata_title = QLabel(f"{metadata['extension']} header in folder")
+                spacer = QSpacerItem(25, 200)
+                
+                
+                if not self.layout_tables[idx].isEmpty():
+                    old_title = self.layout_tables[idx].itemAt(0).widget()
+                    old_table = self.layout_tables[idx].itemAt(1).widget()
+                    old_spacer = self.layout_tables[idx].itemAt(2)
+                    self.layout_tables[idx].removeWidget(old_table)
+                    self.layout_tables[idx].removeWidget(old_title)
+                    self.layout_tables[idx].removeItem(old_spacer)
+                    old_table.deleteLater()
+                    old_title.deleteLater()
+                    
+                self.layout_tables[idx].addWidget(metadata_title, alignment=Qt.AlignLeft)
+                self.layout_tables[idx].addWidget(metadata_table, alignment=Qt.AlignLeft)
+                self.layout_tables[idx].addSpacerItem(spacer)
+
+                if idx == 0 and not self.layout_tables[1].isEmpty():
+                    old_title = self.layout_tables[1].itemAt(0).widget()
+                    old_table = self.layout_tables[1].itemAt(1).widget()
+                    old_spacer = self.layout_tables[1].itemAt(2)
+                    self.layout_tables[1].removeWidget(old_table)
+                    self.layout_tables[1].removeWidget(old_title)
+                    self.layout_tables[1].removeItem(old_spacer)
+                    old_table.deleteLater()
+                    old_title.deleteLater()
+                
             print(f"Output files written in {(end_time-start_time):.4f} seconds")
 
     def _set_input_dir(self):
@@ -164,7 +226,6 @@ class CADIreader(QMainWindow):
         else:
             print(f"Path cant be empty")
         
-    
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = CADIreader()

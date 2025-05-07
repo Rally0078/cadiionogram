@@ -246,7 +246,7 @@ class MDreader(DataReader):
         lpointer = 0
         if multithread:
             cpu_count = multiprocessing.cpu_count()
-            with joblib.Parallel(n_jobs=cpu_count, backend=backend, verbose=True) as parallel:
+            with joblib.Parallel(n_jobs=cpu_count, backend=backend) as parallel:
                 results = parallel(joblib.delayed(self.read_raw_data)(files) for files in files_list)
             for idy, result in enumerate(results):
                 metadata, heights, freqs, dop_shifts, sensors = result
