@@ -38,7 +38,7 @@ class CSVtools:
         metadata['datafiles'] = []
         #Using a two-pointers approach to slice the partitions
         lpointer = 0
-        for minute, rpointer in partitions.items():
+        for partition, rpointer in partitions.items():
             #Create dataframe
             #Todo: Rewrite for arbitrary number of receivers. Currently supports only 4 receivers
             df_sensors = pd.DataFrame({
@@ -53,8 +53,10 @@ class CSVtools:
 
             lpointer = rpointer     #Update the left pointer to the previous right pointer
             #Save dataframe to file with timestamp
-            df_sensors.to_csv(Path(output_dir / obs_dir_name / f"sensor_data{obs_datetime.hour:02d}{minute:02d}.csv"), index=False)
-            metadata['datafiles'].append(f"sensor_data{obs_datetime.hour:02d}{minute:02d}.csv")
+            timestamp = datetime.datetime.strptime(partition, "%H:%M:%S")
+            data_filename = f"sensor_data{obs_datetime.hour:02d}{timestamp.minute:02d}{timestamp.second:02d}.csv"
+            df_sensors.to_csv(Path(output_dir / obs_dir_name / data_filename), index=False)
+            metadata['datafiles'].append(data_filename)
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=4, default=str)
         return metadata, obs_output_path
@@ -89,7 +91,7 @@ class CSVtools:
         
         repeating_indices = np.repeat(list(all_metadata['timepartitions'].keys()), timepartitions)
 
-        repeating_indices = np.array([datetime.datetime.strptime(f"{timestamp.year:04d}-{timestamp.month:02d}-{timestamp.day:02d} {time_str}:00+00:00", 
+        repeating_indices = np.array([datetime.datetime.strptime(f"{timestamp.year:04d}-{timestamp.month:02d}-{timestamp.day:02d} {time_str}+00:00", 
                                                         '%Y-%m-%d %H:%M:%S%z') for time_str in repeating_indices])
         time_index = pd.to_datetime(repeating_indices).time
 
@@ -103,7 +105,6 @@ class CSVtools:
         'sensor3 (signal unit)' : all_sensors[:, 3],
         }, index=time_index)
         df_sensors.index.name = "timestamp"
-        
         df_sensors.to_csv(Path(obs_output_path / f"sensor_data{extension_str}.csv"))
         return all_metadata, obs_output_path
 
@@ -117,7 +118,10 @@ class CSVtools:
             json_input = json.load(f)
             json_input['datetime'] = datetime.datetime.strptime(json_input['datetime'], '%Y-%m-%d %H:%M:%S%z')
             datafiles = json_input['datafiles']
-            partitions = json_input['timepartitions'] = {int(minute): int(idx) for minute, idx in json_input['timepartitions'].items()}
+            partitions = dict()
+            for timestamp, idx in json_input['timepartitions'].items():
+                datetime_obj = datetime.datetime.strptime(timestamp, "%H:%M:%S")
+                partitions[datetime_obj] = int(idx)
             length = partitions[max(partitions)]
             noofreceivers = json_input['noofreceivers']
             heights = np.zeros(shape=(length), dtype=np.int32)
@@ -148,7 +152,10 @@ class CSVtools:
         with open(filename, 'r') as f:
             json_input = json.load(f)
             json_input['datetime'] = datetime.datetime.strptime(json_input['datetime'], '%Y-%m-%d %H:%M:%S%z')
-            partitions = json_input['timepartitions'] = {minute: int(idx) for minute, idx in json_input['timepartitions'].items()}
+            partitions = dict()
+            for timestamp, idx in json_input['timepartitions'].items():
+                datetime_obj = datetime.datetime.strptime(timestamp, "%H:%M:%S")
+                partitions[datetime_obj] = int(idx)
             length = partitions[max(partitions)]
             heights = np.zeros(shape=(length), dtype=np.int32)
             frequencies = np.zeros(shape=(length), dtype=np.float64)

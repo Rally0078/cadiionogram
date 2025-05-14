@@ -145,7 +145,7 @@ class MDreader(DataReader):
                 time_sec = struct.unpack("<B", f.read(1))[0]
                 flag = struct.unpack("<B", f.read(1))[0]  # gainflag
                 timex += 1
-                times.append(time_hour + 60 * time_min + time_sec)
+                time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec, tzinfo=timezone.utc)
                 for freqx in range(nfreqs):
                     #Iterate through each frequency at a given time of observation
                     noise_flag = struct.unpack("<B", f.read(1))[0]  # noiseflag
@@ -178,7 +178,7 @@ class MDreader(DataReader):
                                 dop_flag = dop_flag - int(ndops / 2)
                             dopbin_x_dop_flag.append(dop_flag)
                         flag = struct.unpack("<B", f.read(1))[0]  # next hflag/gainflag/FF
-                time_partitions[time_min] = len(dopbin_iq)
+                time_partitions[f"{time_partition.hour:02d}:{time_partition.minute:02d}:{time_partition.second:02d}"] = len(dopbin_iq)
                 time_min = flag
                 if ((f.tell() - 1) != eof):
                     time_min = struct.unpack("<B", f.read(1))[0]  # next record
@@ -218,9 +218,10 @@ class MDreader(DataReader):
             "site": site,
             "datetime": datetime_init_observation,
             "source": filename.name,
-            "ndops": ndops,
             "filetype": filetype,
+            "ndops": ndops,
             "nfreqs": nfreqs,
+            "nheights": nheights,
             "minheight": minheight,
             "maxheight": maxheight,
             "pps": pps,
@@ -235,6 +236,8 @@ class MDreader(DataReader):
         Reads raw data from a folder containing data for an entire day. Reads both md3 and md4 extensions, switchable with argument.
 
         Returns metadata, and the arrays containing height, frequency, and signals from the receivers.
+        Return signature:
+        metadata, heights, frequencies, dop_shifts, signals
 
         TODO: Description
         """
@@ -252,9 +255,10 @@ class MDreader(DataReader):
                 metadata, heights, freqs, dop_shifts, sensors = result
                 time_partitions = metadata['timepartitions']
                 new_timepartition = dict()
-                for minute, idz in time_partitions.items():
-                    new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}"
-                    new_timepartition[new_timepartition_key] = idz + lpointer
+                for time_partition, idz in time_partitions.items():
+                    #time_partition = datetime.datetime.strptime(time_partition, "%H:%M:%S")
+                    #new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}
+                    new_timepartition[time_partition] = idz + lpointer
 
                 if(idy == 0):
                     obs_datetime: datetime.datetime = metadata['datetime']
@@ -282,9 +286,10 @@ class MDreader(DataReader):
                     #Todo: Read metadata first, and then have fixed size arrays
                     time_partitions = metadata['timepartitions']
                     new_timepartition = dict()
-                    for minute, idz in time_partitions.items():
-                        new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}"
-                        new_timepartition[new_timepartition_key] = idz + lpointer
+                    for time_partition, idz in time_partitions.items():
+                    #time_partition = datetime.datetime.strptime(time_partition, "%H:%M:%S")
+                    #new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}"
+                        new_timepartition[time_partition] = idz + lpointer
 
                     if(idy == 0):
                         obs_datetime: datetime.datetime = metadata['datetime']
