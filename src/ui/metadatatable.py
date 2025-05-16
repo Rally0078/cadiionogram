@@ -33,8 +33,9 @@ class MetadataTableWidget(QWidget):
     def _on_dropdown_changed(self, text: str):
         self.dropdown_changed.emit(text)
 
+    #Update metadata table
     def update_metadata(self, metadata: dict, keys_list: list[str]):       
-        
+        #Disconnect signal if already connected    
         try:
             self.timepartitions_dropdown.currentTextChanged.disconnect(self._on_dropdown_changed)
         except TypeError:
@@ -68,6 +69,7 @@ class MetadataTableWidget(QWidget):
 
         spacer = QSpacerItem(10, 100)
 
+        #If layout table is not empty, delete and update old widgets
         if not self.layout_table.isEmpty():
             old_title = self.layout_table.itemAt(0).widget()
             old_table = self.layout_table.itemAt(1).widget()
@@ -101,14 +103,13 @@ class MetadataTableWidget(QWidget):
         self.layout_table.addSpacerItem(spacer)
         self.layout_table.addWidget(self.timepartitions_dropdown, alignment=Qt.AlignLeft)
         self.layout_table.addWidget(self.pointers_label, alignment=Qt.AlignLeft)
+
         self.arrow_layout = QHBoxLayout()
         self.arrow_layout.addWidget(self.left_button)
-        #self.arrow_layout.addWidget(self.timepartitions_dropdown)
         self.arrow_layout.addWidget(self.right_button)
         self.arrow_layout.setAlignment(Qt.AlignTop)
 
         self.layout_table.addLayout(self.arrow_layout) 
-        self.pointers_label.setText(f"Left = {self.lpointer}, right = {self.rpointer}")
         self.layout_table.update()
 
     def set_pointers(self, lpointer, rpointer):

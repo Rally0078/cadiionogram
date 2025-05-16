@@ -9,9 +9,9 @@ import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout,
-    QPushButton, QFileDialog, QLabel, QHBoxLayout, 
-    QCheckBox, QButtonGroup, QTableWidget, QAbstractScrollArea,
-    QSizePolicy, QSpacerItem, QTableWidgetItem, QComboBox,
+    QPushButton, QFileDialog, QLabel, 
+    QCheckBox, QButtonGroup,
+    QSizePolicy, QSpacerItem,
     QGridLayout, QDialog, QDialogButtonBox
 )
 class MainWidget(QWidget):
@@ -57,6 +57,7 @@ class MainWidget(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
+        #Initialize signal handling
         self.table_widget.dropdown_changed.connect(self._on_dropdown_changed)
         self.table_widget.left_clicked.connect(self._prev_option)
         self.table_widget.right_clicked.connect(self._next_option)
@@ -65,6 +66,7 @@ class MainWidget(QWidget):
         
         self._selected_timestamp = ''
 
+        #Error message box
         self.dlg = QDialog(self)
         self.dlg.setWindowTitle("Error!")
         self.layout_dlg = QVBoxLayout()
@@ -88,44 +90,46 @@ class MainWidget(QWidget):
                 self.dlg.exec()
                 return
     
+    #Create table when correct folder is selected
     def create_table(self, location):
         self.directory = location
         print(f"Currently chosen directory: {self.directory}")
-        #csv_writer = csvio.CSVtools()
         raw_reader = MDreader()
-        args = []
         if self.md3_checkbox.isChecked():
             extension = 'md3'
         if self.md4_checkbox.isChecked():
             extension = 'md4'
         #Note: Throws FolderNotContainingData exception if md3/4 is not found in the directory
         metadata, self.heights, self.freqs, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension)
-        #print(len(self.layout_table))
         self.metadata = metadata
         timepartitions = metadata['timepartitions']
         self.timepartitions = timepartitions
+
         #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(timepartitions.keys())[0]
         
         #Set initial lpointer and rpointer
         self._get_lpointer_rpointer(self.timepartitions, self._selected_timestamp)
-        #Update metadata when new folder is selected
 
+        #Update metadata when new folder is selected
+        #Disconnect signals before updating
         self.table_widget.left_clicked.disconnect(self._prev_option)
         self.table_widget.right_clicked.disconnect(self._next_option)
 
-        # Now, call the update_metadata function in MetadataTableWidget
+        # Call the update_metadata function in MetadataTableWidget
         self.table_widget.update_metadata(metadata, keys_list)
 
         # Reconnect the signals after the update to ensure the buttons work again
         self.table_widget.left_clicked.connect(self._prev_option)
         self.table_widget.right_clicked.connect(self._next_option)
+        
+        #Set initial pointers in the label
         self.table_widget.set_pointers(self.lpointer, self.rpointer)
-        #Handle buttons and dropdown list
         
-        
+        #Do the initial plotting with the given lpointer and rpointer
         self._plot_helper()
     
+    #Callback to handle changes in dropdown value
     def _on_dropdown_changed(self, text):
         self._selected_timestamp = text
         self._get_lpointer_rpointer(self.timepartitions, timestamp=self._selected_timestamp)
@@ -158,19 +162,24 @@ class MainWidget(QWidget):
 
         self.canvas.plot_scatter(freq_selection, height_selection, median_power, 
                                  timestamp=self._selected_timestamp, site=self.metadata['site'])
-
+    
+    #Callback to handle clicking left arrow or pressing left arrow key
+    #Setting current index in dropdown calls the _on_dropdown_changed() with the new index as timestamp
     def _prev_option(self):
         dropdown = self.table_widget.timepartitions_dropdown
         current_index = dropdown.currentIndex()
         new_index = current_index - 1 if current_index > 0 else dropdown.count() - 1
         dropdown.setCurrentIndex(new_index)
-
+    
+    #Callback to handle clicking right arrow or pressing right arrow key
+    #Setting current index in dropdown calls the _on_dropdown_changed() with the new index as timestamp
     def _next_option(self):
         dropdown = self.table_widget.timepartitions_dropdown
         current_index = dropdown.currentIndex()
         new_index = current_index + 1 if current_index < dropdown.count() - 1 else 0
         dropdown.setCurrentIndex(new_index)
 
+    #Keypress event handler
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Left:
             self.table_widget.left_button.click()
