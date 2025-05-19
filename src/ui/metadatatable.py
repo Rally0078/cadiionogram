@@ -20,6 +20,7 @@ class MetadataTableWidget(QWidget):
         self.layout_table.setSpacing(10)
 
         self.timepartitions_dropdown = QComboBox()
+        self.timepartitions_dropdown.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         
         self.pointers_label = QLabel()
         self.left_button = QPushButton("←")

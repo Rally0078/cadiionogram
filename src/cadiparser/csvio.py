@@ -93,7 +93,7 @@ class CSVtools:
 
         repeating_indices = np.array([datetime.datetime.strptime(f"{timestamp.year:04d}-{timestamp.month:02d}-{timestamp.day:02d} {time_str}+00:00", 
                                                         '%Y-%m-%d %H:%M:%S%z') for time_str in repeating_indices])
-        time_index = pd.to_datetime(repeating_indices).time
+        time_index = pd.to_datetime(repeating_indices, utc=True).time
 
         df_sensors = pd.DataFrame({
         'height (km)' : all_heights,
@@ -172,6 +172,6 @@ class CSVtools:
             signals[:,1] = df['sensor1 (signal unit)'].to_numpy(dtype=np.complex128)
             signals[:,2] = df['sensor2 (signal unit)'].to_numpy(dtype=np.complex128)
             signals[:,3] = df['sensor3 (signal unit)'].to_numpy(dtype=np.complex128)
-            df.index = pd.to_datetime(df.index, format='%H:%M:%S').time
+            df.index = pd.to_datetime(df.index, format='%H:%M:%S', utc=True).time
             return json_input, heights, frequencies, dop_shifts, signals
 
