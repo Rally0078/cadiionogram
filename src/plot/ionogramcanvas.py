@@ -1,4 +1,4 @@
-#PySide6 FigureCanvas to plot Ionogram as scatterplot
+#PySide6 FigureCanvas to plot MD4 Ionogram as scatterplot
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.ticker import ScalarFormatter, MultipleLocator
