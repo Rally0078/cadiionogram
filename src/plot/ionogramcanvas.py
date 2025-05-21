@@ -4,7 +4,7 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import ScalarFormatter, MultipleLocator
 import numpy as np
 
-class MatplotlibCanvas(FigureCanvas):
+class IonogramCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure(figsize=(16, 9))
         

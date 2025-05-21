@@ -26,7 +26,13 @@ class DataReader:
 class MDreader(DataReader):
     def __init__(self):
         pass
-
+    
+    def _safe_reader(self, file, bytes):
+        data = file.read(bytes)
+        if data is None or len(data) < bytes:
+            return None
+        return data
+    
     def read_raw_data(self, filename: Path) -> tuple[dict, time_partition_dict, np.ndarray, np.ndarray, np.ndarray]:
         """Read CADI ionogram data in md2/md4 formats.
         ### Parameters
@@ -138,9 +144,8 @@ class MDreader(DataReader):
             time_partitions = dict()
 
             time_min = struct.unpack("<B", f.read(1))[0]
-            
             # Read complex sensor data from all receivers of all observations till eof.
-            while time_min != 255:
+            while f.tell() < eof and time_min != 255:
                 #Iterate through each time of observation
                 time_sec = struct.unpack("<B", f.read(1))[0]
                 flag = struct.unpack("<B", f.read(1))[0]  # gainflag
@@ -165,8 +170,13 @@ class MDreader(DataReader):
                         for dopx in range(ndops_oneh):
                             dop_flag = struct.unpack("<B", f.read(1))[0]
                             for rec in range(noofreceivers):
-                                iq_bytes[rec, 0] = struct.unpack("<B", f.read(1))[0]
-                                iq_bytes[rec, 1] = struct.unpack("<B", f.read(1))[0]
+                                re_part = self._safe_reader(f, 1)
+                                im_part = self._safe_reader(f, 1)
+                                if re_part == None or im_part == None:
+                                    bad_byte_flag = True
+                                    break
+                                iq_bytes[rec, 0] = struct.unpack("<B", re_part)[0]
+                                iq_bytes[rec, 1] = struct.unpack("<B", im_part)[0]
                             dopbinx += 1
                             dopbin_iq.append(copy.deepcopy(iq_bytes))
                             dopbin_x_timex.append(timex)
@@ -224,12 +234,13 @@ class MDreader(DataReader):
             "nheights": nheights,
             "minheight": minheight,
             "maxheight": maxheight,
+            "dheight": dheight,
             "pps": pps,
             "dtime": dtime,
             "extension": filename.suffix.replace('.',''),
             "noofreceivers": noofreceivers,
             "timepartitions": time_partitions,
-        }), height, frequency, dop_shifts, complex_signal
+        }), height, frequency, freqs, dop_shifts, complex_signal
 
     def read_raw_data_dir(self, input_dir: Path, extension: str, multithread=False, backend='threading'):
         """
@@ -241,7 +252,8 @@ class MDreader(DataReader):
 
         TODO: Description
         """
-        all_heights, all_freqs, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float64), np.array([], dtype=np.float32), np.empty(shape=(0,4), dtype=np.complex128)
+        all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float64), np.array([], dtype=np.float64), \
+                                                                            np.array([], dtype=np.float32), np.empty(shape=(0,4), dtype=np.complex128)
         all_metadata = dict()
         files_list = list(Path(input_dir).glob(f"*.{extension}"))
         if len(files_list) == 0:
@@ -252,7 +264,7 @@ class MDreader(DataReader):
             with joblib.Parallel(n_jobs=cpu_count, backend=backend) as parallel:
                 results = parallel(joblib.delayed(self.read_raw_data)(files) for files in files_list)
             for idy, result in enumerate(results):
-                metadata, heights, freqs, dop_shifts, sensors = result
+                metadata, heights, freqs, freq_list, dop_shifts, sensors = result
                 time_partitions = metadata['timepartitions']
                 new_timepartition = dict()
                 for time_partition, idz in time_partitions.items():
@@ -270,6 +282,7 @@ class MDreader(DataReader):
                     all_metadata['source'] = input_dir.name
                     all_metadata['extension'] = extension
                     all_metadata['timepartitions'] = dict()
+                    all_freq_list = np.append(all_freq_list, freq_list)
                     
 
                 all_metadata['timepartitions'] |= new_timepartition
@@ -282,7 +295,7 @@ class MDreader(DataReader):
         else:
             for idy, input_file in enumerate(files_list):
                 if input_file.exists():
-                    metadata, heights, freqs, dop_shifts, sensors = self.read_raw_data(input_file)
+                    metadata, heights, freqs, freq_list, dop_shifts, sensors = self.read_raw_data(input_file)
                     #Todo: Read metadata first, and then have fixed size arrays
                     time_partitions = metadata['timepartitions']
                     new_timepartition = dict()
@@ -301,6 +314,7 @@ class MDreader(DataReader):
                         all_metadata['source'] = input_dir.name
                         all_metadata['extension'] = extension
                         all_metadata['timepartitions'] = dict()
+                        all_freq_list = np.append(all_freq_list, freq_list)
 
                     all_metadata['timepartitions'] |= new_timepartition
                     #Avoid appending, run two passes of the iteration
@@ -309,4 +323,4 @@ class MDreader(DataReader):
                     all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
                     all_sensors = np.append(all_sensors, sensors, axis=0)
                     lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
-        return all_metadata, all_heights, all_freqs, all_dopshifts, all_sensors
+        return all_metadata, all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors

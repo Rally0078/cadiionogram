@@ -1,7 +1,7 @@
 from pathlib import Path
 from datetime import datetime
 from src.errorhandlers.errorhandling import FolderNotContainingData
-from src.plot.mplcanvas import MatplotlibCanvas
+from src.plot.ionogramcanvas import IonogramCanvas
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import keys_list
 from src.cadiparser.readrawdata import MDreader
@@ -12,13 +12,16 @@ from PySide6.QtWidgets import (
     QPushButton, QFileDialog, QLabel, 
     QCheckBox, QButtonGroup,
     QSizePolicy, QSpacerItem,
-    QGridLayout, QDialog, QDialogButtonBox
+    QGridLayout, QDialog, QDialogButtonBox,
+    QComboBox
 )
 class MainWidget(QWidget):
+    md3_options = ['Frequency vs time', 'Height vs time']
+    md4_options = ['Display ionogram', 'Autoscale ionogram', 'Real height analysis']
     def __init__(self):
         super().__init__()
         # Matplotlib plot
-        self.canvas = MatplotlibCanvas(self)
+        self.ionogram_canvas = IonogramCanvas(self)
         
         self.lpointer = -1
         self.rpointer = -1
@@ -34,25 +37,29 @@ class MainWidget(QWidget):
         self.button_group.addButton(self.md3_checkbox)
         self.button_group.addButton(self.md4_checkbox)
         self.button_group.setExclusive(True)
-
+        #self.button_group.connect(self._on_dropdown_changed)
+        
+        self.dropbox = QComboBox()
+        self.dropbox.addItems(MainWidget.md4_options)
         layout = QGridLayout()
 
         # Folder selection and label
         layout.addWidget(self.button, 0, 0)
         layout.addWidget(self.label, 0, 1)
         layout.addItem(QSpacerItem(20, 0, QSizePolicy.Fixed, QSizePolicy.Minimum), 0, 2, 4, 1)
-        layout.addWidget(self.canvas, 0, 3, 3, 3, alignment=Qt.AlignRight) #Spans 3x3 space at position(0,3)
+        layout.addWidget(self.ionogram_canvas, 0, 3, 3, 3, alignment=Qt.AlignRight) #Spans 3x3 space at position(0,3)
 
         # Checkboxes
         layout.addWidget(self.md3_checkbox, 1, 0)
         layout.addWidget(self.md4_checkbox, 1, 1)
-        layout.setColumnStretch(2, 1)
+        layout.addWidget(self.dropbox, 2,0)
+        layout.setColumnStretch(3, 1)
 
         #Custom table widget for metadata table and navigation
         self.table_widget = MetadataTableWidget()
 
         # Set the margins and spacing        
-        layout.addWidget(self.table_widget, 2, 0, 2, 2)
+        layout.addWidget(self.table_widget, 3, 0, 2, 2)
 
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
@@ -100,7 +107,7 @@ class MainWidget(QWidget):
         if self.md4_checkbox.isChecked():
             extension = 'md4'
         #Note: Throws FolderNotContainingData exception if md3/4 is not found in the directory
-        metadata, self.heights, self.freqs, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension)
+        metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension)
         self.metadata = metadata
         timepartitions = metadata['timepartitions']
         self.timepartitions = timepartitions
@@ -129,6 +136,9 @@ class MainWidget(QWidget):
         #Do the initial plotting with the given lpointer and rpointer
         self._plot_helper()
     
+    #Callback to handle tickboxes
+    def _on_tickbox_changed(self):
+        pass
     #Callback to handle changes in dropdown value
     def _on_dropdown_changed(self, text):
         self._selected_timestamp = text
@@ -160,7 +170,7 @@ class MainWidget(QWidget):
         median_power[mask] = 0.0
         median_power[~mask] = 20*np.log10(real_signal_selection[~mask])
 
-        self.canvas.plot_scatter(freq_selection, height_selection, median_power, 
+        self.ionogram_canvas.plot_scatter(freq_selection, height_selection, median_power, 
                                  timestamp=self._selected_timestamp, site=self.metadata['site'])
     
     #Callback to handle clicking left arrow or pressing left arrow key

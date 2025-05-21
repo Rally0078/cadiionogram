@@ -78,7 +78,7 @@ class TestCADIcsv:
     def test_read_csv(self, test_files_md4, test_csvio, test_raw_reader):
         testfiles_dir = Path('./output/md4/09042025')
         for input_file in test_files_md4:
-            metadata, heights, freqs, dop_shifts, sensors = test_raw_reader.read_raw_data(input_file)
+            metadata, heights, freqs, freq_list, dop_shifts, sensors = test_raw_reader.read_raw_data(input_file)
             hour = metadata['datetime'].hour
 
             new_metadata, new_heights, new_freqs, new_dop_shifts, new_sensors = test_csvio.read_from_csv(Path(testfiles_dir / f"metadata{hour:02d}.json"))
@@ -93,7 +93,7 @@ class TestCADIcsv:
 
     def test_read_csv_day(self, test_raw_files_day, test_files_md3_day, test_files_md4_day, test_csvio, test_raw_reader):
         for test_raw_dir, test_metadata_file in zip(test_raw_files_day, test_files_md3_day):
-            metadata, height, freq, dop_shifts, signal = test_raw_reader.read_raw_data_dir(test_raw_dir, extension='md3', multithread=True)
+            metadata, height, freq, freq_list, dop_shifts, signal = test_raw_reader.read_raw_data_dir(test_raw_dir, extension='md3', multithread=True)
             new_metadata, new_height, new_freq, new_dop_shifts, new_signal = test_csvio.read_from_csv_day(test_metadata_file)
 
             assert height.shape == new_height.shape
@@ -104,7 +104,7 @@ class TestCADIcsv:
             assert (height == new_height).all()
             assert (dop_shifts == new_dop_shifts).all()
         for test_raw_dir, test_metadata_file in zip(test_raw_files_day, test_files_md4_day):
-            metadata, height, freq, dop_shifts, signal = test_raw_reader.read_raw_data_dir(test_raw_dir, extension='md4', multithread=True)
+            metadata, height, freq, freq_list, dop_shifts, signal = test_raw_reader.read_raw_data_dir(test_raw_dir, extension='md4', multithread=True)
             new_metadata, new_height, new_freq, new_dop_shifts, new_signal = test_csvio.read_from_csv_day(test_metadata_file)
             
             assert height.shape == new_height.shape

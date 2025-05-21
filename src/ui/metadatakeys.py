@@ -1,1 +1,1 @@
-keys_list = ['site', 'datetime', 'extension', 'ndops', 'filetype', 'nfreqs', 'minheight', 'maxheight', 'pps', 'dtime']
+keys_list = ['site', 'datetime', 'extension', 'ndops', 'filetype', 'nfreqs', 'minheight', 'maxheight', 'dheight', 'pps', 'dtime']
