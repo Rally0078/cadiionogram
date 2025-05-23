@@ -13,9 +13,8 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout,
     QPushButton, QFileDialog, QLabel, 
     QCheckBox, QButtonGroup,
-    QSizePolicy, QSpacerItem,
     QGridLayout, QDialog, QDialogButtonBox,
-    QComboBox, QMenuBar, QMenu
+    QComboBox, QHBoxLayout
 )
 class MainWidget(QWidget):
     md3_options = ['Frequency vs time', 'Height vs time']
@@ -31,6 +30,7 @@ class MainWidget(QWidget):
         self.canvas_widget = None
         self.lpointer = -1
         self.rpointer = -1
+        self.current_plot_state = None
 
         # Folder selector buttons and label
         self.label = QLabel("No folder selected")
@@ -47,11 +47,32 @@ class MainWidget(QWidget):
         self.button_group.setExclusive(True)
         self.md3_checkbox.stateChanged.connect(self._on_tickbox_changed)
         self.md4_checkbox.stateChanged.connect(self._on_tickbox_changed)
+
+        self.polan_button = QPushButton("POLAN")
+        self.polan_button.setVisible(False)  # Hidden initially
+        self.polan_button.clicked.connect(lambda: print("Placeholder clicked"))
+          # Next to dropdown
         
         # Mode selection dropbox
         self.dropbox = QComboBox()
+        
         # Default mode is md4
         self.dropbox.addItems(MainWidget.md4_options)
+        
+        # Create container widget + layout for dropbox + Run button
+        self.dropbox_container = QWidget()
+        self.dropbox_layout = QHBoxLayout()
+        self.dropbox_layout.setContentsMargins(0, 0, 0, 0)
+        self.dropbox_layout.setSpacing(5)
+        self.dropbox_container.setContentsMargins(0, 0, 0, 0)
+        self.dropbox_container.setLayout(self.dropbox_layout)
+
+        # Add dropbox and Run button to this layout
+        self.run_button = QPushButton("Run")
+        self.run_button.setEnabled(False)
+        self.dropbox_layout.addWidget(self.dropbox)
+        self.dropbox_layout.addWidget(self.run_button)
+        self.run_button.clicked.connect(self._plot_helper)
         
         # Grid layout
         layout = QGridLayout()
@@ -63,7 +84,8 @@ class MainWidget(QWidget):
         # Checkboxes
         layout.addWidget(self.md3_checkbox, 2, 0)
         layout.addWidget(self.md4_checkbox, 2, 1)
-        layout.addWidget(self.dropbox, 3,0)
+        layout.addWidget(self.dropbox_container, 3, 0, 1, 2)
+
         layout.setColumnStretch(4, 1)
 
         # Custom table widget for metadata table and navigation
@@ -71,6 +93,7 @@ class MainWidget(QWidget):
 
         # Set the margins and spacing        
         layout.addWidget(self.table_widget, 4, 0, 2, 2)
+        layout.addWidget(self.polan_button, 6, 1)
 
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
@@ -83,6 +106,7 @@ class MainWidget(QWidget):
         self.setLayout(layout)
         
         self._selected_timestamp = ''
+        self.directory = None
 
         #Error message box
         self.dlg = QDialog(self)
@@ -103,9 +127,11 @@ class MainWidget(QWidget):
             try:
                 self.create_table(folder_path)
                 self.label.setText(f"Selected: {folder_path}")
+                self.run_button.setEnabled(True)
             except FolderNotContainingData:
                 self.textbox_errormsg.setText("You must choose a folder.")
                 self.dlg.exec()
+                self.run_button.setEnabled(False)
                 return
     
     #Create table when correct folder is selected
@@ -175,20 +201,39 @@ class MainWidget(QWidget):
         self.rpointer = rpointer
 
     def _plot_helper(self):
-        state = PlotStateFactory.get_state(self)
-        if self.canvas_widget is None:
-            self.canvas_widget = state.create_canvas()
+        new_state = PlotStateFactory.get_state(self)
+
+        # Determine whether the canvas needs to be replaced
+        need_new_canvas = (
+            self.canvas_widget is None or
+            not isinstance(self.current_plot_state, type(new_state))
+        )
+
+        if need_new_canvas:
+            # Remove and delete the existing canvas widget if it exists
+            if self.canvas_widget is not None:
+                self.layout().removeWidget(self.canvas_widget)
+                self.canvas_widget.setParent(None)
+                self.canvas_widget.deleteLater()
+                self.canvas_widget = None
+
+            # Create and add the new canvas
+            self.canvas_widget = new_state.create_canvas()
             self.canvas_widget.setHidden(True)
             self.layout().addWidget(
-            self.canvas_widget,
-            self.canvas_layout_row,
-            self.canvas_layout_col,
-            self.canvas_layout_rowspan,
-            self.canvas_layout_colspan,
-        )
+                self.canvas_widget,
+                self.canvas_layout_row,
+                self.canvas_layout_col,
+                self.canvas_layout_rowspan,
+                self.canvas_layout_colspan,
+            )
             self.canvas_widget.setHidden(False)
-        if self.canvas_widget is not None:
-            state.update_canvas(self.canvas_widget)
+
+        # Update the canvas using the new state
+        new_state.update_canvas(self.canvas_widget)
+        
+        # Track the current state
+        self.current_plot_state = new_state
 
     #Callback to handle clicking left arrow or pressing left arrow key
     #Setting current index in dropdown calls the _on_dropdown_changed() with the new index as timestamp
