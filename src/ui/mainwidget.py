@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime
 from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.plot.ionogramcanvas import IonogramCanvas
+from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import keys_list
 from src.plotstate.factory import PlotStateFactory
@@ -16,6 +17,8 @@ from PySide6.QtWidgets import (
     QGridLayout, QDialog, QDialogButtonBox,
     QComboBox, QHBoxLayout
 )
+import subprocess
+
 class MainWidget(QWidget):
     md3_options = ['Frequency vs time', 'Height vs time']
     md4_options = ['Display ionogram', 'Autoscale ionogram', 'Real height analysis']
@@ -50,7 +53,7 @@ class MainWidget(QWidget):
 
         self.polan_button = QPushButton("POLAN")
         self.polan_button.setVisible(False)  # Hidden initially
-        self.polan_button.clicked.connect(lambda: print("Placeholder clicked"))
+        self.polan_button.clicked.connect(self._run_polan)
           # Next to dropdown
         
         # Mode selection dropbox
@@ -196,7 +199,7 @@ class MainWidget(QWidget):
             prev_index = index - 1
             lpointer = timepartitions[list(timepartitions.keys())[prev_index]]
         rpointer = timepartitions[timestamp]
-
+        self.timestamp = timestamp
         self.lpointer = lpointer
         self.rpointer = rpointer
 
@@ -234,6 +237,59 @@ class MainWidget(QWidget):
         
         # Track the current state
         self.current_plot_state = new_state
+    
+    #Run POLAN function that takes interpolated input data.
+    def _run_polan(self):
+        if isinstance(self.canvas_widget, RealHeightAnalysisCanvas):
+            freqs, heights = self.canvas_widget.compute_matched_curve()
+            real_freqs = []
+            real_heights = []
+            if len(freqs) > 0:
+                short_datetime: datetime = self.metadata['datetime']
+
+                with open("a.a", 'w') as polan_input:
+                    polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
+                    polan_input.write(f"Date = {short_datetime.year}{short_datetime.month}{short_datetime.day}ti           1.38  0.5  0.0 0.00    0\n")
+                    polan_input.write(f"{self.timestamp}                    0.0\n")
+                    for freq, height in zip(freqs, heights):
+                        polan_input.write(f"{freq}, {float(round(height)):.2f}\n")
+                    polan_input.write(f"{freqs[-1]+0.1}, {0.0}\n")
+                    polan_input.write(f"0.0, 0.0")
+                subprocess.run('./polan.exe')
+                stop_reading = False
+                with open("POLOUT.T", 'r') as polan_output:
+                    lines = polan_output.readlines()
+                    for i, line in enumerate(lines):
+                        if "Real Heights" in line:
+                            data_start_index = i + 1
+                            break
+                    else:
+                        raise ValueError('"Real Heights" not found in file')
+                    for line in lines[data_start_index:]:
+                        if stop_reading:
+                            break
+                        if line.strip() == '' or '*' in line:
+                            break
+                        try:
+                            floats = list(map(float, line.strip().split()))
+                        except ValueError:
+                            # Skip or stop on bad data depending on desired behavior
+                            raise ValueError(f"Non-numeric value found in line: {line}")
+                        line_freqs = floats[::2]
+                        line_heights = floats[1::2]
+                        
+                        for f, h in zip(line_freqs, line_heights):
+                            if h <= 50 or f <= 0.25:
+                                stop_reading = True
+                                break
+                            real_freqs.append(f)
+                            real_heights.append(h)
+
+                self.canvas_widget.plot_polan(real_freqs, real_heights)
+            else:
+                print("No drawn curve or ionogram data to match.")
+        else:
+            print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
 
     #Callback to handle clicking left arrow or pressing left arrow key
     #Setting current index in dropdown calls the _on_dropdown_changed() with the new index as timestamp

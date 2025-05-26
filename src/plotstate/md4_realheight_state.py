@@ -1,5 +1,5 @@
-#Concrete implementation of MD4 display ionogram PlotState
-#Handles plotting of raw ionograms with MD4
+#Concrete implementation of real height analysis with interactive figure
+#Handles POLAN input and output
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.plotstate.base import PlotState
 import numpy as np

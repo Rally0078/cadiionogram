@@ -67,3 +67,9 @@ pip-wheel-metadata/
 
 # pytest debug logs generated via --debug
 pytestdebug.log
+
+#POLAN-related
+a.a
+POLOUT.T
+polan.exe
+polan

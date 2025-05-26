@@ -4,6 +4,7 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import ScalarFormatter, MultipleLocator
 from matplotlib.lines import Line2D
 import numpy as np
+from scipy.interpolate import interp1d, PchipInterpolator
 
 class RealHeightAnalysisCanvas(FigureCanvas):
     def __init__(self, parent=None):
@@ -23,6 +24,9 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.drawing = False
         self.drawn_points = []  # List of (x, y) tuples for curve
         self.line = None  # Line2D object for the curve
+        self.line_polan = None #Line2D for POLAN real height curve
+        self.freqs = np.array([])   # Empty by default
+        self.heights = np.array([]) # Empty by default
 
         # Connect matplotlib mouse events
         self.mpl_connect("button_press_event", self.on_mouse_press)
@@ -47,6 +51,8 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax.grid()
 
     def plot_scatter(self, freqs, heights, signals, timestamp, site):
+        self.freqs = freqs
+        self.heights = heights
         self.ax.clear()
         self.fig.tight_layout(pad=3)
         self.setHidden(self.is_hidden)
@@ -72,6 +78,19 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         # Re-create the interactive drawing line
         self.line = Line2D([], [], color='red', linewidth=2)
         self.ax.add_line(self.line)
+
+        self.line_polan = Line2D([], [], color='green', linewidth=2, linestyle='--')
+        self.ax.add_line(self.line_polan)
+        self.draw()
+    
+    def plot_polan(self, freqs, real_heights):
+        freqs = np.array(freqs)
+        freqs = freqs * 1e6
+        if self.line_polan is None:
+            self.line_polan = Line2D(freqs, real_heights, color='green', linewidth=2, linestyle='--')
+            self.ax.add_line(self.line_polan)
+        else:
+            self.line_polan.set_data(freqs, real_heights)
         self.draw()
 
     def on_mouse_press(self, event):
@@ -109,7 +128,46 @@ class RealHeightAnalysisCanvas(FigureCanvas):
     def on_mouse_release(self, event):
         if event.button == 1 and self.drawing:
             self.drawing = False
-            # Drawing finished, curve is ready in self.drawn_points
-            # You can add any post-processing here if needed
-            # For example, print points:
-            # print("Drawn curve points:", self.drawn_points)
+
+    def compute_matched_curve(self):
+        if not self.drawn_points:
+            return np.array([]), np.array([])
+        points = np.array([(x, y) for x, y in self.drawn_points if x is not None and y is not None])
+        if points.size == 0:
+            return np.array([]), np.array([])
+        if points.shape[0] < 2:
+            return np.array([]), np.array([])
+
+        freqs_hz = points[:, 0]
+        heights = points[:, 1]
+
+        # Convert Hz to MHz
+        freqs_mhz = freqs_hz / 1e6
+
+        # Round frequencies to 1 decimal place
+        freqs_rounded = np.round(freqs_mhz, 1)
+
+        # Find unique frequencies and average corresponding heights to remove duplicates
+        unique_freqs, inverse_indices = np.unique(freqs_rounded, return_inverse=True)
+        avg_heights = np.zeros_like(unique_freqs)
+
+        for i in range(len(unique_freqs)):
+            avg_heights[i] = heights[inverse_indices == i].mean()
+
+        # Prepare interpolation points in 0.1 MHz steps
+        f_min = np.floor(unique_freqs.min() * 10) / 10
+        f_max = np.ceil(unique_freqs.max() * 10) / 10
+        num_points = int(np.round((f_max - f_min) / 0.1)) + 1
+        freqs_interp = np.round(np.linspace(f_min, f_max, num_points), 1)
+
+        # Interpolate heights at these frequencies
+        interpolator = PchipInterpolator(unique_freqs, avg_heights, extrapolate=False)
+        heights_interp = interpolator(freqs_interp)
+
+        # Remove any NaN from interpolation (outside original frequency range)
+        mask = ~np.isnan(heights_interp)
+        freqs_interp = freqs_interp[mask]
+        heights_interp = heights_interp[mask]
+
+        # Return frequencies in MHz and heights interpolated (both no duplicates)
+        return freqs_interp, heights_interp
