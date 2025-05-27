@@ -140,7 +140,7 @@ class MDreader(DataReader):
             dopbin_x_dop_flag = []
             dopbin_iq = []
             hflag = 0
-
+            file_list = []
             time_partitions = dict()
 
             time_min = struct.unpack("<B", f.read(1))[0]
@@ -189,6 +189,7 @@ class MDreader(DataReader):
                             dopbin_x_dop_flag.append(dop_flag)
                         flag = struct.unpack("<B", f.read(1))[0]  # next hflag/gainflag/FF
                 time_partitions[f"{time_partition.hour:02d}:{time_partition.minute:02d}:{time_partition.second:02d}"] = len(dopbin_iq)
+                file_list.append(filename.name)
                 time_min = flag
                 if ((f.tell() - 1) != eof):
                     time_min = struct.unpack("<B", f.read(1))[0]  # next record
@@ -224,7 +225,7 @@ class MDreader(DataReader):
         dopbin_iq = np.array(dopbin_iq)
         #Combine the real and imaginary parts into one complex part
         complex_signal = dopbin_iq[:,:, 0] + 1j * dopbin_iq[:,:,1]
-        return dict({
+        return file_list, dict({
             "site": site,
             "datetime": datetime_init_observation,
             "source": filename.name,
@@ -254,6 +255,7 @@ class MDreader(DataReader):
         """
         all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float64), np.array([], dtype=np.float64), \
                                                                             np.array([], dtype=np.float32), np.empty(shape=(0,4), dtype=np.complex128)
+        all_files_list = []
         all_metadata = dict()
         files_list = list(Path(input_dir).glob(f"*.{extension}"))
         if len(files_list) == 0:
@@ -264,7 +266,7 @@ class MDreader(DataReader):
             with joblib.Parallel(n_jobs=cpu_count, backend=backend) as parallel:
                 results = parallel(joblib.delayed(self.read_raw_data)(files) for files in files_list)
             for idy, result in enumerate(results):
-                metadata, heights, freqs, freq_list, dop_shifts, sensors = result
+                files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = result
                 time_partitions = metadata['timepartitions']
                 new_timepartition = dict()
                 for time_partition, idz in time_partitions.items():
@@ -286,6 +288,7 @@ class MDreader(DataReader):
                     
 
                 all_metadata['timepartitions'] |= new_timepartition
+                all_files_list.extend(files_list)
                 all_heights = np.append(all_heights, heights, axis=0)
                 all_freqs = np.append(all_freqs, freqs, axis=0)
                 all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
@@ -295,7 +298,7 @@ class MDreader(DataReader):
         else:
             for idy, input_file in enumerate(files_list):
                 if input_file.exists():
-                    metadata, heights, freqs, freq_list, dop_shifts, sensors = self.read_raw_data(input_file)
+                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = self.read_raw_data(input_file)
                     #Todo: Read metadata first, and then have fixed size arrays
                     time_partitions = metadata['timepartitions']
                     new_timepartition = dict()
@@ -317,10 +320,11 @@ class MDreader(DataReader):
                         all_freq_list = np.append(all_freq_list, freq_list)
 
                     all_metadata['timepartitions'] |= new_timepartition
+                    all_files_list.extend(files_list)
                     #Avoid appending, run two passes of the iteration
                     all_heights = np.append(all_heights, heights, axis=0)
                     all_freqs = np.append(all_freqs, freqs, axis=0)
                     all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
                     all_sensors = np.append(all_sensors, sensors, axis=0)
                     lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
-        return all_metadata, all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors
+        return all_files_list, all_metadata, all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors

@@ -26,5 +26,6 @@ class Md4DisplayIonogramState(PlotState):
             heights,
             power,
             self.main._selected_timestamp,
+            self.main.metadata['datetime'],
             self.main.metadata['site']
         )

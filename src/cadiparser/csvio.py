@@ -70,7 +70,7 @@ class CSVtools:
         """
         all_metadata = dict()
         all_heights, all_freqs, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float64), np.array([],dtype=np.float64), np.empty(shape=(0,4), dtype=np.complex128)
-        all_metadata, all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = raw_reader.read_raw_data_dir(input_dir, extension_str, multithread, backend)
+        files_list, all_metadata, all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = raw_reader.read_raw_data_dir(input_dir, extension_str, multithread, backend)
 
         obs_datetime: datetime.datetime = all_metadata['datetime']
         obs_dir_name = f"{obs_datetime.day:02d}{obs_datetime.month:02d}{obs_datetime.year:04d}"

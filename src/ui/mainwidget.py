@@ -18,13 +18,14 @@ from PySide6.QtWidgets import (
     QComboBox, QHBoxLayout
 )
 import subprocess
+import shutil
 
 class MainWidget(QWidget):
     md3_options = ['Frequency vs time', 'Height vs time']
     md4_options = ['Display ionogram', 'Autoscale ionogram', 'Real height analysis']
     def __init__(self):
         super().__init__()
-
+        self.polan_dir = None
         # Canvas parameters to be used later
         self.canvas_layout_row = 2
         self.canvas_layout_col = 3
@@ -147,9 +148,8 @@ class MainWidget(QWidget):
         if self.md4_checkbox.isChecked():
             extension = 'md4'
         #Note: Throws FolderNotContainingData exception if md3/4 is not found in the directory
-        self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension)
+        self.files_list, self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension)
         self.timepartitions = self.metadata['timepartitions']
-
         #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(self.timepartitions.keys())[0]
         
@@ -192,6 +192,7 @@ class MainWidget(QWidget):
     
     def _get_lpointer_rpointer(self, timepartitions, timestamp):
         index = list(timepartitions.keys()).index(timestamp)
+        self.file_timestamp_index = index
         lpointer = -1
         if index == 0:
             lpointer = 0
@@ -249,11 +250,13 @@ class MainWidget(QWidget):
 
                 with open("a.a", 'w') as polan_input:
                     polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
-                    polan_input.write(f"Date = {short_datetime.year}{short_datetime.month}{short_datetime.day}ti           1.38  0.5  0.0 0.00    0\n")
+                    polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}ti           1.38  0.5  0.0 0.00    0\n")
                     polan_input.write(f"{self.timestamp}                    0.0\n")
-                    for freq, height in zip(freqs, heights):
+                    for idx, (freq, height) in enumerate(zip(freqs, heights)):
+                        if idx == len(freqs) - 1:
+                            height = 0.0
                         polan_input.write(f"{freq}, {float(round(height)):.2f}\n")
-                    polan_input.write(f"{freqs[-1]+0.1}, {0.0}\n")
+#                    polan_input.write(f"{freqs[-1]+0.1}, {0.0}\n")
                     polan_input.write(f"0.0, 0.0")
                 subprocess.run('./polan.exe')
                 stop_reading = False
@@ -284,7 +287,13 @@ class MainWidget(QWidget):
                                 break
                             real_freqs.append(f)
                             real_heights.append(h)
+                input_file_name = f"POLOUT.T"
+                output_file_nominute_name = Path(self.files_list[self.file_timestamp_index]).stem[:4]
+                new_timestamp = self.timestamp.replace(':', '')[:-2]
+                new_output_file_name = output_file_nominute_name + new_timestamp
 
+                output_file_name = f"{self.polan_dir / new_output_file_name}.pol"
+                shutil.copyfile(input_file_name, output_file_name)
                 self.canvas_widget.plot_polan(real_freqs, real_heights)
             else:
                 print("No drawn curve or ionogram data to match.")

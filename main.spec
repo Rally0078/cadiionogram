@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['src\\ui\\main.py'],
+    ['src\\plot\\main.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -10,7 +10,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PyQt5', 'tkinter', 'matplotlib', 'PyQt6', 'scipy', 'pillow', 'IPython', 'PIL', 'numba'],
+    excludes=['PyQt5', 'tkinter', 'PyQt6', 'pillow', 'IPython', 'numba'],
     noarchive=False,
     optimize=0,
 )
