@@ -7,6 +7,7 @@ import struct
 import datetime
 from datetime import timezone
 from time import strptime
+from io import BufferedReader
 import joblib
 
 from src.errorhandlers.errorhandling import FolderNotContainingData
@@ -27,10 +28,10 @@ class MDreader(DataReader):
     def __init__(self):
         pass
     
-    def _safe_reader(self, file, bytes):
+    def _safe_reader(self, file: BufferedReader, bytes):
         data = file.read(bytes)
         if data is None or len(data) < bytes:
-            return None
+            raise EOFError
         return data
     
     def read_raw_data(self, filename: Path) -> tuple[dict, time_partition_dict, np.ndarray, np.ndarray, np.ndarray]:
@@ -67,132 +68,153 @@ class MDreader(DataReader):
         max_ntimes = 256
         max_ndopbins = 300000
         dheight = 3.0  # not defined in data file
-        with open(filename, "rb") as f:
-            f.seek(-1,2)     # go to the file end.
-            eof = f.tell()   # get the end of file location
-            f.seek(0,0)      # go back to file beginning
-            # 1) read header information as described in the documentation p. 26-27
-            site = f.read(3).decode("utf-8")
-            ascii_datetime = f.read(22).decode("utf-8")
-            filetype = f.read(1).decode("utf-8")
 
-            nfreqs = struct.unpack("<H", f.read(2))[0]
+        metadata = dict({
+            "site": '',
+            "datetime": '',
+            "source": filename.name,
+            "filetype": '',
+            "ndops": 0,
+            "nfreqs": 0,
+            "nheights": 0,
+            "minheight": 0,
+            "maxheight": 0,
+            "dheight": 0,
+            "pps": 0,
+            "dtime": 0,
+            "extension": filename.suffix.replace('.',''),
+            "noofreceivers": 0,
+            "timepartitions": 0,
+        })
+        try:
+            with open(filename, "rb") as f:
+                f.seek(-1,2)     # go to the file end.
+                eof = f.tell()   # get the end of file location
+                f.seek(0,0)      # go back to file beginning
+                # 1) read header information as described in the documentation p. 26-27
+                site = self._safe_reader(f, 3).decode("utf-8")
+                ascii_datetime = self._safe_reader(f, 22).decode("utf-8")
+                filetype = self._safe_reader(f, 1).decode("utf-8")
 
-            ndops = struct.unpack("<B", f.read(1))[0]
-            minheight = struct.unpack("<H", f.read(2))[0]
+                nfreqs = struct.unpack("<H", self._safe_reader(f, 2))[0]
 
-            maxheight = struct.unpack("<H", f.read(2))[0]
-            pps = struct.unpack("<B", f.read(1))[0]
+                ndops = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                minheight = struct.unpack("<H", self._safe_reader(f, 2))[0]
 
-            npulses_avgd = struct.unpack("<B", f.read(1))[0]
-            base_thr100 = struct.unpack("<H", f.read(2))[0]
-            noise_thr100 = struct.unpack("<H", f.read(2))[0]
-            min_dop_forsave = struct.unpack("<B", f.read(1))[0]
-            dtime = struct.unpack("<H", f.read(2))[0]
-            gain_control = f.read(1).decode("utf-8")
-            sig_process = f.read(1).decode("utf-8")
-            noofreceivers = struct.unpack("<B", f.read(1))[0]
-            spares = f.read(11).decode("utf-8")
+                maxheight = struct.unpack("<H", self._safe_reader(f, 2))[0]
+                pps = struct.unpack("<B", self._safe_reader(f, 1))[0]
 
-            month = ascii_datetime[1:4]
-            day = int(ascii_datetime[5:7])
-            hour = int(ascii_datetime[8:10])
-            minute = int(ascii_datetime[11:13])
-            sec = int(ascii_datetime[14:16])
-            year = int(ascii_datetime[17:21])
+                npulses_avgd = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                base_thr100 = struct.unpack("<H", self._safe_reader(f, 2))[0]
+                noise_thr100 = struct.unpack("<H", self._safe_reader(f, 2))[0]
+                min_dop_forsave = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                dtime = struct.unpack("<H", self._safe_reader(f, 2))[0]
+                gain_control = self._safe_reader(f, 1).decode("utf-8")
+                sig_process = self._safe_reader(f, 1).decode("utf-8")
+                noofreceivers = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                spares = self._safe_reader(f, 11).decode("utf-8")
 
-            month_number = strptime(month, '%b').tm_mon
-            mydate = datetime.date(year, month_number, day)
-            jd = mydate.toordinal() + 1721424.5
-            jd0jd = datetime.date(1986, 1, 1)
-            jd0 = jd0jd.toordinal() + 1721424.5
+                month = ascii_datetime[1:4]
+                day = int(ascii_datetime[5:7])
+                hour = int(ascii_datetime[8:10])
+                minute = int(ascii_datetime[11:13])
+                sec = int(ascii_datetime[14:16])
+                year = int(ascii_datetime[17:21])
 
-            time_header = (jd - jd0) * 86400 + hour * 3600 + minute * 60 + sec
-            time_hour = time_header
+                month_number = strptime(month, '%b').tm_mon
+                mydate = datetime.date(year, month_number, day)
+                jd = mydate.toordinal() + 1721424.5
+                jd0jd = datetime.date(1986, 1, 1)
+                jd0 = jd0jd.toordinal() + 1721424.5
 
-            # 2) read all frequencies used
+                time_header = (jd - jd0) * 86400 + hour * 3600 + minute * 60 + sec
+                time_hour = time_header
 
-            freqs = np.array([struct.unpack("<f", f.read(4))[0] for i in range(nfreqs)], dtype=np.float32)
+                # 2) read all frequencies used
 
-            if filetype == 'I':
-                max_nfrebins = nfreqs
-            else:
-                max_nfrebins = min(max_ntimes * nfreqs, max_ndopbins)
+                freqs = np.array([struct.unpack("<f", self._safe_reader(f, 4))[0] for i in range(nfreqs)], dtype=np.float32)
 
-            nheights = int(maxheight / dheight + 1)
+                if filetype == 'I':
+                    max_nfrebins = nfreqs
+                else:
+                    max_nfrebins = min(max_ntimes * nfreqs, max_ndopbins)
 
-            times = []
-            frebins = []
-            frebins_x = []
-            frebins_gain_flag = []
-            frebins_noise_flag = []
-            frebins_noise_power10 = []
-            time_min = 0
-            time_sec = 0
-            timex = -1
-            freqx = nfreqs - 1
-            dopbinx = -1
-            frebinx = -1
-            iq_bytes = np.zeros((noofreceivers, 2))
-            dopbin_x_timex = []
-            dopbin_x_freqx = []
-            dopbin_x_hflag = []
-            dopbin_x_dop_flag = []
-            dopbin_iq = []
-            hflag = 0
-            file_list = []
-            time_partitions = dict()
+                nheights = int(maxheight / dheight + 1)
 
-            time_min = struct.unpack("<B", f.read(1))[0]
-            # Read complex sensor data from all receivers of all observations till eof.
-            while f.tell() < eof and time_min != 255:
-                #Iterate through each time of observation
-                time_sec = struct.unpack("<B", f.read(1))[0]
-                flag = struct.unpack("<B", f.read(1))[0]  # gainflag
-                timex += 1
-                time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec, tzinfo=timezone.utc)
-                for freqx in range(nfreqs):
-                    #Iterate through each frequency at a given time of observation
-                    noise_flag = struct.unpack("<B", f.read(1))[0]  # noiseflag
-                    noise_power10 = struct.unpack("<H", f.read(2))[0]
-                    frebinx += 1
-                    frebins_gain_flag.append(flag)
-                    frebins_noise_flag.append(noise_flag)
-                    frebins_noise_power10.append(noise_power10)
-                    flag = struct.unpack("<B", f.read(1))[0]
-                    while flag < 224:
-                        #Iterate through all sensor values at a given time and at a given frequency
-                        ndops_oneh = struct.unpack("<B", f.read(1))[0]
-                        hflag = flag
-                        if ndops_oneh >= 128:
-                            ndops_oneh = ndops_oneh - 128
-                            hflag = hflag + 200
-                        for dopx in range(ndops_oneh):
-                            dop_flag = struct.unpack("<B", f.read(1))[0]
-                            for rec in range(noofreceivers):
-                                re_part = self._safe_reader(f, 1)
-                                im_part = self._safe_reader(f, 1)
-                                if re_part == None or im_part == None:
-                                    bad_byte_flag = True
-                                    break
-                                iq_bytes[rec, 0] = struct.unpack("<B", re_part)[0]
-                                iq_bytes[rec, 1] = struct.unpack("<B", im_part)[0]
-                            dopbinx += 1
-                            dopbin_iq.append(copy.deepcopy(iq_bytes))
-                            dopbin_x_timex.append(timex)
-                            dopbin_x_freqx.append(freqx)
-                            dopbin_x_hflag.append(hflag)
-                            if dop_flag < int(ndops / 2):
-                                dop_flag = dop_flag + int(ndops / 2)
-                            else:
-                                dop_flag = dop_flag - int(ndops / 2)
-                            dopbin_x_dop_flag.append(dop_flag)
-                        flag = struct.unpack("<B", f.read(1))[0]  # next hflag/gainflag/FF
-                time_partitions[f"{time_partition.hour:02d}:{time_partition.minute:02d}:{time_partition.second:02d}"] = len(dopbin_iq)
-                file_list.append(filename.name)
-                time_min = flag
-                if ((f.tell() - 1) != eof):
-                    time_min = struct.unpack("<B", f.read(1))[0]  # next record
+                times = []
+                frebins = []
+                frebins_x = []
+                frebins_gain_flag = []
+                frebins_noise_flag = []
+                frebins_noise_power10 = []
+                time_min = 0
+                time_sec = 0
+                timex = -1
+                freqx = nfreqs - 1
+                dopbinx = -1
+                frebinx = -1
+                iq_bytes = np.zeros((noofreceivers, 2))
+                dopbin_x_timex = []
+                dopbin_x_freqx = []
+                dopbin_x_hflag = []
+                dopbin_x_dop_flag = []
+                dopbin_iq = []
+                hflag = 0
+                file_list = []
+                time_partitions = dict()
+
+                time_min = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                # Read complex sensor data from all receivers of all observations till eof.
+                while f.tell() < eof and time_min != 255:
+                    #Iterate through each time of observation
+                    time_sec = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                    flag = struct.unpack("<B", self._safe_reader(f, 1))[0]  # gainflag
+                    timex += 1
+                    time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec, tzinfo=timezone.utc)
+                    for freqx in range(nfreqs):
+                        #Iterate through each frequency at a given time of observation
+                        noise_flag = struct.unpack("<B", self._safe_reader(f, 1))[0]  # noiseflag
+                        noise_power10 = struct.unpack("<H", self._safe_reader(f, 2))[0]
+                        frebinx += 1
+                        frebins_gain_flag.append(flag)
+                        frebins_noise_flag.append(noise_flag)
+                        frebins_noise_power10.append(noise_power10)
+                        flag = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                        while flag < 224:
+                            #Iterate through all sensor values at a given time and at a given frequency
+                            ndops_oneh = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                            hflag = flag
+                            if ndops_oneh >= 128:
+                                ndops_oneh = ndops_oneh - 128
+                                hflag = hflag + 200
+                            for dopx in range(ndops_oneh):
+                                dop_flag = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                                for rec in range(noofreceivers):
+                                    re_part = self._safe_reader(f, 1)
+                                    im_part = self._safe_reader(f, 1)
+                                    if re_part == None or im_part == None:
+                                        bad_byte_flag = True
+                                        break
+                                    iq_bytes[rec, 0] = struct.unpack("<B", re_part)[0]
+                                    iq_bytes[rec, 1] = struct.unpack("<B", im_part)[0]
+                                dopbinx += 1
+                                dopbin_iq.append(copy.deepcopy(iq_bytes))
+                                dopbin_x_timex.append(timex)
+                                dopbin_x_freqx.append(freqx)
+                                dopbin_x_hflag.append(hflag)
+                                if dop_flag < int(ndops / 2):
+                                    dop_flag = dop_flag + int(ndops / 2)
+                                else:
+                                    dop_flag = dop_flag - int(ndops / 2)
+                                dopbin_x_dop_flag.append(dop_flag)
+                            flag = struct.unpack("<B", self._safe_reader(f, 1))[0]  # next hflag/gainflag/FF
+                    time_partitions[f"{time_partition.hour:02d}:{time_partition.minute:02d}:{time_partition.second:02d}"] = len(dopbin_iq)
+                    file_list.append(filename.name)
+                    time_min = flag
+                    if ((f.tell() - 1) != eof):
+                        time_min = struct.unpack("<B", self._safe_reader(f, 1))[0]  # next record
+        except EOFError:
+            return file_list, metadata, np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
 
         #Raw signal values from the four receivers
         #Use 20 log(value) to get power in dB
@@ -267,44 +289,12 @@ class MDreader(DataReader):
                 results = parallel(joblib.delayed(self.read_raw_data)(files) for files in files_list)
             for idy, result in enumerate(results):
                 files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = result
-                time_partitions = metadata['timepartitions']
-                new_timepartition = dict()
-                for time_partition, idz in time_partitions.items():
-                    #time_partition = datetime.datetime.strptime(time_partition, "%H:%M:%S")
-                    #new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}
-                    new_timepartition[time_partition] = idz + lpointer
-
-                if(idy == 0):
-                    obs_datetime: datetime.datetime = metadata['datetime']
-                    obs_dateonly = datetime.datetime(year=obs_datetime.year, month=obs_datetime.month, 
-                                                    day=obs_datetime.day, tzinfo=obs_datetime.tzinfo,
-                                                    hour=0,minute=0,second=0)
-                    all_metadata = metadata
-                    all_metadata['datetime'] = obs_dateonly
-                    all_metadata['source'] = input_dir.name
-                    all_metadata['extension'] = extension
-                    all_metadata['timepartitions'] = dict()
-                    all_freq_list = np.append(all_freq_list, freq_list)
-                    
-
-                all_metadata['timepartitions'] |= new_timepartition
-                all_files_list.extend(files_list)
-                all_heights = np.append(all_heights, heights, axis=0)
-                all_freqs = np.append(all_freqs, freqs, axis=0)
-                all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
-                all_sensors = np.append(all_sensors, sensors, axis=0)
-                lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
-
-        else:
-            for idy, input_file in enumerate(files_list):
-                if input_file.exists():
-                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = self.read_raw_data(input_file)
-                    #Todo: Read metadata first, and then have fixed size arrays
+                if len(heights) > 0:
                     time_partitions = metadata['timepartitions']
                     new_timepartition = dict()
                     for time_partition, idz in time_partitions.items():
-                    #time_partition = datetime.datetime.strptime(time_partition, "%H:%M:%S")
-                    #new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}"
+                        #time_partition = datetime.datetime.strptime(time_partition, "%H:%M:%S")
+                        #new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}
                         new_timepartition[time_partition] = idz + lpointer
 
                     if(idy == 0):
@@ -318,13 +308,50 @@ class MDreader(DataReader):
                         all_metadata['extension'] = extension
                         all_metadata['timepartitions'] = dict()
                         all_freq_list = np.append(all_freq_list, freq_list)
+                        
 
                     all_metadata['timepartitions'] |= new_timepartition
                     all_files_list.extend(files_list)
-                    #Avoid appending, run two passes of the iteration
                     all_heights = np.append(all_heights, heights, axis=0)
                     all_freqs = np.append(all_freqs, freqs, axis=0)
                     all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
                     all_sensors = np.append(all_sensors, sensors, axis=0)
                     lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
+                else:
+                    continue
+
+        else:
+            for idy, input_file in enumerate(files_list):
+                if input_file.exists():
+                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = self.read_raw_data(input_file)
+                    if len(heights) > 0:
+                        time_partitions = metadata['timepartitions']
+                        new_timepartition = dict()
+                        for time_partition, idz in time_partitions.items():
+                        #time_partition = datetime.datetime.strptime(time_partition, "%H:%M:%S")
+                        #new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}"
+                            new_timepartition[time_partition] = idz + lpointer
+
+                        if(idy == 0):
+                            obs_datetime: datetime.datetime = metadata['datetime']
+                            obs_dateonly = datetime.datetime(year=obs_datetime.year, month=obs_datetime.month, 
+                                                            day=obs_datetime.day, tzinfo=obs_datetime.tzinfo,
+                                                            hour=0,minute=0,second=0)
+                            all_metadata = metadata
+                            all_metadata['datetime'] = obs_dateonly
+                            all_metadata['source'] = input_dir.name
+                            all_metadata['extension'] = extension
+                            all_metadata['timepartitions'] = dict()
+                            all_freq_list = np.append(all_freq_list, freq_list)
+
+                        all_metadata['timepartitions'] |= new_timepartition
+                        all_files_list.extend(files_list)
+                        #Avoid appending, run two passes of the iteration
+                        all_heights = np.append(all_heights, heights, axis=0)
+                        all_freqs = np.append(all_freqs, freqs, axis=0)
+                        all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
+                        all_sensors = np.append(all_sensors, sensors, axis=0)
+                        lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
+                    else:
+                        continue
         return all_files_list, all_metadata, all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors
