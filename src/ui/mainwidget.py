@@ -129,20 +129,21 @@ class MainWidget(QWidget):
         folder_path = Path(folder_path)
         if folder_path:
             try:
-                self.create_table(folder_path)
+                self.plot_widget_table(folder_path)
                 self.label.setText(f"Selected: {folder_path}")
                 self.run_button.setEnabled(True)
             except FolderNotContainingData:
-                self.textbox_errormsg.setText("You must choose a folder.")
+                self.textbox_errormsg.setText("You must choose a folder containing the data.")
                 self.dlg.exec()
                 self.run_button.setEnabled(False)
                 return
     
-    #Create table when correct folder is selected
-    def create_table(self, location):
+    #Create table and plot the selected canvas when a valid folder is selected.
+    def plot_widget_table(self, location):
         self.directory = location
         print(f"Currently chosen directory: {self.directory}")
         raw_reader = MDreader()
+        #TODO: Dropdown list for md1-md4 formats?
         if self.md3_checkbox.isChecked():
             extension = 'md3'
         if self.md4_checkbox.isChecked():
@@ -182,14 +183,15 @@ class MainWidget(QWidget):
         if self.md4_checkbox.isChecked():
             self.dropbox.clear()
             self.dropbox.addItems(MainWidget.md4_options)
+
     #Callback to handle changes in dropdown value
     def _on_dropdown_changed(self, text):
         self._selected_timestamp = text
         self._get_lpointer_rpointer(self.timepartitions, timestamp=self._selected_timestamp)
         self.table_widget.set_pointers(self.lpointer, self.rpointer)
-        
         self._plot_helper()
-    
+
+    #Get lpointer and rpointer for plotting
     def _get_lpointer_rpointer(self, timepartitions, timestamp):
         index = list(timepartitions.keys()).index(timestamp)
         self.file_timestamp_index = index
@@ -203,7 +205,8 @@ class MainWidget(QWidget):
         self.timestamp = timestamp
         self.lpointer = lpointer
         self.rpointer = rpointer
-
+    
+    #Main plotting function. Delegates the choice of canvas to PlotStateFactory based on the mdx file option and the type of plot
     def _plot_helper(self):
         new_state = PlotStateFactory.get_state(self)
 
@@ -240,6 +243,7 @@ class MainWidget(QWidget):
         self.current_plot_state = new_state
     
     #Run POLAN function that takes interpolated input data.
+    #Could be moved into the real height canvas?
     def _run_polan(self):
         if isinstance(self.canvas_widget, RealHeightAnalysisCanvas):
             freqs, heights = self.canvas_widget.compute_matched_curve()
@@ -247,7 +251,6 @@ class MainWidget(QWidget):
             real_heights = []
             if len(freqs) > 0:
                 short_datetime: datetime = self.metadata['datetime']
-
                 with open("a.a", 'w') as polan_input:
                     polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
                     polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}ti           1.38  0.5  0.0 0.00    0\n")
@@ -256,10 +259,10 @@ class MainWidget(QWidget):
                         if idx == len(freqs) - 1:
                             height = 0.0
                         polan_input.write(f"{freq}, {float(round(height)):.2f}\n")
-#                    polan_input.write(f"{freqs[-1]+0.1}, {0.0}\n")
                     polan_input.write(f"0.0, 0.0")
                 subprocess.run('./polan.exe')
                 stop_reading = False
+
                 with open("POLOUT.T", 'r') as polan_output:
                     lines = polan_output.readlines()
                     for i, line in enumerate(lines):
@@ -291,7 +294,6 @@ class MainWidget(QWidget):
                 output_file_nominute_name = Path(self.files_list[self.file_timestamp_index]).stem[:4]
                 new_timestamp = self.timestamp.replace(':', '')[:-2]
                 new_output_file_name = output_file_nominute_name + new_timestamp
-
                 output_file_name = f"{self.polan_dir / new_output_file_name}.pol"
                 shutil.copyfile(input_file_name, output_file_name)
                 self.canvas_widget.plot_polan(real_freqs, real_heights)

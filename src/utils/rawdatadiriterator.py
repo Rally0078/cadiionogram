@@ -1,6 +1,22 @@
 import numpy as np
 
 class RawDataDirIterator:
+    """
+        Iterator for raw data from a full directory.
+        Can be iterated through the following way:
+        ```
+        it = RawDataDirIterator(metadata, freqs, heights, dops, sensors)
+        for data in it:
+            freq, height, dop, sensor = data
+            ...
+        ```
+        Can also be indexed using a timestamp str or integer index:
+        ```
+        data_at_time = it['12:30:00']
+        data_at_index = it[10]
+        ```
+        
+    """
     def __init__(self, metadata, freqs, heights, dops, sensors):
         self.freqs = freqs
         self.heights = heights

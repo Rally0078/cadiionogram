@@ -13,17 +13,14 @@ import joblib
 from src.errorhandlers.errorhandling import FolderNotContainingData
 import numpy as np
 
-
-type time_partition_dict = dict[int, int]
-
-
+type time_partition_dict = dict[str, int]
 
 #Base class for data readers
 class DataReader:
     pass
 
 #MDn format reader, extended from DataReader baseclass
-#Use dependency injection to connect with the CSV IO class
+#Use dependency injection to connect with the CSV IO class or Parquet IO class
 class MDreader(DataReader):
     def __init__(self):
         pass

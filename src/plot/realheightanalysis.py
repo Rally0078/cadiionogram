@@ -5,7 +5,7 @@ from matplotlib.ticker import ScalarFormatter, MultipleLocator
 from matplotlib.lines import Line2D
 import numpy as np
 from datetime import datetime
-from scipy.interpolate import interp1d, PchipInterpolator
+from scipy.interpolate import PchipInterpolator
 
 class RealHeightAnalysisCanvas(FigureCanvas):
     def __init__(self, parent=None):
@@ -34,7 +34,6 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.mpl_connect("motion_notify_event", self.on_mouse_move)
         self.mpl_connect("button_release_event", self.on_mouse_release)
         self._set_plot_ax()
-        #self.plot_initial()
         self.is_hidden = False
         self.setHidden(self.is_hidden)
 
@@ -63,16 +62,13 @@ class RealHeightAnalysisCanvas(FigureCanvas):
 
         if self.colorbar:
             self.colorbar.update_ticks()
-            #self.colorbar.set_clim(signals.min(), signals.max())  # Update color limits
         else:
-            # Create the colorbar if it doesn't exist
             self.colorbar = self.figure.colorbar(self.scatter, ax=self.ax)
             self.colorbar.set_label("Power (dB)")
             self.colorbar.set_ticks(np.arange(0, 51, 5))  # Fixed ticks from 0 to 50 with step of 5
             self.scatter.set_clim(0, 50)  # Set color limits on scatter plot
         self.ax.set_title(f"Ionogram site: {site} at time {timestamp} {date.day:02d}-{date.month:02d}-{date.year:04d} UTC")
         self._set_plot_ax()
-        #self.fig.tight_layout()
         self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)
         self.drawing = False
         self.drawn_points = []
@@ -121,7 +117,6 @@ class RealHeightAnalysisCanvas(FigureCanvas):
     def on_mouse_move(self, event):
         if not self.drawing or event.inaxes != self.ax:
             return
-        # Append current point and update line data
         self.drawn_points.append((event.xdata, event.ydata))
         xs, ys = zip(*self.drawn_points)
         self.line.set_data(xs, ys)
@@ -132,6 +127,10 @@ class RealHeightAnalysisCanvas(FigureCanvas):
             self.drawing = False
 
     def compute_matched_curve(self):
+        """
+            Interpolate a curve based on the input drawn on the canvas, and return an output curve at fixed frequency steps. 
+            Required for POLAN.
+        """
         if not self.drawn_points:
             return np.array([]), np.array([])
         points = np.array([(x, y) for x, y in self.drawn_points if x is not None and y is not None])
@@ -143,33 +142,24 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         freqs_hz = points[:, 0]
         heights = points[:, 1]
 
-        # Convert Hz to MHz
         freqs_mhz = freqs_hz / 1e6
-
-        # Round frequencies to 1 decimal place
         freqs_rounded = np.round(freqs_mhz, 1)
 
-        # Find unique frequencies and average corresponding heights to remove duplicates
         unique_freqs, inverse_indices = np.unique(freqs_rounded, return_inverse=True)
         avg_heights = np.zeros_like(unique_freqs)
 
         for i in range(len(unique_freqs)):
             avg_heights[i] = heights[inverse_indices == i].mean()
 
-        # Prepare interpolation points in 0.1 MHz steps
         f_min = np.floor(unique_freqs.min() * 10) / 10
         f_max = np.ceil(unique_freqs.max() * 10) / 10
         num_points = int(np.round((f_max - f_min) / 0.5)) + 1
         freqs_interp = np.round(np.linspace(f_min, f_max, num_points), 1)
 
-        # Interpolate heights at these frequencies
         interpolator = PchipInterpolator(unique_freqs, avg_heights, extrapolate=False)
         heights_interp = interpolator(freqs_interp)
-
-        # Remove any NaN from interpolation (outside original frequency range)
         mask = ~np.isnan(heights_interp)
         freqs_interp = freqs_interp[mask]
         heights_interp = heights_interp[mask]
 
-        # Return frequencies in MHz and heights interpolated (both no duplicates)
         return freqs_interp, heights_interp
