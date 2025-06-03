@@ -28,7 +28,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.line_polan = None #Line2D for POLAN real height curve
         self.freqs = np.array([])   # Empty by default
         self.heights = np.array([]) # Empty by default
-
+        self.interp_line = None
         # Connect matplotlib mouse events
         self.mpl_connect("button_press_event", self.on_mouse_press)
         self.mpl_connect("motion_notify_event", self.on_mouse_move)
@@ -81,9 +81,15 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax.add_line(self.line_polan)
         self.draw()
     
-    def plot_polan(self, freqs, real_heights):
+    def plot_polan(self, freqs, real_heights, interp_freqs, interp_heights):
         freqs = np.array(freqs)
         freqs = freqs * 1e6
+        interp_freqs = np.array(interp_freqs) * 1e6
+        if self.interp_line is None:
+            self.interp_line = Line2D(interp_freqs, interp_heights, color='magenta', linewidth=1.5, linestyle='--')
+            self.ax.add_line(self.interp_line)
+        else:
+            self.interp_line.set_data(interp_freqs, interp_heights)
         if self.line_polan is None:
             self.line_polan = Line2D(freqs, real_heights, color='green', linewidth=2, linestyle='--')
             self.ax.add_line(self.line_polan)
@@ -162,4 +168,4 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         freqs_interp = freqs_interp[mask]
         heights_interp = heights_interp[mask]
 
-        return freqs_interp, heights_interp
+        return freqs_interp, heights_interp, unique_freqs, avg_heights

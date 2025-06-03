@@ -21,8 +21,8 @@ import subprocess
 import shutil
 
 class MainWidget(QWidget):
-    md3_options = ['Frequency vs time', 'Height vs time']
-    md4_options = ['Display ionogram', 'Autoscale ionogram', 'Real height analysis']
+    md3_options = ['Range vs Time (Freq colored)']
+    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)']
     def __init__(self):
         super().__init__()
         self.polan_dir = None
@@ -76,7 +76,7 @@ class MainWidget(QWidget):
         self.run_button.setEnabled(False)
         self.dropbox_layout.addWidget(self.dropbox)
         self.dropbox_layout.addWidget(self.run_button)
-        self.run_button.clicked.connect(self._plot_helper)
+        self.run_button.clicked.connect(self._run_button_callback)
         
         # Grid layout
         layout = QGridLayout()
@@ -123,21 +123,26 @@ class MainWidget(QWidget):
         self.layout_dlg.addWidget(self.textbox_errormsg)
         self.layout_dlg.addWidget(self.buttonBox_dlg)
         self.dlg.setLayout(self.layout_dlg)
+        self.prev_checkbox = None
+        self.last_folder_path = None
         
     def open_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
         folder_path = Path(folder_path)
-        if folder_path:
+        self.last_folder_path = folder_path
+        self._run_button_callback()
+        
+    def _run_button_callback(self):
+        if self.last_folder_path:
             try:
-                self.plot_widget_table(folder_path)
-                self.label.setText(f"Selected: {folder_path}")
+                self.plot_widget_table(self.last_folder_path)
+                self.label.setText(f"Selected: {self.last_folder_path}")
                 self.run_button.setEnabled(True)
             except FolderNotContainingData:
                 self.textbox_errormsg.setText("You must choose a folder containing the data.")
                 self.dlg.exec()
                 self.run_button.setEnabled(False)
                 return
-    
     #Create table and plot the selected canvas when a valid folder is selected.
     def plot_widget_table(self, location):
         self.directory = location
@@ -209,13 +214,16 @@ class MainWidget(QWidget):
     #Main plotting function. Delegates the choice of canvas to PlotStateFactory based on the mdx file option and the type of plot
     def _plot_helper(self):
         new_state = PlotStateFactory.get_state(self)
-
+        curr_checkbox = "md4" if self.md4_checkbox.isChecked() else "md3"
+        if self.prev_checkbox is None:
+            self.prev_checkbox = curr_checkbox
         # Determine whether the canvas needs to be replaced
         need_new_canvas = (
             self.canvas_widget is None or
-            not isinstance(self.current_plot_state, type(new_state))
+            not isinstance(self.current_plot_state, type(new_state)) or 
+            not self.prev_checkbox == curr_checkbox
         )
-
+        print(f"is new canvas needed: {need_new_canvas}, prev_checkbox={self.prev_checkbox}, curr_checkbox={curr_checkbox}, equal? {self.prev_checkbox == curr_checkbox}")
         if need_new_canvas:
             # Remove and delete the existing canvas widget if it exists
             if self.canvas_widget is not None:
@@ -238,7 +246,7 @@ class MainWidget(QWidget):
 
         # Update the canvas using the new state
         new_state.update_canvas(self.canvas_widget)
-        
+        self.prev_checkbox = curr_checkbox
         # Track the current state
         self.current_plot_state = new_state
     
@@ -246,7 +254,7 @@ class MainWidget(QWidget):
     #Could be moved into the real height canvas?
     def _run_polan(self):
         if isinstance(self.canvas_widget, RealHeightAnalysisCanvas):
-            freqs, heights = self.canvas_widget.compute_matched_curve()
+            freqs, heights, ml_freqs, ml_heights = self.canvas_widget.compute_matched_curve()
             real_freqs = []
             real_heights = []
             if len(freqs) > 0:
@@ -262,7 +270,6 @@ class MainWidget(QWidget):
                     polan_input.write(f"0.0, 0.0")
                 subprocess.run('./polan.exe')
                 stop_reading = False
-
                 with open("POLOUT.T", 'r') as polan_output:
                     lines = polan_output.readlines()
                     for i, line in enumerate(lines):
@@ -295,8 +302,12 @@ class MainWidget(QWidget):
                 new_timestamp = self.timestamp.replace(':', '')[:-2]
                 new_output_file_name = output_file_nominute_name + new_timestamp
                 output_file_name = f"{self.polan_dir / new_output_file_name}.pol"
+                ml_output_filename = f"{self.polan_dir / new_output_file_name}.txt"
                 shutil.copyfile(input_file_name, output_file_name)
-                self.canvas_widget.plot_polan(real_freqs, real_heights)
+                with open(ml_output_filename, 'w') as f:
+                    for freq, height in zip(ml_freqs, ml_heights):
+                        f.write(f"{freq}, {float(round(height)):.2f}\n")
+                self.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
             else:
                 print("No drawn curve or ionogram data to match.")
         else:
