@@ -24,13 +24,15 @@ class MDreader(DataReader):
     def __init__(self):
         pass
     
-    def _safe_reader(self, file: BufferedReader, bytes):
+    @staticmethod
+    def _safe_reader(file: BufferedReader, bytes):
         data = file.read(bytes)
         if data is None or len(data) < bytes:
             raise EOFError
         return data
     
-    def read_raw_data(self, filename: Path, 
+    @staticmethod
+    def read_raw_data(filename: Path, 
                       cached: bool = False, cache_dir: Path | None = None) -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Read CADI ionogram data from mdx formats(x=1,2,3,4).
         ### Parameters
@@ -111,27 +113,27 @@ class MDreader(DataReader):
                     eof = f.tell()   # get the end of file location
                     f.seek(0,0)      # go back to file beginning
                     # 1) read header information as described in the documentation p. 26-27
-                    site = self._safe_reader(f, 3).decode("utf-8")
-                    ascii_datetime = self._safe_reader(f, 22).decode("utf-8")
-                    filetype = self._safe_reader(f, 1).decode("utf-8")
+                    site = MDreader._safe_reader(f, 3).decode("utf-8")
+                    ascii_datetime = MDreader._safe_reader(f, 22).decode("utf-8")
+                    filetype = MDreader._safe_reader(f, 1).decode("utf-8")
 
-                    nfreqs = struct.unpack("<H", self._safe_reader(f, 2))[0]
+                    nfreqs = struct.unpack("<H", MDreader._safe_reader(f, 2))[0]
 
-                    ndops = struct.unpack("<B", self._safe_reader(f, 1))[0]
-                    minheight = struct.unpack("<H", self._safe_reader(f, 2))[0]
+                    ndops = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                    minheight = struct.unpack("<H", MDreader._safe_reader(f, 2))[0]
 
-                    maxheight = struct.unpack("<H", self._safe_reader(f, 2))[0]
-                    pps = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                    maxheight = struct.unpack("<H", MDreader._safe_reader(f, 2))[0]
+                    pps = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
 
-                    npulses_avgd = struct.unpack("<B", self._safe_reader(f, 1))[0]
-                    base_thr100 = struct.unpack("<H", self._safe_reader(f, 2))[0]
-                    noise_thr100 = struct.unpack("<H", self._safe_reader(f, 2))[0]
-                    min_dop_forsave = struct.unpack("<B", self._safe_reader(f, 1))[0]
-                    dtime = struct.unpack("<H", self._safe_reader(f, 2))[0]
-                    gain_control = self._safe_reader(f, 1).decode("utf-8")
-                    sig_process = self._safe_reader(f, 1).decode("utf-8")
-                    noofreceivers = struct.unpack("<B", self._safe_reader(f, 1))[0]
-                    spares = self._safe_reader(f, 11).decode("utf-8")
+                    npulses_avgd = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                    base_thr100 = struct.unpack("<H", MDreader._safe_reader(f, 2))[0]
+                    noise_thr100 = struct.unpack("<H", MDreader._safe_reader(f, 2))[0]
+                    min_dop_forsave = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                    dtime = struct.unpack("<H", MDreader._safe_reader(f, 2))[0]
+                    gain_control = MDreader._safe_reader(f, 1).decode("utf-8")
+                    sig_process = MDreader._safe_reader(f, 1).decode("utf-8")
+                    noofreceivers = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                    spares = MDreader._safe_reader(f, 11).decode("utf-8")
 
                     month = ascii_datetime[1:4]
                     day = int(ascii_datetime[5:7])
@@ -151,7 +153,7 @@ class MDreader(DataReader):
 
                     # 2) read all frequencies used
 
-                    freqs = np.array([struct.unpack("<f", self._safe_reader(f, 4))[0] for i in range(nfreqs)], dtype=np.float32)
+                    freqs = np.array([struct.unpack("<f", MDreader._safe_reader(f, 4))[0] for i in range(nfreqs)], dtype=np.float32)
 
                     if filetype == 'I':
                         max_nfrebins = nfreqs
@@ -182,35 +184,35 @@ class MDreader(DataReader):
                     file_list = []
                     time_partitions = dict()
 
-                    time_min = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                    time_min = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                     # Read complex sensor data from all receivers of all observations till eof.
                     while f.tell() < eof and time_min != 255:
                         #Iterate through each time of observation
-                        time_sec = struct.unpack("<B", self._safe_reader(f, 1))[0]
-                        flag = struct.unpack("<B", self._safe_reader(f, 1))[0]  # gainflag
+                        time_sec = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                        flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # gainflag
                         timex += 1
                         time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec, tzinfo=timezone.utc)
                         for freqx in range(nfreqs):
                             #Iterate through each frequency at a given time of observation
-                            noise_flag = struct.unpack("<B", self._safe_reader(f, 1))[0]  # noiseflag
-                            noise_power10 = struct.unpack("<H", self._safe_reader(f, 2))[0]
+                            noise_flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # noiseflag
+                            noise_power10 = struct.unpack("<H", MDreader._safe_reader(f, 2))[0]
                             frebinx += 1
                             frebins_gain_flag.append(flag)
                             frebins_noise_flag.append(noise_flag)
                             frebins_noise_power10.append(noise_power10)
-                            flag = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                            flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                             while flag < 224:
                                 #Iterate through all sensor values at a given time and at a given frequency
-                                ndops_oneh = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                                ndops_oneh = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                                 hflag = flag
                                 if ndops_oneh >= 128:
                                     ndops_oneh = ndops_oneh - 128
                                     hflag = hflag + 200
                                 for dopx in range(ndops_oneh):
-                                    dop_flag = struct.unpack("<B", self._safe_reader(f, 1))[0]
+                                    dop_flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                                     for rec in range(noofreceivers):
-                                        re_part = self._safe_reader(f, 1)
-                                        im_part = self._safe_reader(f, 1)
+                                        re_part = MDreader._safe_reader(f, 1)
+                                        im_part = MDreader._safe_reader(f, 1)
                                         if re_part == None or im_part == None:
                                             bad_byte_flag = True
                                             break
@@ -226,12 +228,12 @@ class MDreader(DataReader):
                                     else:
                                         dop_flag = dop_flag - int(ndops / 2)
                                     dopbin_x_dop_flag.append(dop_flag)
-                                flag = struct.unpack("<B", self._safe_reader(f, 1))[0]  # next hflag/gainflag/FF
+                                flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # next hflag/gainflag/FF
                         time_partitions[f"{time_partition.hour:02d}:{time_partition.minute:02d}:{time_partition.second:02d}"] = len(dopbin_iq)
                         file_list.append(filename.name)
                         time_min = flag
                         if ((f.tell() - 1) != eof):
-                            time_min = struct.unpack("<B", self._safe_reader(f, 1))[0]  # next record
+                            time_min = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # next record
             except EOFError:
                 return file_list, metadata, np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
 
@@ -303,7 +305,8 @@ class MDreader(DataReader):
             ParquetUtils.write_to_parquet(copy.deepcopy(metadata), frequency, height, freqs, dop_shifts, complex_signal, filename, cache_output_parent, extension)
         return file_list, metadata, height, frequency, freqs, dop_shifts, complex_signal
 
-    def read_raw_data_dir(self, input_dir: Path, extension: str, 
+    @staticmethod
+    def read_raw_data_dir(input_dir: Path, extension: str, 
                           multithread=False, backend='threading', 
                           cached=False, cache_dir: Path | None = None) -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -326,7 +329,7 @@ class MDreader(DataReader):
         if multithread:
             cpu_count = multiprocessing.cpu_count()
             with joblib.Parallel(n_jobs=cpu_count, backend=backend) as parallel:
-                results = parallel(joblib.delayed(self.read_raw_data)(files, cached, cache_dir) for files in files_list)
+                results = parallel(joblib.delayed(MDreader.read_raw_data)(files, cached, cache_dir) for files in files_list)
             for idy, result in enumerate(results):
                 files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = result  # type: ignore
                 if len(heights) > 0:
@@ -364,7 +367,7 @@ class MDreader(DataReader):
         else:
             for idy, input_file in enumerate(files_list):
                 if input_file.exists():
-                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = self.read_raw_data(input_file, cached, cache_dir)
+                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = MDreader.read_raw_data(input_file, cached, cache_dir)
                     if len(heights) > 0:
                         time_partitions = metadata['timepartitions']
                         new_timepartition = dict()
