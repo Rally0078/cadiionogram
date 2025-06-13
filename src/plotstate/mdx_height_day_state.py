@@ -14,6 +14,7 @@ class MdxHeightDayCanvasState(PlotState):
     def update_canvas(self, canvas):
         freqs = self.main.freqs
         heights = self.main.heights
+        dops = self.main.dops
         timepartitions_dict = self.main.metadata['timepartitions']
         date_of_obs = self.main.metadata['datetime']
         timepartitions = np.array(list(timepartitions_dict.values()))
@@ -29,6 +30,7 @@ class MdxHeightDayCanvasState(PlotState):
         canvas.plot_scatter(
             time_index,
             heights,
+            dops,
             freqs, 
             self.main.metadata['datetime'],
             self.main.metadata['site']

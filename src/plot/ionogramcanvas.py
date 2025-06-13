@@ -38,7 +38,7 @@ class IonogramCanvas(FigureCanvas):
         self.ax.yaxis.set_minor_locator(MultipleLocator(5))
         self.ax.grid()
 
-    def plot_scatter(self, freqs, heights, signals, timestamp, date: datetime, site):
+    def plot_scatter(self, freqs, heights, dops, signals, timestamp, date: datetime, site):
         self.ax.clear()
         self.fig.tight_layout(pad=3)
         self.setHidden(self.is_hidden)

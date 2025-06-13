@@ -72,3 +72,30 @@ def freq_filter(freqs, heights):
     heights_filtered = np.delete(heights, noise_idx)
     _, new_medians, new_freqs_flayer = calculate_pixbins(freqs_filtered, heights_filtered)
     return noise_idx, new_freqs_flayer, new_medians
+
+def o_x_separation(freq_selection, height_selection, dop_selection, sensors_selection):
+    """
+        Separate O and X mode based on phase14
+    """
+    sensor1_phase = np.angle(sensors_selection[:, 0] + 1j * sensors_selection[:, 1])
+    sensor2_phase = np.angle(sensors_selection[:, 2] + 1j * sensors_selection[:, 3])
+    sensor3_phase = np.angle(sensors_selection[:, 4] + 1j * sensors_selection[:, 5])
+    sensor4_phase = np.angle(sensors_selection[:, 6] + 1j * sensors_selection[:, 7])
+    #Site Info, this cannot be hardcoded in
+    sitecorrectionEW = 0
+    sitecorrectionNS = 0 
+    interferometerconstEW = 3.0e8/(2.0*np.pi*30.1)
+    interferometerconstNS = 3.0e8/(2.0*np.pi*30.1)
+
+    PH2_corr=np.pi+45*np.pi/180
+    PH4_corr=np.pi-20*np.pi/180
+    corr = -45
+
+    sensor1_phase = sensor1_phase + PH2_corr
+    sensor3_phase = sensor3_phase + PH4_corr
+
+    phase14 = sensor1_phase - sensor4_phase
+    phase14[phase14 < np.pi] += 2*np.pi
+    phase14[phase14 > np.pi] -= 2*np.pi
+
+    return freq_selection[phase14 > 0], height_selection[phase14 > 0], dop_selection[phase14 > 0], sensors_selection[phase14 > 0]

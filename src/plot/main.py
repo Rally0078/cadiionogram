@@ -18,15 +18,18 @@ class MainWindow(QMainWindow):
             self.cfg_file.touch()
             self.config['Locations'] = {'DefaultInputDirectory': 'C:\\CADIinput',
                                         'DefaultOutputDirectory': 'C:\\CADIoutput',
-                                        "polanoutputdirectory": "C:\\cdata"}
+                                        "polanoutputdirectory": "C:\\cdata",
+                                        "cachedir": "E:\\vimal\\data\\parquetcache"}
             self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
         else:
             self.config.read(self.cfg_file)
             self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
+            self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
         self.main_widget = MainWidget()
         self.main_widget.polan_dir = self.polan_dir
+        self.main_widget.parquet_cache_dir = self.parquet_cache_dir
         self.setWindowTitle("CADI Ionogram Plotter")
         self.setCentralWidget(self.main_widget)
         self.resize(1366, 768)

@@ -6,7 +6,7 @@ from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import keys_list
 from src.plotstate.factory import PlotStateFactory
-from src.cadiparser.readrawdata import MDreader
+from src.cadiparser.mdxreader import MDreader
 import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
@@ -54,7 +54,7 @@ class MainWidget(QWidget):
 
         self.polan_button = QPushButton("POLAN")
         self.polan_button.setVisible(False)  # Hidden initially
-        self.polan_button.clicked.connect(self._run_polan)
+        self.polan_button.clicked.connect(self._polan_manual_helper)
           # Next to dropdown
         
         # Mode selection dropbox
@@ -154,7 +154,7 @@ class MainWidget(QWidget):
         if self.md4_checkbox.isChecked():
             extension = 'md4'
         #Note: Throws FolderNotContainingData exception if md3/4 is not found in the directory
-        self.files_list, self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension)
+        self.files_list, self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension, cached=True, cache_dir=self.parquet_cache_dir)
         self.timepartitions = self.metadata['timepartitions']
         #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(self.timepartitions.keys())[0]
@@ -245,74 +245,90 @@ class MainWidget(QWidget):
             self.canvas_widget.setHidden(False)
 
         # Update the canvas using the new state
-        new_state.update_canvas(self.canvas_widget)
+        else:
+            new_state.update_canvas(self.canvas_widget)
         self.prev_checkbox = curr_checkbox
         # Track the current state
         self.current_plot_state = new_state
+        self._polan_auto_helper()
+
     
+    def _run_polan(self, freqs, heights, ml_freqs, ml_heights):
+        real_freqs = []
+        real_heights = []
+        if len(freqs) > 0:
+            short_datetime: datetime = self.metadata['datetime']
+            with open("a.a", 'w') as polan_input:
+                polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
+                polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}ti           1.38  0.5  0.0 0.00    0\n")
+                polan_input.write(f"{self.timestamp}                    0.0\n")
+                for idx, (freq, height) in enumerate(zip(freqs, heights)):
+                    if idx == len(freqs) - 1:
+                        height = 0.0
+                    polan_input.write(f"{freq}, {float(round(height)):.2f}\n")
+                polan_input.write(f"0.0, 0.0")
+            subprocess.run('./polan.exe')
+            stop_reading = False
+            with open("POLOUT.T", 'r') as polan_output:
+                lines = polan_output.readlines()
+                for i, line in enumerate(lines):
+                    if "Real Heights" in line:
+                        data_start_index = i + 1
+                        break
+                else:
+                    raise ValueError('"Real Heights" not found in file')
+                for line in lines[data_start_index:]:
+                    if stop_reading:
+                        break
+                    if line.strip() == '' or '*' in line:
+                        break
+                    try:
+                        floats = list(map(float, line.strip().split()))
+                    except ValueError:
+                        # Skip or stop on bad data depending on desired behavior
+                        raise ValueError(f"Non-numeric value found in line: {line}")
+                    line_freqs = floats[::2]
+                    line_heights = floats[1::2]
+                    
+                    for f, h in zip(line_freqs, line_heights):
+                        if h <= 50 or f <= 0.25:
+                            stop_reading = True
+                            break
+                        real_freqs.append(f)
+                        real_heights.append(h)
+            input_file_name = f"POLOUT.T"
+            output_file_nominute_name = Path(self.files_list[self.file_timestamp_index]).stem[:4]
+            new_timestamp = self.timestamp.replace(':', '')[:-2]
+            new_output_file_name = output_file_nominute_name + new_timestamp
+            output_file_name = f"{self.polan_dir / new_output_file_name}.pol"
+            ml_output_filename = f"{self.polan_dir / new_output_file_name}.txt"
+            shutil.copyfile(input_file_name, output_file_name)
+            with open(ml_output_filename, 'w') as f:
+                for freq, height in zip(ml_freqs, ml_heights):
+                    f.write(f"{freq}, {float(round(height)):.2f}\n")
+            self.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
+        else:
+            print("No drawn curve or ionogram data to match.")
     #Run POLAN function that takes interpolated input data.
     #Could be moved into the real height canvas?
-    def _run_polan(self):
+    def _polan_manual_helper(self):
         if isinstance(self.canvas_widget, RealHeightAnalysisCanvas):
-            freqs, heights, ml_freqs, ml_heights = self.canvas_widget.compute_matched_curve()
-            real_freqs = []
-            real_heights = []
-            if len(freqs) > 0:
-                short_datetime: datetime = self.metadata['datetime']
-                with open("a.a", 'w') as polan_input:
-                    polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
-                    polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}ti           1.38  0.5  0.0 0.00    0\n")
-                    polan_input.write(f"{self.timestamp}                    0.0\n")
-                    for idx, (freq, height) in enumerate(zip(freqs, heights)):
-                        if idx == len(freqs) - 1:
-                            height = 0.0
-                        polan_input.write(f"{freq}, {float(round(height)):.2f}\n")
-                    polan_input.write(f"0.0, 0.0")
-                subprocess.run('./polan.exe')
-                stop_reading = False
-                with open("POLOUT.T", 'r') as polan_output:
-                    lines = polan_output.readlines()
-                    for i, line in enumerate(lines):
-                        if "Real Heights" in line:
-                            data_start_index = i + 1
-                            break
-                    else:
-                        raise ValueError('"Real Heights" not found in file')
-                    for line in lines[data_start_index:]:
-                        if stop_reading:
-                            break
-                        if line.strip() == '' or '*' in line:
-                            break
-                        try:
-                            floats = list(map(float, line.strip().split()))
-                        except ValueError:
-                            # Skip or stop on bad data depending on desired behavior
-                            raise ValueError(f"Non-numeric value found in line: {line}")
-                        line_freqs = floats[::2]
-                        line_heights = floats[1::2]
-                        
-                        for f, h in zip(line_freqs, line_heights):
-                            if h <= 50 or f <= 0.25:
-                                stop_reading = True
-                                break
-                            real_freqs.append(f)
-                            real_heights.append(h)
-                input_file_name = f"POLOUT.T"
-                output_file_nominute_name = Path(self.files_list[self.file_timestamp_index]).stem[:4]
-                new_timestamp = self.timestamp.replace(':', '')[:-2]
-                new_output_file_name = output_file_nominute_name + new_timestamp
-                output_file_name = f"{self.polan_dir / new_output_file_name}.pol"
-                ml_output_filename = f"{self.polan_dir / new_output_file_name}.txt"
-                shutil.copyfile(input_file_name, output_file_name)
-                with open(ml_output_filename, 'w') as f:
-                    for freq, height in zip(ml_freqs, ml_heights):
-                        f.write(f"{freq}, {float(round(height)):.2f}\n")
-                self.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
-            else:
-                print("No drawn curve or ionogram data to match.")
+            freqs, heights, ml_freqs, ml_heights = self.canvas_widget.draw_manual_curve()
+            self._run_polan(freqs, heights, ml_freqs, ml_heights)
         else:
             print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
 
+    def _polan_auto_helper(self):
+        if isinstance(self.canvas_widget, RealHeightAnalysisCanvas):
+            freqs = self.freqs[self.lpointer:self.rpointer]
+            heights = self.heights[self.lpointer:self.rpointer]
+            dops = self.dops[self.lpointer:self.rpointer]
+            signals = self.signals[self.lpointer:self.rpointer]
+            freqs_interp, heights_interp, ml_freqs, ml_heights = self.canvas_widget.draw_auto_curve(freqs, heights, dops, signals)
+            
+            self._run_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
+        else:
+            print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
     #Callback to handle clicking left arrow or pressing left arrow key
     #Setting current index in dropdown calls the _on_dropdown_changed() with the new index as timestamp
     def _prev_option(self):

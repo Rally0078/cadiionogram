@@ -36,7 +36,7 @@ class HeightDayCanvas(FigureCanvas):
         self.ax.margins(x=0.015,y=0)
         self.ax.grid()
 
-    def plot_scatter(self, time_index, heights, freqs, date: datetime, site):
+    def plot_scatter(self, time_index, heights, dops, freqs, date: datetime, site):
         self.ax.clear()
         self.fig.tight_layout(pad=3)
         self.setHidden(self.is_hidden)

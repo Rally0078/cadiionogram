@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QFont
 from PySide6.QtCore import QSize, Qt
-from src.cadiparser import readrawdata, csvio
+from src.cadiparser import mdxreader, csvio
 import sys
 import time
 from datetime import datetime
@@ -56,8 +56,8 @@ class CADIreader(QMainWindow):
         self.setWindowTitle("CADI reader")
         self.setMinimumSize(QSize(1024, 576))
         self.move(300, 85)
-        self.layout = QVBoxLayout()
-        self.layout_h = QHBoxLayout()
+        self.layout_window = QVBoxLayout()
+        self.layout_window_h = QHBoxLayout()
         self.read_button = QPushButton('Read from folder')
         self.set_data_folder_button = QPushButton('Set Default Input Folder')
         self.set_output_folder_button = QPushButton('Set Output folder')
@@ -88,47 +88,47 @@ class CADIreader(QMainWindow):
         self.set_output_folder_button.setFont(set_output_folder_button_font)
         self.set_output_folder_button.setFixedSize(QSize(228, 128))
         
-        self.layout.addWidget(self.read_button)
-        self.layout.addWidget(self.set_data_folder_button)
-        self.layout.addWidget(self.set_output_folder_button)
-        self.layout_small_h = QHBoxLayout()
-        self.layout_small_h.addWidget(self.md3_checkbox)
-        self.layout_small_h.addWidget(self.md4_checkbox)
-        self.layout_small_h.addStretch()
-        self.layout_small_h.setSpacing(0)
-        self.layout_small_h.setContentsMargins(0,10,0,10)
-        self.layout.addLayout(self.layout_small_h)
-        self.layout.addWidget(self.input_textbox, alignment=Qt.AlignTop)
-        self.layout.addWidget(self.output_textbox, alignment=Qt.AlignTop)
+        self.layout_window.addWidget(self.read_button)
+        self.layout_window.addWidget(self.set_data_folder_button)
+        self.layout_window.addWidget(self.set_output_folder_button)
+        self.layout_window_small_h = QHBoxLayout()
+        self.layout_window_small_h.addWidget(self.md3_checkbox)
+        self.layout_window_small_h.addWidget(self.md4_checkbox)
+        self.layout_window_small_h.addStretch()
+        self.layout_window_small_h.setSpacing(0)
+        self.layout_window_small_h.setContentsMargins(0,10,0,10)
+        self.layout_window.addLayout(self.layout_window_small_h)
+        self.layout_window.addWidget(self.input_textbox, alignment=Qt.AlignmentFlag.AlignTop)
+        self.layout_window.addWidget(self.output_textbox, alignment=Qt.AlignmentFlag.AlignTop)
         
-        self.layout.setContentsMargins(25, 0, 100, 0)
-        self.layout.setSpacing(0)
-        self.layout_h.addLayout(self.layout)
+        self.layout_window.setContentsMargins(25, 0, 100, 0)
+        self.layout_window.setSpacing(0)
+        self.layout_window_h.addLayout(self.layout_window)
 
-        self.layout_tables = [QVBoxLayout(), QVBoxLayout()]
-        for layout_table in self.layout_tables:
+        self.layout_window_tables = [QVBoxLayout(), QVBoxLayout()]
+        for layout_table in self.layout_window_tables:
             layout_table.setContentsMargins(0, 0, 0, 0)
             layout_table.setSpacing(0)
-            self.layout_h.addLayout(layout_table)
-        self.layout_h.setContentsMargins(0, 10, 0, 0)
-        self.layout_h.setSpacing(0)
-        self.layout_h.addStretch()
+            self.layout_window_h.addLayout(layout_table)
+        self.layout_window_h.setContentsMargins(0, 10, 0, 0)
+        self.layout_window_h.setSpacing(0)
+        self.layout_window_h.addStretch()
 
-        #self.layout_h.addWidget(QPushButton("Test"), alignment=Qt.AlignCenter)
+        #self.layout_window_h.addWidget(QPushButton("Test"), alignment=Qt.AlignCenter)
         self.container = QWidget()
         
         self.dlg = QDialog(self)
         self.dlg.setWindowTitle("Error!")
-        self.layout_dlg = QVBoxLayout()
+        self.layout_window_dlg = QVBoxLayout()
         self.textbox_errormsg = QLabel("")
-        self.button_dlg_close = QDialogButtonBox.Close
+        self.button_dlg_close = QDialogButtonBox.StandardButton.Close
         self.buttonBox_dlg = QDialogButtonBox(self.button_dlg_close)
         self.buttonBox_dlg.clicked.connect(self.dlg.close)
-        self.layout_dlg.addWidget(self.textbox_errormsg)
-        self.layout_dlg.addWidget(self.buttonBox_dlg)
-        self.dlg.setLayout(self.layout_dlg)
+        self.layout_window_dlg.addWidget(self.textbox_errormsg)
+        self.layout_window_dlg.addWidget(self.buttonBox_dlg)
+        self.dlg.setLayout(self.layout_window_dlg)
 
-        self.container.setLayout(self.layout_h)
+        self.container.setLayout(self.layout_window_h)
         self.setCentralWidget(self.container)
 
     def _read_button_click(self):
@@ -145,7 +145,7 @@ class CADIreader(QMainWindow):
             print(f"Currently chosen directory: {self.directory}")
             self.input_textbox.setText(f"Currently chosen directory: {self.directory}")
             csv_writer = csvio.CSVtools()
-            raw_reader = readrawdata.MDreader()
+            raw_reader = mdxreader.MDreader()
             args = []
             if self.md3_checkbox.isChecked():
                 args.append((Path(self.directory), 'md3', Path(self.output_dir), raw_reader, True, 'loky'))
@@ -155,14 +155,14 @@ class CADIreader(QMainWindow):
             results = list(starmap(csv_writer.write_csv_day, args))
             end_time = time.perf_counter()
             keys_list = ['site', 'datetime', 'extension', 'ndops', 'filetype', 'nfreqs', 'minheight', 'maxheight', 'pps', 'dtime']
-            print(len(self.layout_tables))
+            print(len(self.layout_window_tables))
             for idx, result in enumerate(results):
                 metadata, path = result
                 metadata_table = QTableWidget()
                 metadata_table.setRowCount(len(keys_list))
                 metadata_table.setColumnCount(2)
                 metadata_table.setHorizontalHeaderLabels(['Property', 'Value'])
-                metadata_table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+                metadata_table.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
                 #metadata_table.setSizePolicy(QSizePolicy.Expanding, QAbstractScrollArea.AdjustToContents)
                 for idy, key in enumerate(keys_list):
                     header_key = QTableWidgetItem(key)
@@ -176,27 +176,27 @@ class CADIreader(QMainWindow):
                 spacer = QSpacerItem(25, 200)
                 
                 
-                if not self.layout_tables[idx].isEmpty():
-                    old_title = self.layout_tables[idx].itemAt(0).widget()
-                    old_table = self.layout_tables[idx].itemAt(1).widget()
-                    old_spacer = self.layout_tables[idx].itemAt(2)
-                    self.layout_tables[idx].removeWidget(old_table)
-                    self.layout_tables[idx].removeWidget(old_title)
-                    self.layout_tables[idx].removeItem(old_spacer)
+                if not self.layout_window_tables[idx].isEmpty():
+                    old_title = self.layout_window_tables[idx].itemAt(0).widget()
+                    old_table = self.layout_window_tables[idx].itemAt(1).widget()
+                    old_spacer = self.layout_window_tables[idx].itemAt(2)
+                    self.layout_window_tables[idx].removeWidget(old_table)
+                    self.layout_window_tables[idx].removeWidget(old_title)
+                    self.layout_window_tables[idx].removeItem(old_spacer)
                     old_table.deleteLater()
                     old_title.deleteLater()
                     
-                self.layout_tables[idx].addWidget(metadata_title, alignment=Qt.AlignLeft)
-                self.layout_tables[idx].addWidget(metadata_table, alignment=Qt.AlignLeft)
-                self.layout_tables[idx].addSpacerItem(spacer)
+                self.layout_window_tables[idx].addWidget(metadata_title, alignment=Qt.AlignmentFlag.AlignLeft)
+                self.layout_window_tables[idx].addWidget(metadata_table, alignment=Qt.AlignmentFlag.AlignLeft)
+                self.layout_window_tables[idx].addSpacerItem(spacer)
 
-                if idx == 0 and not self.layout_tables[1].isEmpty():
-                    old_title = self.layout_tables[1].itemAt(0).widget()
-                    old_table = self.layout_tables[1].itemAt(1).widget()
-                    old_spacer = self.layout_tables[1].itemAt(2)
-                    self.layout_tables[1].removeWidget(old_table)
-                    self.layout_tables[1].removeWidget(old_title)
-                    self.layout_tables[1].removeItem(old_spacer)
+                if idx == 0 and not self.layout_window_tables[1].isEmpty():
+                    old_title = self.layout_window_tables[1].itemAt(0).widget()
+                    old_table = self.layout_window_tables[1].itemAt(1).widget()
+                    old_spacer = self.layout_window_tables[1].itemAt(2)
+                    self.layout_window_tables[1].removeWidget(old_table)
+                    self.layout_window_tables[1].removeWidget(old_title)
+                    self.layout_window_tables[1].removeItem(old_spacer)
                     old_table.deleteLater()
                     old_title.deleteLater()
                 
