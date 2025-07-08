@@ -2,6 +2,7 @@
 #Handles plotting of raw ionograms with MD4
 from src.plot.ionogramcanvas import IonogramCanvas
 from src.plotstate.base import PlotState
+from src.utils.powerpreprocessing import convert_amplitude_to_power
 import numpy as np
 
 class Md4DisplayIonogramState(PlotState):
@@ -13,17 +14,21 @@ class Md4DisplayIonogramState(PlotState):
     def update_canvas(self, canvas):
         freqs = self.main.freqs[self.main.lpointer:self.main.rpointer]
         heights = self.main.heights[self.main.lpointer:self.main.rpointer]
+        dops = self.main.dops[self.main.lpointer:self.main.rpointer]
         signals = self.main.signals[self.main.lpointer:self.main.rpointer]
-
-        real_signals = np.median(np.abs(signals), axis=1)
-        power = np.zeros_like(real_signals)
-        mask = real_signals <= 0.0
-        power[mask] = 0.0
-        power[~mask] = 20 * np.log10(real_signals[~mask])
+        if self.main.extension == 'iono':
+            power_prethres = signals[:, 0]
+            power = power_prethres[power_prethres >=0 ]
+            freqs = freqs[power_prethres >= 0] * 1e6
+            heights = heights[power_prethres >= 0]
+            dops = dops[power_prethres >=0 ]
+        if self.main.extension in ['md3', 'md4']:
+            power = convert_amplitude_to_power(signals)
 
         canvas.plot_scatter(
             freqs,
             heights,
+            dops,
             power,
             self.main._selected_timestamp,
             self.main.metadata['datetime'],

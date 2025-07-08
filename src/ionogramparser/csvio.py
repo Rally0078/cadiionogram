@@ -1,4 +1,5 @@
-from src.cadiparser.readrawdata import DataReader
+#Rework the whole class
+from src.cadiparser.mdxreader import DataReader
 import pandas as pd
 import numpy as np
 from pathlib import Path, PosixPath, WindowsPath
@@ -83,17 +84,19 @@ class CSVtools:
         with open(metadata_path, 'w') as f:
             json.dump(all_metadata, f, indent=4, default=str)
         timestamp: datetime.datetime = all_metadata['datetime']
-
-        timepartitions = np.array(list(all_metadata['timepartitions'].values()))
+        timepartitions = np.array(list(timestamp.values()))
         tmp = timepartitions[0]
         timepartitions = np.diff(timepartitions, prepend=timepartitions[0])
         timepartitions[0] = tmp
-        
-        repeating_indices = np.repeat(list(all_metadata['timepartitions'].keys()), timepartitions)
+        base_date_str = f"{obs_datetime.year:04d}-{obs_datetime.month:02d}-{obs_datetime.day:02d}"
+        print(base_date_str[0])
+        repeating_indices = np.repeat(list(timestamp['timepartitions'].keys()), timepartitions)
+        print(repeating_indices[0])
+        datetime_strs = np.char.add(base_date_str + ' ', repeating_indices)
+        datetime_strs = np.char.add(datetime_strs, "+00:00")
+        print(datetime_strs[0])
 
-        repeating_indices = np.array([datetime.datetime.strptime(f"{timestamp.year:04d}-{timestamp.month:02d}-{timestamp.day:02d} {time_str}+00:00", 
-                                                        '%Y-%m-%d %H:%M:%S%z') for time_str in repeating_indices])
-        time_index = pd.to_datetime(repeating_indices, utc=True).time
+        time_index = pd.to_datetime(datetime_strs, format='%Y-%m-%d %H:%M:%S%z', utc=True).time
 
         df_sensors = pd.DataFrame({
         'height (km)' : all_heights,
@@ -143,7 +146,7 @@ class CSVtools:
                 lpointer = rpointer
             return json_input, heights, frequencies, dop_shifts, signals
 
-    def read_from_csv_day(self, filename: Path) -> tuple[dict, np.ndarray, np.ndarray, np.ndarray]:
+    def read_from_csv_day(self, filename: Path) -> tuple[dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
             Read whole day's data from CSV by providing a metadata_day file
             
