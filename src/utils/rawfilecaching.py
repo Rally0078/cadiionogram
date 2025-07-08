@@ -4,6 +4,7 @@
 #Handle caching for single hour/observation file and for the whole folder separately.
 
 def enable_cache(func):
+    raise NotImplementedError
     """Decorator to use caching features.
 
         Example usage:

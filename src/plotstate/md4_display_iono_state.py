@@ -16,8 +16,14 @@ class Md4DisplayIonogramState(PlotState):
         heights = self.main.heights[self.main.lpointer:self.main.rpointer]
         dops = self.main.dops[self.main.lpointer:self.main.rpointer]
         signals = self.main.signals[self.main.lpointer:self.main.rpointer]
-
-        power = convert_amplitude_to_power(signals)
+        if self.main.extension == 'iono':
+            power_prethres = signals[:, 0]
+            power = power_prethres[power_prethres >=0 ]
+            freqs = freqs[power_prethres >= 0] * 1e6
+            heights = heights[power_prethres >= 0]
+            dops = dops[power_prethres >=0 ]
+        if self.main.extension in ['md3', 'md4']:
+            power = convert_amplitude_to_power(signals)
 
         canvas.plot_scatter(
             freqs,

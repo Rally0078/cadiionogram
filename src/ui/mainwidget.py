@@ -1,15 +1,14 @@
 from pathlib import Path
 from datetime import datetime
 from src.errorhandlers.errorhandling import FolderNotContainingData
-from src.plot.ionogramcanvas import IonogramCanvas
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.ui.metadatatable import MetadataTableWidget
-from src.ui.metadatakeys import keys_list
+from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
+from src.utils.siteinfo import site_dict
 from src.plotstate.factory import PlotStateFactory
-from src.cadiparser.mdxreader import MDreader
-import numpy as np
+from src.ionogramparser.mdxreader import MDreader
+from src.ionogramparser.sameerreader import SameerReader
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout,
     QPushButton, QFileDialog, QLabel, 
@@ -44,14 +43,16 @@ class MainWidget(QWidget):
         self.button.clicked.connect(self.open_folder)
         self.md3_checkbox = QCheckBox("md3 format")
         self.md4_checkbox = QCheckBox("md4 format")
+        self.iono_checkbox = QCheckBox("iono format")
         self.md4_checkbox.setChecked(True)
         self.button_group = QButtonGroup()
         self.button_group.addButton(self.md3_checkbox)
         self.button_group.addButton(self.md4_checkbox)
+        self.button_group.addButton(self.iono_checkbox)
         self.button_group.setExclusive(True)
         self.md3_checkbox.stateChanged.connect(self._on_tickbox_changed)
         self.md4_checkbox.stateChanged.connect(self._on_tickbox_changed)
-
+        self.iono_checkbox.stateChanged.connect(self._on_tickbox_changed)
         self.polan_button = QPushButton("POLAN")
         self.polan_button.setVisible(False)  # Hidden initially
         self.polan_button.clicked.connect(self._polan_manual_helper)
@@ -83,11 +84,12 @@ class MainWidget(QWidget):
 
         # Folder selection and label
         layout.addWidget(self.button, 1, 0)
-        layout.addWidget(self.label, 1, 1)
+        #layout.addWidget(self.label, 4, 0)
 
         # Checkboxes
         layout.addWidget(self.md3_checkbox, 2, 0)
         layout.addWidget(self.md4_checkbox, 2, 1)
+        layout.addWidget(self.iono_checkbox, 2, 2)
         layout.addWidget(self.dropbox_container, 3, 0, 1, 2)
 
         layout.setColumnStretch(4, 1)
@@ -96,8 +98,8 @@ class MainWidget(QWidget):
         self.table_widget = MetadataTableWidget()
 
         # Set the margins and spacing        
-        layout.addWidget(self.table_widget, 4, 0, 2, 2)
-        layout.addWidget(self.polan_button, 6, 1)
+        layout.addWidget(self.table_widget, 5, 0, 2, 2)
+        layout.addWidget(self.polan_button, 7, 1)
 
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
@@ -136,7 +138,7 @@ class MainWidget(QWidget):
         if self.last_folder_path:
             try:
                 self.plot_widget_table(self.last_folder_path)
-                self.label.setText(f"Selected: {self.last_folder_path}")
+                self.label.setText(f"Selected: {self.last_folder_path.parent.parent.name +  self.last_folder_path.parent.name + self.last_folder_path.name}")
                 self.run_button.setEnabled(True)
             except FolderNotContainingData:
                 self.textbox_errormsg.setText("You must choose a folder containing the data.")
@@ -147,14 +149,24 @@ class MainWidget(QWidget):
     def plot_widget_table(self, location):
         self.directory = location
         print(f"Currently chosen directory: {self.directory}")
-        raw_reader = MDreader()
+        
         #TODO: Dropdown list for md1-md4 formats?
         if self.md3_checkbox.isChecked():
             extension = 'md3'
+            raw_reader = MDreader()
+            keys_list = cadi_keys_list
         if self.md4_checkbox.isChecked():
             extension = 'md4'
+            raw_reader = MDreader()
+            keys_list = cadi_keys_list
+        if self.iono_checkbox.isChecked():
+            extension = 'iono'
+            raw_reader = SameerReader()
+            keys_list = sameer_keys_list
+        self.extension = extension
         #Note: Throws FolderNotContainingData exception if md3/4 is not found in the directory
-        self.files_list, self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension, cached=True, cache_dir=self.parquet_cache_dir)
+        self.files_list, self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, 
+                                                                                                                                          extension, cached=False, cache_dir=self.parquet_cache_dir)
         self.timepartitions = self.metadata['timepartitions']
         #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(self.timepartitions.keys())[0]
@@ -186,6 +198,9 @@ class MainWidget(QWidget):
             self.dropbox.clear()
             self.dropbox.addItems(MainWidget.md3_options)
         if self.md4_checkbox.isChecked():
+            self.dropbox.clear()
+            self.dropbox.addItems(MainWidget.md4_options)
+        if self.iono_checkbox.isChecked():
             self.dropbox.clear()
             self.dropbox.addItems(MainWidget.md4_options)
 
@@ -260,7 +275,7 @@ class MainWidget(QWidget):
             short_datetime: datetime = self.metadata['datetime']
             with open("a.a", 'w') as polan_input:
                 polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
-                polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}ti           1.38  0.5  0.0 0.00    0\n")
+                polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}{site_dict[self.metadata['site']].short_site}           {site_dict[self.metadata['site']].FH:.2f}  {site_dict[self.metadata['site']].dip:.1f}  0.0 0.00    0\n")
                 polan_input.write(f"{self.timestamp}                    0.0\n")
                 for idx, (freq, height) in enumerate(zip(freqs, heights)):
                     if idx == len(freqs) - 1:
@@ -297,8 +312,12 @@ class MainWidget(QWidget):
                         real_freqs.append(f)
                         real_heights.append(h)
             input_file_name = f"POLOUT.T"
-            output_file_nominute_name = Path(self.files_list[self.file_timestamp_index]).stem[:4]
             new_timestamp = self.timestamp.replace(':', '')[:-2]
+            timestamp_hour = int(self.timestamp.replace(':', '')[:2])
+            #Warn: The following line works only for H type (hourly) MDx files 
+            #This might not work as intended with I type(file per observation) MDx files
+            output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
+            
             new_output_file_name = output_file_nominute_name + new_timestamp
             output_file_name = f"{self.polan_dir / new_output_file_name}.pol"
             ml_output_filename = f"{self.polan_dir / new_output_file_name}.txt"
@@ -324,9 +343,11 @@ class MainWidget(QWidget):
             heights = self.heights[self.lpointer:self.rpointer]
             dops = self.dops[self.lpointer:self.rpointer]
             signals = self.signals[self.lpointer:self.rpointer]
-            freqs_interp, heights_interp, ml_freqs, ml_heights = self.canvas_widget.draw_auto_curve(freqs, heights, dops, signals)
-            
-            self._run_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
+            if self.extension == 'md4':
+                freqs_interp, heights_interp, ml_freqs, ml_heights = self.canvas_widget.draw_auto_curve(freqs, heights, dops, signals)
+                self._run_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
+            else:
+                print("Automatic curvefitting for .iono files is not implemented yet")
         else:
             print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
     #Callback to handle clicking left arrow or pressing left arrow key

@@ -1,1 +1,2 @@
-keys_list = ['site', 'datetime', 'extension', 'ndops', 'filetype', 'nfreqs', 'minheight', 'maxheight', 'dheight', 'pps', 'dtime']
+cadi_keys_list = ['site', 'datetime', 'extension', 'ndops', 'filetype', 'nfreqs', 'minheight', 'maxheight', 'dheight', 'pps', 'dtime']
+sameer_keys_list = ['site', 'datetime', 'extension', 'lat', 'long', 'nfreqs', 'start_freq', 'end_freq', 'freq_step', 'ipp','nrgb','nfft','nci','cbl']

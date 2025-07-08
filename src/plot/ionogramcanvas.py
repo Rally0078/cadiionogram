@@ -4,6 +4,7 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import ScalarFormatter, MultipleLocator
 from datetime import datetime
 import numpy as np
+from src.utils.siteinfo import site_dict
 
 class IonogramCanvas(FigureCanvas):
     def __init__(self, parent=None):
@@ -54,7 +55,7 @@ class IonogramCanvas(FigureCanvas):
             self.colorbar.set_label("Power (dB)")
             self.colorbar.set_ticks(np.arange(0, 51, 5))  # Fixed ticks from 0 to 50 with step of 5
             self.scatter.set_clim(0, 50)  # Set color limits on scatter plot
-        self.ax.set_title(f"Ionogram site: {site} at time {timestamp} {date.day:02d}-{date.month:02d}-{date.year:04d} UTC")
+        self.ax.set_title(f"Ionogram site: {site} at time {timestamp} {date.day:02d}-{date.month:02d}-{date.year:04d} {site_dict[site].timezone}")
         self._set_plot_ax()
         #self.fig.tight_layout()
         self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)

@@ -38,8 +38,9 @@ class ParquetUtils:
         for key, type_to_convert in zip(converted_value_keys, converted_value_key_types):
             decoded_metadata[key] = type_to_convert(decoded_metadata[key])
         frequency, height, dop_shifts, complex_signal = PandasUtils.create_arrays_from_pandas(decoded_metadata, new_table_df)
-        filename_str = filename.name if isinstance(filename, Path) else filename
-        file_list.append(filename_str)
+        filename_str = filename.name if isinstance(filename, Path) else filename    #'5D090700_md4.parquet'
+        for _ in range(len(decoded_metadata['timepartitions'])):
+            file_list.append(filename_str[:-8].replace("_", '.'))
         decoded_metadata['datetime'] = datetime.strptime(decoded_metadata['datetime'], '%Y-%m-%d %H:%M:%S%z')
         freqs = decoded_metadata['freqbins']
         del decoded_metadata['freqbins']
