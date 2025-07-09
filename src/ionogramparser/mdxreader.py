@@ -1,3 +1,15 @@
+"""
+    MDx binary format ionogram parser.
+
+    Classes
+    ---------
+    MDreader
+        Static Methods
+        ---------
+        read_raw_data: Reads ionogram data from mdx file.
+
+        read_raw_data_dir: Reads ionogram data from a directory containing one or more mdx files.
+"""
 import multiprocessing
 import joblib
 multiprocessing.freeze_support()
@@ -19,7 +31,6 @@ import numpy as np
 type time_partition_dict = dict[str, int]
 
 #MDn format reader, extended from DataReader baseclass
-#Use dependency injection to connect with the CSV IO class or Parquet IO class
 class MDreader(DataReader):
     def __init__(self):
         pass
@@ -32,44 +43,47 @@ class MDreader(DataReader):
         return data
     
     @staticmethod
-    def read_raw_data(filename: Path, 
-                      cached: bool = False, cache_dir: Path | None = None) -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Read CADI ionogram data from mdx formats(x=1,2,3,4).
-        ### Parameters
-        filename : Path object
-            - Location of the mdx file to parse.
-        ### Returns
-        Returns multiple values as follows:
+    def read_raw_data(filename: Path) -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Read CADI ionogram data from mdx binary formats(x=1,2,3,4).
 
-        file_list : List
-        - List containing the name of the file.
+        Parameters
+        ----------
+        filename : `Path`
+            Location of the mdx file to parse.
 
-        metadata : Dict
-        - Dictionary containing metadata of the observations. Contains header info stored in the mdx file and \
+        Returns
+        ----------
+        Returns multiple values as follows, where the arrays can be partitioned by the timepartitions provided in `metadata`.
+
+        file_list : `List[str]`
+            List containing the name of the file.
+
+        metadata : `Dict`
+            Dictionary containing metadata of the observations. Contains header info stored in the mdx file and \
         time partitions in key-value pairs to partition the observations by time.
 
-        height : numpy.ndarray 
-        - Heights in km from all the observations in the file. Use the time_partitions to \
+        height : `numpy.ndarray `
+            Heights in km from all the observations in the file. Use the time_partitions to \
         partition the heights by observation time.
 
-        frequency : numpy.ndarray 
-        - Frequencies in Hz from all the observations in the file. Use the time_partitions to \
+        frequency : `numpy.ndarray` 
+            Frequencies in Hz from all the observations in the file. Use the time_partitions to \
         partition the heights by observation time.
 
-        freqs : numpy.ndarray
-        - List of all frequencies used by the Ionosonde.
+        freqs : `numpy.ndarray`
+            List of all frequencies used by the Ionosonde.
 
-        dop_shifts : numpy.ndarray
-        - Contains the scaled doppler shift values of all the observations.
+        dop_shifts : `numpy.ndarray`
+            Contains the scaled doppler shift values of all the observations.
 
-        dopbin_iq : numpy.ndarray
-        - numpy.ndarray containing complex signal value from each receiver. Use the time_partitions \
+        dopbin_iq : `numpy.ndarray`
+            Contains the complex signal value from each receiver. Use the time_partitions \
         to partition the signals by observation time.
 
         ### Examples
-        Read from current directory
+        Read one md4 file from current directory
         ```
-            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = read_raw_data('input.md4')
+            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = MDreader.read_raw_data(Path('./input.md4'))
         ```
         """
         max_ntimes = 256
@@ -296,16 +310,60 @@ class MDreader(DataReader):
 
     @staticmethod
     def read_raw_data_dir(input_dir: Path, extension: str, 
-                          multithread=False, backend='threading', 
-                          cached=False, cache_dir: Path | None = None) -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                          multithread=False, backend='threading') -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
-        Reads raw data from a folder containing data for an entire day. Reads both md3 and md4 extensions, switchable with argument.
+        Reads mdx binary format raw data from a folder containing data for an entire day. Reads all mdx formats, switchable with argument.
 
-        Returns metadata, and the arrays containing height, frequency, and signals from the receivers.
-        Return signature:
-        metadata, heights, frequencies, dop_shifts, signals
+        Parameters
+        ----------
+        folder : `Path`
+            Path to the folder containing the mdx files to parse.
 
-        TODO: Description
+        extension : `str`
+            Extension of the mdx format file to be parsed. Possible values are `'md1'`, `md2`, ``, `` Can parse only one extension at a time from a folder.
+
+        multithread : `bool`
+            Enable multithreaded reading using joblib. `False` by default. **Do not** use this option within the **PySide6 GUI code**, \
+                otherwise each joblib job opens an instance of the GUI when particular backends are selected.
+        
+        backend : `str`
+            Backend for joblib. `'threading'` by default. The `'loky'` and `'multiprocessing'` backends cannot be used within the PySide 6 GUI \
+                due to the reason mentioned above.
+
+        Returns
+        ----------
+        Returns multiple values as follows, where the arrays can be partitioned by the timepartitions provided in `metadata`.
+
+        file_list : `List[str]`
+            List containing the name of the file.
+
+        metadata : `Dict`
+            Dictionary containing metadata of the observations. Contains header info stored in the mdx file and \
+        time partitions in key-value pairs to partition the observations by time.
+
+        height : `numpy.ndarray `
+            Heights in km from all the observations in the file. Use the time_partitions to \
+        partition the heights by observation time.
+
+        frequency : `numpy.ndarray` 
+            Frequencies in Hz from all the observations in the file. Use the time_partitions to \
+        partition the heights by observation time.
+
+        freqs : `numpy.ndarray`
+            List of all frequencies used by the Ionosonde.
+
+        dop_shifts : `numpy.ndarray`
+            Contains the scaled doppler shift values of all the observations.
+
+        dopbin_iq : `numpy.ndarray`
+            Contains the complex signal value from each receiver. Use the time_partitions \
+        to partition the signals by observation time.
+
+        ### Examples
+        Read all md4 files from a directory.
+        ```
+            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = MDreader.read_raw_data_dir(Path('./datafolder'), extension='md4')
+        ```
         """
         all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float32), np.array([], dtype=np.float32), \
                                                                             np.array([], dtype=np.float16), np.empty(shape=(0,8), dtype=np.int8)
@@ -318,7 +376,7 @@ class MDreader(DataReader):
         if multithread:
             cpu_count = multiprocessing.cpu_count()
             with joblib.Parallel(n_jobs=cpu_count, backend=backend) as parallel:
-                results = parallel(joblib.delayed(MDreader.read_raw_data)(files, cached, cache_dir) for files in files_list)
+                results = parallel(joblib.delayed(MDreader.read_raw_data)(files) for files in files_list)
             for idy, result in enumerate(results):
                 files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = result  # type: ignore
                 if len(heights) > 0:
@@ -356,7 +414,7 @@ class MDreader(DataReader):
         else:
             for idy, input_file in enumerate(files_list):
                 if input_file.exists():
-                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = MDreader.read_raw_data(input_file, cached, cache_dir)
+                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = MDreader.read_raw_data(input_file)
                     if len(heights) > 0:
                         time_partitions = metadata['timepartitions']
                         new_timepartition = dict()
