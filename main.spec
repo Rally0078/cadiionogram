@@ -10,7 +10,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PyQt5', 'tkinter', 'PyQt6', 'pillow', 'IPython', 'numba'],
+    excludes=['PyQt5', 'tkinter', 'PyQt6', 'torch', 'pillow', 'IPython', 'numba', 'jupyter_client', 'jupyter_code', 'jupyterlab_widgets'],
     noarchive=False,
     optimize=0,
 )
