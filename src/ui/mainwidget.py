@@ -165,8 +165,7 @@ class MainWidget(QWidget):
             keys_list = sameer_keys_list
         self.extension = extension
         #Note: Throws FolderNotContainingData exception if md3/4 is not found in the directory
-        self.files_list, self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, 
-                                                                                                                                          extension, cached=False, cache_dir=self.parquet_cache_dir)
+        self.files_list, self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension)
         self.timepartitions = self.metadata['timepartitions']
         #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(self.timepartitions.keys())[0]

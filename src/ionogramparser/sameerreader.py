@@ -73,7 +73,7 @@ class SameerReader(DataReader):
         ### Examples
         Read one iono file from current directory
         ```
-            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = read_raw_data(Path('./input.iono'))
+            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = SameerReader.read_raw_data(Path('./input.iono'))
         ```
         """
         lines = []
@@ -190,7 +190,7 @@ class SameerReader(DataReader):
         ### Examples
         Read one iono file from current directory
         ```
-            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = read_raw_data_dir(Path('./data_dir'))
+            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = SameerReader.read_raw_data_dir(Path('./data_dir'))
         ```
         """
         all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.float32), np.array([], dtype=np.float32), np.array([], dtype=np.float32), \
