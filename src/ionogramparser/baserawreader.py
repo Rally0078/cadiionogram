@@ -15,7 +15,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 import numpy as np
 
-type time_partition_dict = dict[str, int]
 
 class DataReader(ABC):
     @staticmethod

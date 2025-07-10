@@ -25,10 +25,9 @@ from io import BufferedReader
 
 from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.ionogramparser.baserawreader import DataReader
-from src.utils.parquetutils import ParquetUtils
 import numpy as np
 
-type time_partition_dict = dict[str, int]
+
 
 #MDn format reader, extended from DataReader baseclass
 class MDreader(DataReader):
