@@ -1,6 +1,7 @@
+from typing import Annotated, Literal
 import numpy as np
 
-def convert_amplitude_to_power(signal: np.ndarray[np.int8, np.int8]):
+def convert_amplitude_to_power(signal: Annotated[np.typing.NDArray[np.int8], Literal["M", "N"]]):
     sensors_abs = np.empty(shape=(signal.shape[0],signal.shape[1]//2))
     sensors_median = np.empty(shape=(sensors_abs.shape[0],))
     for idx in range(0, signal.shape[1]-1, 2):

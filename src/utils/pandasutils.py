@@ -7,6 +7,28 @@ class PandasUtils:
     
     @staticmethod
     def create_pandas_from_arrays(metadata, freqs, heights, dop_shifts, sensors):
+        """
+            Creates a pandas dataframe from the given input.
+
+            Parameters
+            ----------
+            metadata : `dict`
+                Contains the metadata from a file or multiple files.
+            freqs : `numpy.ndarray`
+                Contains all the frequencies indexed by time.
+            heights : `numpy.ndarray`
+                Contains all the heights indexed by time.
+            dop_shifts : `numpy.ndarray`
+                Contains the doppler values indexed by time.
+            sensors : `numpy.ndarray`
+                Contains the sensor values in I and Q pairs for each receiver. Note: **Currently supports only CADI's MDx format**.
+
+            Returns
+            -------
+            df : `pandas.DataFrame`
+                DataFrame containing all the IQ, frequency, and height data indexed by the timestamp from metadata.
+
+        """
         signals_re_im_separate = sensors
         column_names = ['freq (Hz)', 'height (km)', 'dopplershift']
 
@@ -37,6 +59,24 @@ class PandasUtils:
     
     @staticmethod
     def create_arrays_from_pandas(metadata, df_sensors):
+        """
+            Reads frequency, height, dopplers, and IQ data from `pandas.DataFrame`.
+
+            Parameters
+            ----------
+            metadata : `Dict`
+                Metadata containing information about the data. This is required to shape the arrays correctly.
+            df_sensors : `pandas.DataFrame`
+                Contains all the IQ, frequency, height, and doppler data.
+            
+            Returns
+            -------
+            frequency : `numpy.ndarray`
+            height : `numpy.ndarray`
+            dop_shifts : `numpy.ndarray`
+            complex_signal : `numpy.ndarray`
+
+        """
         column_names = ['freq (Hz)', 'height (km)', 'dopplershift']
         noofreceivers = metadata['noofreceivers']
         for i in range(2 * noofreceivers):

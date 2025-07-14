@@ -1,3 +1,16 @@
+"""
+    SAMEER iono ASCII format ionogram parser.
+
+    Classes
+    ---------
+    MDreader
+        Static Methods
+        ---------
+        read_raw_data: Reads ionogram data from iono file.
+
+        read_raw_data_dir: Reads ionogram data from a directory containing one or more iono files.
+"""
+
 import multiprocessing
 import joblib
 multiprocessing.freeze_support()
@@ -17,11 +30,52 @@ import numpy as np
 
 type time_partition_dict = dict[str, int]
 
-#MDn format reader, extended from DataReader baseclass
-#Use dependency injection to connect with the CSV IO class or Parquet IO class
+#Sameer .iono ASCII format reader, extended from DataReader baseclass
 class SameerReader(DataReader):
     @staticmethod
-    def read_raw_data(filename: Path, cached: bool = False, cache_dir: Path | None = None):
+    def read_raw_data(filename: Path):
+        """Read SAMEER ionogram ASCII data from .iono ASCII format.
+
+        Parameters
+        ----------
+        filename : `Path`
+            Location of the .iono file to parse.
+
+        Returns
+        ----------
+        Returns multiple values as follows, where the arrays can be partitioned by the timepartitions provided in `metadata`.
+
+        file_list : `List[str]`
+            List containing the name of the file.
+
+        metadata : `Dict`
+            Dictionary containing metadata of the observations. Contains header info stored in the .iono file and \
+        time partitions in key-value pairs to partition the observations by time.
+
+        height : `numpy.ndarray`
+            Heights in km from all the observations in the file. Use the time_partitions to \
+        partition the heights by observation time.
+
+        frequency : `numpy.ndarray` 
+            Frequencies in Hz from all the observations in the file. Use the time_partitions to \
+        partition the heights by observation time.
+
+        freq_list : `numpy.ndarray`
+            List of all frequencies used by the Ionosonde.
+
+        dop_shifts : `numpy.ndarray`
+            Contains the scaled doppler shift values of all the observations.
+
+        signals : `numpy.ndarray`
+            Contains the complex signal value from each receiver in amplitude-phase form. Use the time_partitions \
+        to partition the signals by observation time.
+
+        ### Examples
+        Read one iono file from current directory
+        ```
+            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = SameerReader.read_raw_data(Path('./input.iono'))
+        ```
+        """
         lines = []
         with open(filename, 'r') as f:
             lines = f.readlines()
@@ -85,8 +139,60 @@ class SameerReader(DataReader):
     
     @staticmethod
     def read_raw_data_dir(input_dir: Path, extension: str = 'iono', 
-                          multithread=False, backend='threading', 
-                          cached=False, cache_dir: Path | None = None) -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                          multithread=False, backend='threading') -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Read SAMEER ionogram ASCII data from a folder containing .iono ASCII format files.
+
+        Parameters
+        ----------
+        filename : `Path`
+            Location of the folder containing the .iono files to parse.
+
+        extension : `str`
+            Extension of the mdx format file to be parsed. Only possible value is `'iono'`, and can parse only one extension at a time from a folder.
+
+        multithread : `bool`
+            Enable multithreaded reading using joblib. `False` by default. **Do not** use this option within the **PySide6 GUI code**, \
+                otherwise each joblib job opens an instance of the GUI when particular backends are selected.
+        
+        backend : `str`
+            Backend for joblib. `'threading'` by default. The `'loky'` and `'multiprocessing'` backends cannot be used within the PySide 6 GUI \
+                due to the reason mentioned above.
+
+        Returns
+        ----------
+        Returns multiple values as follows, where the arrays can be partitioned by the timepartitions provided in `metadata`.
+
+        file_list : `List[str]`
+            List containing the name of the file.
+
+        metadata : `Dict`
+            Dictionary containing metadata of the observations. Contains header info stored in the .iono file and \
+        time partitions in key-value pairs to partition the observations by time.
+
+        height : `numpy.ndarray`
+            Heights in km from all the observations in the file. Use the time_partitions to \
+        partition the heights by observation time.
+
+        frequency : `numpy.ndarray` 
+            Frequencies in Hz from all the observations in the file. Use the time_partitions to \
+        partition the heights by observation time.
+
+        freq_list : `numpy.ndarray`
+            List of all frequencies used by the Ionosonde.
+
+        dop_shifts : `numpy.ndarray`
+            Contains the scaled doppler shift values of all the observations.
+
+        signals : `numpy.ndarray`
+            Contains the complex signal value from each receiver in amplitude-phase form. Use the time_partitions \
+        to partition the signals by observation time.
+
+        ### Examples
+        Read one iono file from current directory
+        ```
+            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = SameerReader.read_raw_data_dir(Path('./data_dir'))
+        ```
+        """
         all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.float32), np.array([], dtype=np.float32), np.array([], dtype=np.float32), \
                                                                             np.array([], dtype=np.float32), np.empty(shape=(0,2), dtype=np.float16)
         all_files_list = []
@@ -97,7 +203,7 @@ class SameerReader(DataReader):
         lpointer = 0
         for idy, input_file in enumerate(files_list):
                 if input_file.exists():
-                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = SameerReader.read_raw_data(input_file, cached, cache_dir)
+                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = SameerReader.read_raw_data(input_file)
                     if len(heights) > 0:
                         time_partitions = metadata['timepartitions']
                         new_timepartition = dict()
