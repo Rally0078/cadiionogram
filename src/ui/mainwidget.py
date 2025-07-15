@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime
 from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
+from src.plot.autoscaling import ScaleIonogramCanvas
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.utils.siteinfo import site_dict
@@ -57,6 +58,10 @@ class MainWidget(QWidget):
         self.polan_button = QPushButton("POLAN")
         self.polan_button.setVisible(False)  # Hidden initially
         self.polan_button.clicked.connect(self._polan_manual_helper)
+        #Save Scaling button
+        self.save_scale_button = QPushButton("Save Scaling")
+        self.save_scale_button.setVisible(False)  # Hidden initially
+        self.save_scale_button.clicked.connect(self._save_manual_scale)        
         
         # Mode selection dropdown
         self.mode_dropdown = QComboBox()
@@ -100,6 +105,7 @@ class MainWidget(QWidget):
         # Add table widget and POLAN button to the layout        
         layout.addWidget(self.table_widget, 5, 0, 2, 2)
         layout.addWidget(self.polan_button, 7, 1)
+        layout.addWidget(self.save_scale_button, 7, 2)
 
         # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
@@ -266,6 +272,26 @@ class MainWidget(QWidget):
         # Track the current state
         self.current_plot_state = new_state
         self._polan_auto_helper()
+        self._autoscale_helper()
+    
+    #TODO
+    def _autoscale_helper(self):
+        pass
+
+    def _save_manual_scale(self):
+        if isinstance(self.canvas_widget, ScaleIonogramCanvas):
+            datetime_obs: datetime = self.metadata['datetime']
+            new_timestamp = self.timestamp.replace(':', '')[:-2]
+            timestamp_hour = int(self.timestamp.replace(':', '')[:2])
+            timestamp_minute = int(self.timestamp.replace(':', '')[2:4])
+            timestamp_second = int(self.timestamp.replace(':', '')[4:6])
+            output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
+            output_filename = f"{datetime_obs.strftime('%y%m%d')}{site_dict[self.metadata['site']].short_site}_F.tfh"
+            output_file_name = f"{self.polan_dir / output_filename}"
+            with open(output_file_name, 'a') as f:
+                f.write(f"{timestamp_hour} {timestamp_minute} {timestamp_second} {self.canvas_widget.fof2/1e6:.2f} {self.canvas_widget.hprimef2:.2f}\n")
+        else:
+            print(f"Not scaling canvas! Use the appropriate canvas")
 
     # Run POLAN by outputting fit curve into a file and executing the POLAN executable, then read from the POLAN's output text file POLOUT.T
     def _run_polan(self, freqs, heights, ml_freqs, ml_heights):

@@ -13,11 +13,17 @@ class PlotStateFactory:
         is_iono = main_widget.iono_checkbox.isChecked()
         option = main_widget.mode_dropdown.currentText()
         main_widget.polan_button.setVisible(False)
+        main_widget.save_scale_button.setVisible(False)
+
+        #Handle buttons common for different canvases
         if option in ['Display ionogram', 'Real height analysis', 'Scale ionogram']:
             PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,True)
         elif option in ['Range vs Time (Freq colored)']:
             PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,False)
-        if is_md4 and (option == 'Scale ionogram'):
+        
+        #Handle buttons and canvases for each state
+        if (is_md4 or is_iono) and (option == 'Scale ionogram'):
+            main_widget.save_scale_button.setVisible(True)
             return Md4ScaleIonogramState(main_widget)
         if (is_md4 or is_iono) and option == 'Display ionogram':
             return Md4DisplayIonogramState(main_widget)
