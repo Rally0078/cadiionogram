@@ -21,7 +21,7 @@ import shutil
 
 class MainWidget(QWidget):
     md3_options = ['Range vs Time (Freq colored)']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)']
+    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)', 'Scale ionogram']
     def __init__(self):
         super().__init__()
         self.polan_dir = None
@@ -45,38 +45,38 @@ class MainWidget(QWidget):
         self.md4_checkbox = QCheckBox("md4 format")
         self.iono_checkbox = QCheckBox("iono format")
         self.md4_checkbox.setChecked(True)
-        self.button_group = QButtonGroup()
-        self.button_group.addButton(self.md3_checkbox)
-        self.button_group.addButton(self.md4_checkbox)
-        self.button_group.addButton(self.iono_checkbox)
-        self.button_group.setExclusive(True)
+        self.filetype_button_group = QButtonGroup()
+        self.filetype_button_group.addButton(self.md3_checkbox)
+        self.filetype_button_group.addButton(self.md4_checkbox)
+        self.filetype_button_group.addButton(self.iono_checkbox)
+        self.filetype_button_group.setExclusive(True)
         self.md3_checkbox.stateChanged.connect(self._on_tickbox_changed)
         self.md4_checkbox.stateChanged.connect(self._on_tickbox_changed)
         self.iono_checkbox.stateChanged.connect(self._on_tickbox_changed)
+        # POLAN button
         self.polan_button = QPushButton("POLAN")
         self.polan_button.setVisible(False)  # Hidden initially
         self.polan_button.clicked.connect(self._polan_manual_helper)
-          # Next to dropdown
         
-        # Mode selection dropbox
-        self.dropbox = QComboBox()
+        # Mode selection dropdown
+        self.mode_dropdown = QComboBox()
         
         # Default mode is md4
-        self.dropbox.addItems(MainWidget.md4_options)
+        self.mode_dropdown.addItems(MainWidget.md4_options)
         
-        # Create container widget + layout for dropbox + Run button
-        self.dropbox_container = QWidget()
-        self.dropbox_layout = QHBoxLayout()
-        self.dropbox_layout.setContentsMargins(0, 0, 0, 0)
-        self.dropbox_layout.setSpacing(5)
-        self.dropbox_container.setContentsMargins(0, 0, 0, 0)
-        self.dropbox_container.setLayout(self.dropbox_layout)
+        # Create container widget + layout for dropdown + Run button
+        self.mode_dropdown_container = QWidget()
+        self.mode_dropdown_layout = QHBoxLayout()
+        self.mode_dropdown_layout.setContentsMargins(0, 0, 0, 0)
+        self.mode_dropdown_layout.setSpacing(5)
+        self.mode_dropdown_container.setContentsMargins(0, 0, 0, 0)
+        self.mode_dropdown_container.setLayout(self.mode_dropdown_layout)
 
-        # Add dropbox and Run button to this layout
+        # Add mode selection dropdown and Run button to this layout
         self.run_button = QPushButton("Run")
         self.run_button.setEnabled(False)
-        self.dropbox_layout.addWidget(self.dropbox)
-        self.dropbox_layout.addWidget(self.run_button)
+        self.mode_dropdown_layout.addWidget(self.mode_dropdown)
+        self.mode_dropdown_layout.addWidget(self.run_button)
         self.run_button.clicked.connect(self._run_button_callback)
         
         # Grid layout
@@ -90,17 +90,18 @@ class MainWidget(QWidget):
         layout.addWidget(self.md3_checkbox, 2, 0)
         layout.addWidget(self.md4_checkbox, 2, 1)
         layout.addWidget(self.iono_checkbox, 2, 2)
-        layout.addWidget(self.dropbox_container, 3, 0, 1, 2)
+        layout.addWidget(self.mode_dropdown_container, 3, 0, 1, 2)
 
         layout.setColumnStretch(4, 1)
 
         # Custom table widget for metadata table and navigation
         self.table_widget = MetadataTableWidget()
 
-        # Set the margins and spacing        
+        # Add table widget and POLAN button to the layout        
         layout.addWidget(self.table_widget, 5, 0, 2, 2)
         layout.addWidget(self.polan_button, 7, 1)
 
+        # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
@@ -114,7 +115,7 @@ class MainWidget(QWidget):
         self._selected_timestamp = ''
         self.directory = None
 
-        #Error message box
+        #Error message dialog box
         self.dlg = QDialog(self)
         self.dlg.setWindowTitle("Error!")
         self.layout_dlg = QVBoxLayout()
@@ -129,7 +130,7 @@ class MainWidget(QWidget):
         self.last_folder_path = None
         
     def open_folder(self):
-        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", dir=str(self.input_dir))
         folder_path = Path(folder_path)
         self.last_folder_path = folder_path
         self._run_button_callback()
@@ -194,14 +195,14 @@ class MainWidget(QWidget):
     #Callback to handle tickboxes
     def _on_tickbox_changed(self):
         if self.md3_checkbox.isChecked():
-            self.dropbox.clear()
-            self.dropbox.addItems(MainWidget.md3_options)
+            self.mode_dropdown.clear()
+            self.mode_dropdown.addItems(MainWidget.md3_options)
         if self.md4_checkbox.isChecked():
-            self.dropbox.clear()
-            self.dropbox.addItems(MainWidget.md4_options)
+            self.mode_dropdown.clear()
+            self.mode_dropdown.addItems(MainWidget.md4_options)
         if self.iono_checkbox.isChecked():
-            self.dropbox.clear()
-            self.dropbox.addItems(MainWidget.md4_options)
+            self.mode_dropdown.clear()
+            self.mode_dropdown.addItems(MainWidget.md4_options)
 
     #Callback to handle changes in dropdown value
     def _on_dropdown_changed(self, text):
@@ -266,7 +267,7 @@ class MainWidget(QWidget):
         self.current_plot_state = new_state
         self._polan_auto_helper()
 
-    
+    # Run POLAN by outputting fit curve into a file and executing the POLAN executable, then read from the POLAN's output text file POLOUT.T
     def _run_polan(self, freqs, heights, ml_freqs, ml_heights):
         real_freqs = []
         real_heights = []
