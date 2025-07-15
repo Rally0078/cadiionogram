@@ -74,7 +74,7 @@ class ScaleIonogramCanvas(FigureCanvas):
         # Only respond to left or right clicks inside axes
         if event.inaxes != self.ax:
             return
-        if event.button == 1:  # Left click -> start drawing
+        if event.button == 1:  # Left click -> scale height
             # Create a new line or clear old one
             if self.line_h is None:
                 self.line_h = self.ax.axhline(event.ydata, color='red', linewidth=2, linestyle='--', label=r"$h'F_2$ = {:.2f} km".format(event.ydata))
@@ -82,7 +82,7 @@ class ScaleIonogramCanvas(FigureCanvas):
                 self.line_h.set_data([self.line_h.get_xdata()], [event.ydata])
             self.hprimef2 = event.ydata
 
-        elif event.button == 3:  # Right click -> clear the curve
+        elif event.button == 3:  # Right click -> scale frequency
             if self.line_f is None:
                 self.line_f = self.ax.axvline(event.xdata, color='blue', linewidth=2, linestyle='--', label=r"$f_oF_2$ = {:.2f} MHz".format(event.xdata/1e6))
             else:
