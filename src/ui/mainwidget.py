@@ -326,7 +326,7 @@ class MainWidget(QWidget):
                     try:
                         floats = list(map(float, line.strip().split()))
                     except ValueError:
-                        # Skip or stop on bad data depending on desired behavior
+                        # Raise exception if non numeric value, cant parse as a number.
                         raise ValueError(f"Non-numeric value found in line: {line}")
                     line_freqs = floats[::2]
                     line_heights = floats[1::2]
