@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
             self.config['Locations'] = {'DefaultInputDirectory': 'C:\\CADIinput',
                                         'DefaultOutputDirectory': 'C:\\CADIoutput',
                                         "polanoutputdirectory": "C:\\cdata",
-                                        "cachedir": "E:\\vimal\\data\\parquetcache"}
+                                        "cachedir": "C:\\cdata\\parquetcache"}
             self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
