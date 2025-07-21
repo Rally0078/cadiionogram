@@ -3,6 +3,7 @@
 from src.plotstate.md4_display_iono_state import Md4DisplayIonogramState
 from src.plotstate.md4_realheight_state import Md4RealheightAnalysisState
 from src.plotstate.mdx_height_day_state import MdxHeightDayCanvasState
+from src.plotstate.md4_autoscaling_state import Md4ScaleIonogramState
 
 class PlotStateFactory:
     @staticmethod
@@ -10,12 +11,20 @@ class PlotStateFactory:
         is_md3 = main_widget.md3_checkbox.isChecked()
         is_md4 = main_widget.md4_checkbox.isChecked()
         is_iono = main_widget.iono_checkbox.isChecked()
-        option = main_widget.dropbox.currentText()
+        option = main_widget.mode_dropdown.currentText()
         main_widget.polan_button.setVisible(False)
-        if option in ['Display ionogram', 'Real height analysis']:
+        main_widget.save_scale_button.setVisible(False)
+
+        #Handle buttons common for different canvases
+        if option in ['Display ionogram', 'Real height analysis', 'Scale ionogram']:
             PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,True)
         elif option in ['Range vs Time (Freq colored)']:
             PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,False)
+        
+        #Handle buttons and canvases for each state
+        if (is_md4 or is_iono) and (option == 'Scale ionogram'):
+            main_widget.save_scale_button.setVisible(True)
+            return Md4ScaleIonogramState(main_widget)
         if (is_md4 or is_iono) and option == 'Display ionogram':
             return Md4DisplayIonogramState(main_widget)
         elif (is_md4 or is_iono) and option == 'Real height analysis':

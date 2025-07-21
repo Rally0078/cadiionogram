@@ -75,7 +75,7 @@ def freq_filter(freqs, heights):
 
 def o_x_separation(freq_selection, height_selection, dop_selection, sensors_selection):
     """
-        Separate O and X mode based on phase14
+        Separate O and X mode based on phase14 of the CADI system.
     """
     sensor1_phase = np.angle(sensors_selection[:, 0] + 1j * sensors_selection[:, 1])
     sensor2_phase = np.angle(sensors_selection[:, 2] + 1j * sensors_selection[:, 3])

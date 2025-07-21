@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime
 from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
+from src.plot.autoscaling import ScaleIonogramCanvas
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.utils.siteinfo import site_dict
@@ -21,7 +22,7 @@ import shutil
 
 class MainWidget(QWidget):
     md3_options = ['Range vs Time (Freq colored)']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)']
+    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)', 'Scale ionogram']
     def __init__(self):
         super().__init__()
         self.polan_dir = None
@@ -45,38 +46,42 @@ class MainWidget(QWidget):
         self.md4_checkbox = QCheckBox("md4 format")
         self.iono_checkbox = QCheckBox("iono format")
         self.md4_checkbox.setChecked(True)
-        self.button_group = QButtonGroup()
-        self.button_group.addButton(self.md3_checkbox)
-        self.button_group.addButton(self.md4_checkbox)
-        self.button_group.addButton(self.iono_checkbox)
-        self.button_group.setExclusive(True)
+        self.filetype_button_group = QButtonGroup()
+        self.filetype_button_group.addButton(self.md3_checkbox)
+        self.filetype_button_group.addButton(self.md4_checkbox)
+        self.filetype_button_group.addButton(self.iono_checkbox)
+        self.filetype_button_group.setExclusive(True)
         self.md3_checkbox.stateChanged.connect(self._on_tickbox_changed)
         self.md4_checkbox.stateChanged.connect(self._on_tickbox_changed)
         self.iono_checkbox.stateChanged.connect(self._on_tickbox_changed)
+        # POLAN button
         self.polan_button = QPushButton("POLAN")
         self.polan_button.setVisible(False)  # Hidden initially
         self.polan_button.clicked.connect(self._polan_manual_helper)
-          # Next to dropdown
+        #Save Scaling button
+        self.save_scale_button = QPushButton("Save Scaling")
+        self.save_scale_button.setVisible(False)  # Hidden initially
+        self.save_scale_button.clicked.connect(self._save_manual_scale)        
         
-        # Mode selection dropbox
-        self.dropbox = QComboBox()
+        # Mode selection dropdown
+        self.mode_dropdown = QComboBox()
         
         # Default mode is md4
-        self.dropbox.addItems(MainWidget.md4_options)
+        self.mode_dropdown.addItems(MainWidget.md4_options)
         
-        # Create container widget + layout for dropbox + Run button
-        self.dropbox_container = QWidget()
-        self.dropbox_layout = QHBoxLayout()
-        self.dropbox_layout.setContentsMargins(0, 0, 0, 0)
-        self.dropbox_layout.setSpacing(5)
-        self.dropbox_container.setContentsMargins(0, 0, 0, 0)
-        self.dropbox_container.setLayout(self.dropbox_layout)
+        # Create container widget + layout for dropdown + Run button
+        self.mode_dropdown_container = QWidget()
+        self.mode_dropdown_layout = QHBoxLayout()
+        self.mode_dropdown_layout.setContentsMargins(0, 0, 0, 0)
+        self.mode_dropdown_layout.setSpacing(5)
+        self.mode_dropdown_container.setContentsMargins(0, 0, 0, 0)
+        self.mode_dropdown_container.setLayout(self.mode_dropdown_layout)
 
-        # Add dropbox and Run button to this layout
+        # Add mode selection dropdown and Run button to this layout
         self.run_button = QPushButton("Run")
         self.run_button.setEnabled(False)
-        self.dropbox_layout.addWidget(self.dropbox)
-        self.dropbox_layout.addWidget(self.run_button)
+        self.mode_dropdown_layout.addWidget(self.mode_dropdown)
+        self.mode_dropdown_layout.addWidget(self.run_button)
         self.run_button.clicked.connect(self._run_button_callback)
         
         # Grid layout
@@ -90,17 +95,19 @@ class MainWidget(QWidget):
         layout.addWidget(self.md3_checkbox, 2, 0)
         layout.addWidget(self.md4_checkbox, 2, 1)
         layout.addWidget(self.iono_checkbox, 2, 2)
-        layout.addWidget(self.dropbox_container, 3, 0, 1, 2)
+        layout.addWidget(self.mode_dropdown_container, 3, 0, 1, 2)
 
         layout.setColumnStretch(4, 1)
 
         # Custom table widget for metadata table and navigation
         self.table_widget = MetadataTableWidget()
 
-        # Set the margins and spacing        
+        # Add table widget and POLAN button to the layout        
         layout.addWidget(self.table_widget, 5, 0, 2, 2)
         layout.addWidget(self.polan_button, 7, 1)
+        layout.addWidget(self.save_scale_button, 7, 2)
 
+        # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
@@ -114,7 +121,7 @@ class MainWidget(QWidget):
         self._selected_timestamp = ''
         self.directory = None
 
-        #Error message box
+        #Error message dialog box
         self.dlg = QDialog(self)
         self.dlg.setWindowTitle("Error!")
         self.layout_dlg = QVBoxLayout()
@@ -129,7 +136,7 @@ class MainWidget(QWidget):
         self.last_folder_path = None
         
     def open_folder(self):
-        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", dir=str(self.input_dir))
         folder_path = Path(folder_path)
         self.last_folder_path = folder_path
         self._run_button_callback()
@@ -194,14 +201,14 @@ class MainWidget(QWidget):
     #Callback to handle tickboxes
     def _on_tickbox_changed(self):
         if self.md3_checkbox.isChecked():
-            self.dropbox.clear()
-            self.dropbox.addItems(MainWidget.md3_options)
+            self.mode_dropdown.clear()
+            self.mode_dropdown.addItems(MainWidget.md3_options)
         if self.md4_checkbox.isChecked():
-            self.dropbox.clear()
-            self.dropbox.addItems(MainWidget.md4_options)
+            self.mode_dropdown.clear()
+            self.mode_dropdown.addItems(MainWidget.md4_options)
         if self.iono_checkbox.isChecked():
-            self.dropbox.clear()
-            self.dropbox.addItems(MainWidget.md4_options)
+            self.mode_dropdown.clear()
+            self.mode_dropdown.addItems(MainWidget.md4_options)
 
     #Callback to handle changes in dropdown value
     def _on_dropdown_changed(self, text):
@@ -265,8 +272,28 @@ class MainWidget(QWidget):
         # Track the current state
         self.current_plot_state = new_state
         self._polan_auto_helper()
-
+        self._autoscale_helper()
     
+    #TODO
+    def _autoscale_helper(self):
+        pass
+
+    def _save_manual_scale(self):
+        if isinstance(self.canvas_widget, ScaleIonogramCanvas):
+            datetime_obs: datetime = self.metadata['datetime']
+            new_timestamp = self.timestamp.replace(':', '')[:-2]
+            timestamp_hour = int(self.timestamp.replace(':', '')[:2])
+            timestamp_minute = int(self.timestamp.replace(':', '')[2:4])
+            timestamp_second = int(self.timestamp.replace(':', '')[4:6])
+            output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
+            output_filename = f"{datetime_obs.strftime('%y%m%d')}{site_dict[self.metadata['site']].short_site}_F.tfh"
+            output_file_name = f"{self.polan_dir / output_filename}"
+            with open(output_file_name, 'a') as f:
+                f.write(f"{timestamp_hour} {timestamp_minute} {timestamp_second} {self.canvas_widget.fof2/1e6:.2f} {self.canvas_widget.hprimef2:.2f}\n")
+        else:
+            print(f"Not scaling canvas! Use the appropriate canvas")
+
+    # Run POLAN by outputting fit curve into a file and executing the POLAN executable, then read from the POLAN's output text file POLOUT.T
     def _run_polan(self, freqs, heights, ml_freqs, ml_heights):
         real_freqs = []
         real_heights = []
@@ -299,7 +326,7 @@ class MainWidget(QWidget):
                     try:
                         floats = list(map(float, line.strip().split()))
                     except ValueError:
-                        # Skip or stop on bad data depending on desired behavior
+                        # Raise exception if non numeric value, cant parse as a number.
                         raise ValueError(f"Non-numeric value found in line: {line}")
                     line_freqs = floats[::2]
                     line_heights = floats[1::2]

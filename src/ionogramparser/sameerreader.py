@@ -135,7 +135,7 @@ class SameerReader(DataReader):
             },
             'nfreqs': nfreqs, 'start_freq': start_freq, 'end_freq': end_freq, 'freq_step': step_freq,
             'ipp': ipp, 'nrgb': nrgb, 'nfft': nfft, 'nci': nci, 'cbl': cbl}
-        return [filename.name], metadata, np.array(height_txs), np.array(frequencies), np.unique(frequencies), np.array(dop_frequencies), np.vstack([amps, phases]).T
+        return [filename.name], metadata, np.array(height_txs), np.array(frequencies), np.unique(frequencies), np.array(dop_frequencies), np.vstack([antenna_idxs, amps, phases]).T
     
     @staticmethod
     def read_raw_data_dir(input_dir: Path, extension: str = 'iono', 
@@ -194,7 +194,7 @@ class SameerReader(DataReader):
         ```
         """
         all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.float32), np.array([], dtype=np.float32), np.array([], dtype=np.float32), \
-                                                                            np.array([], dtype=np.float32), np.empty(shape=(0,2), dtype=np.float16)
+                                                                            np.array([], dtype=np.float32), np.empty(shape=(0,3), dtype=np.float16)
         all_files_list = []
         all_metadata = dict()
         files_list = list(Path(input_dir).glob(f"*.{extension}"))
