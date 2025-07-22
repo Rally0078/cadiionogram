@@ -3,7 +3,7 @@
 
     Classes
     ---------
-    MDreader
+    SameerReader
         Static Methods
         ---------
         read_raw_data: Reads ionogram data from iono file.
@@ -70,11 +70,12 @@ class SameerReader(DataReader):
             Contains the complex signal value from each receiver in amplitude-phase form. Use the time_partitions \
         to partition the signals by observation time.
 
-        ### Examples
+        Examples
+        --------
         Read one iono file from current directory
-        ```
-            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = SameerReader.read_raw_data(Path('./input.iono'))
-        ```
+
+        >>> files, metadata, heights, frequencies, freq_list, dop_shifts, signals = SameerReader.read_raw_data(Path('./input.iono'))
+
         """
         lines = []
         with open(filename, 'r') as f:
@@ -187,11 +188,12 @@ class SameerReader(DataReader):
             Contains the complex signal value from each receiver in amplitude-phase form. Use the time_partitions \
         to partition the signals by observation time.
 
-        ### Examples
+        Examples
+        --------
         Read one iono file from current directory
-        ```
-            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = SameerReader.read_raw_data_dir(Path('./data_dir'))
-        ```
+        
+        >>> files, metadata, heights, frequencies, freq_list, dop_shifts, signals = SameerReader.read_raw_data_dir(Path('./data_dir'))
+
         """
         all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.float32), np.array([], dtype=np.float32), np.array([], dtype=np.float32), \
                                                                             np.array([], dtype=np.float32), np.empty(shape=(0,3), dtype=np.float16)

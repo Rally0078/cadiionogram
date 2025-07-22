@@ -61,7 +61,7 @@ class MDreader(DataReader):
             Dictionary containing metadata of the observations. Contains header info stored in the mdx file and \
         time partitions in key-value pairs to partition the observations by time.
 
-        height : `numpy.ndarray `
+        height : `numpy.ndarray`
             Heights in km from all the observations in the file. Use the time_partitions to \
         partition the heights by observation time.
 
@@ -79,11 +79,12 @@ class MDreader(DataReader):
             Contains the complex signal value from each receiver. Use the time_partitions \
         to partition the signals by observation time.
 
-        ### Examples
+        Examples
+        --------
         Read one md4 file from current directory
-        ```
-            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = MDreader.read_raw_data(Path('./input.md4'))
-        ```
+        
+        >>> files, metadata, heights, frequencies, freq_list, dop_shifts, signals = MDreader.read_raw_data(Path('./input.md4'))
+        
         """
         max_ntimes = 256
         max_ndopbins = 300000
@@ -319,7 +320,7 @@ class MDreader(DataReader):
             Path to the folder containing the mdx files to parse.
 
         extension : `str`
-            Extension of the mdx format file to be parsed. Possible values are `'md1'`, `md2`, ``, `` Can parse only one extension at a time from a folder.
+            Extension of the mdx format file to be parsed. Possible values are `'md1'`, `'md2'`, `'md3'`, `'md4'` Can parse only one extension at a time from a folder.
 
         multithread : `bool`
             Enable multithreaded reading using joblib. `False` by default. **Do not** use this option within the **PySide6 GUI code**, \
@@ -340,7 +341,7 @@ class MDreader(DataReader):
             Dictionary containing metadata of the observations. Contains header info stored in the mdx file and \
         time partitions in key-value pairs to partition the observations by time.
 
-        height : `numpy.ndarray `
+        height : `numpy.ndarray`
             Heights in km from all the observations in the file. Use the time_partitions to \
         partition the heights by observation time.
 
@@ -358,11 +359,12 @@ class MDreader(DataReader):
             Contains the complex signal value from each receiver. Use the time_partitions \
         to partition the signals by observation time.
 
-        ### Examples
+        Examples
+        --------
         Read all md4 files from a directory.
-        ```
-            files, metadata, heights, frequencies, freq_list, dop_shifts, signals = MDreader.read_raw_data_dir(Path('./datafolder'), extension='md4')
-        ```
+        
+        >>> files, metadata, heights, frequencies, freq_list, dop_shifts, signals = MDreader.read_raw_data_dir(Path('./datafolder'), extension='md4')
+        
         """
         all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float32), np.array([], dtype=np.float32), \
                                                                             np.array([], dtype=np.float16), np.empty(shape=(0,8), dtype=np.int8)
