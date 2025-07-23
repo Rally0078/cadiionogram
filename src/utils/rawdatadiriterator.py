@@ -6,15 +6,15 @@ class RawDataDirIterator:
         This is not a Python iterator in a technical sense for reasons mentioned below, but it is an iterable container that allows for random access
         through indexing by an integer or a timestamp string.
 
-        Usage
-        -----
+        Examples
+        --------
 
         >>> it = RawDataDirIterator(metadata, freqs, heights, dops, sensors)
         >>> for data in it:
         >>>     freq, height, dop, sensor = data
         >>>     ...
 
-        It also be indexed using a timestamp str or integer index, or a slice of them. 
+        It can also be indexed using a timestamp str or integer index, or a slice of them. 
         Note that when slicing using timestamp strs, the end timestamp is **inclusive** unlike the standard Python slice convention. 
 
         >>> data_at_time = it['12:30:00']
