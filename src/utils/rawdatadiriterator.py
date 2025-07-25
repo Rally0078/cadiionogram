@@ -1,5 +1,5 @@
-import numpy as np
-
+from typing import Union, Tuple, Self
+import numpy.typing as npt
 class RawDataDirIterator:
     """
         Iterable and indexable class for accessing raw data given the data arrays and timepartitions. 
@@ -23,7 +23,7 @@ class RawDataDirIterator:
         These are iterables that can be looped through in a for loop.
 
         >>> data_in_slice_ints = it[5:12]   #12 is exclusive as usual. Slice contains data of timestamps 5, 6, 7, 8, 9, 10, and 11.
-        >>> data_in_slice_timestamp = it['12:45:00':'14:15:00'] #End time '14:15:00' is **inclusive**, unlike the standard Python convention.
+        >>> data_in_slice_timestamp = it['12:45:00':'14:15:00'] #End time '14:15:00' is inclusive, unlike the standard Python convention.
         >>> for obs in data_in_slice_ints:
         >>>     freq, height, dop, sensor = obs
 
@@ -48,9 +48,10 @@ class RawDataDirIterator:
             lpointer, rpointer = self._handle_single_index(i)
             yield self.freqs[lpointer:rpointer], self.heights[lpointer:rpointer], self.dops[lpointer:rpointer], self.sensors[lpointer:rpointer]
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Union[Tuple[npt.NDArray, npt.NDArray, npt.NDArray, npt.NDArray], Self]:
         """
-            Handles the indexing for the [] operator. 
+            Handles the indexing for the [] operator. Returns tuple of data at that timestamp/time index, 
+            or returns an iterable view of data contained within the slice.
         """
         #Index is a single integer. This integer corresponds to the timestamp in the metadata.
         if isinstance(idx, int):
