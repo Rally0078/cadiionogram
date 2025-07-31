@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.stats import describe, mode
+from typing import Literal
 
 def calculate_pixbins(freqs, heights):
     pixel_counts = []
@@ -73,10 +74,15 @@ def freq_filter(freqs, heights):
     _, new_medians, new_freqs_flayer = calculate_pixbins(freqs_filtered, heights_filtered)
     return noise_idx, new_freqs_flayer, new_medians
 
-def o_x_separation(freq_selection, height_selection, dop_selection, sensors_selection):
+def o_x_separation(freq_selection, height_selection, dop_selection, sensors_selection, mode: Literal['O','X']='O', phchoice: Literal['14','23']='14'):
     """
-        Separate O and X mode based on phase14 of the CADI system.
+        Separate O and X mode based on phase14 of the CADI system. Note that old CADI TIR Data has the phase signs flipped for some reason.
     """
+    if mode not in ['O', 'X']:
+        raise ValueError("Only O and X modes are available")
+    if phchoice not in ['14', '23']:
+        raise ValueError("Only phase difference 1-4 and 2-3 are available")
+    
     sensor1_phase = np.angle(sensors_selection[:, 0] + 1j * sensors_selection[:, 1])
     sensor2_phase = np.angle(sensors_selection[:, 2] + 1j * sensors_selection[:, 3])
     sensor3_phase = np.angle(sensors_selection[:, 4] + 1j * sensors_selection[:, 5])
@@ -93,9 +99,15 @@ def o_x_separation(freq_selection, height_selection, dop_selection, sensors_sele
 
     sensor1_phase = sensor1_phase + PH2_corr
     sensor3_phase = sensor3_phase + PH4_corr
-
-    phase14 = sensor1_phase - sensor4_phase
-    phase14[phase14 < np.pi] += 2*np.pi
-    phase14[phase14 > np.pi] -= 2*np.pi
-
-    return freq_selection[phase14 > 0], height_selection[phase14 > 0], dop_selection[phase14 > 0], sensors_selection[phase14 > 0]
+    if phchoice == '12':
+        phdiff = sensor1_phase - sensor4_phase
+        phdiff[phdiff < np.pi] += 2*np.pi
+        phdiff[phdiff > np.pi] -= 2*np.pi
+    else:
+        phdiff = sensor2_phase - sensor3_phase
+        phdiff[phdiff < np.pi] += 2*np.pi
+        phdiff[phdiff > np.pi] -= 2*np.pi       
+    if mode == 'O':
+        return freq_selection[phdiff > 0], height_selection[phdiff > 0], dop_selection[phdiff > 0], sensors_selection[phdiff > 0]
+    else:
+        return freq_selection[phdiff < 0], height_selection[phdiff < 0], dop_selection[phdiff < 0], sensors_selection[phdiff < 0]
