@@ -4,6 +4,7 @@ from src.plotstate.md4_display_iono_state import Md4DisplayIonogramState
 from src.plotstate.md4_realheight_state import Md4RealheightAnalysisState
 from src.plotstate.mdx_height_day_state import MdxHeightDayCanvasState
 from src.plotstate.md4_autoscaling_state import Md4ScaleIonogramState
+from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
 
 class PlotStateFactory:
     @staticmethod
@@ -14,9 +15,10 @@ class PlotStateFactory:
         option = main_widget.mode_dropdown.currentText()
         main_widget.polan_button.setVisible(False)
         main_widget.save_scale_button.setVisible(False)
+        main_widget.table_widget.end_timepartitions_dropdown.setVisible(False)
 
         #Handle buttons common for different canvases
-        if option in ['Display ionogram', 'Real height analysis', 'Scale ionogram']:
+        if option in ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'XY plot']:
             PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,True)
         elif option in ['Range vs Time (Freq colored)']:
             PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,False)
@@ -32,11 +34,17 @@ class PlotStateFactory:
             return Md4RealheightAnalysisState(main_widget)
         elif option == 'Range vs Time (Freq colored)':
             return MdxHeightDayCanvasState(main_widget)
+        elif option == 'XY plot':
+            main_widget.table_widget.end_timepartitions_dropdown.setVisible(True)
+            return MdxXYplotCanvasState(main_widget)
         else:
             raise ValueError(f"No valid PlotState for combination: md3={is_md3}, md4={is_md4}, option={option}")
+        
     @staticmethod 
     def _set_tablewidget_buttons_visibility(main_widget, state):
         main_widget.table_widget.left_button.setVisible(state)
         main_widget.table_widget.right_button.setVisible(state)
         main_widget.table_widget.timepartitions_dropdown.setVisible(state)
         main_widget.table_widget.pointers_label.setVisible(state)
+        if state is False:
+            main_widget.table_widget.end_timepartitions_dropdown.setVisible(state)

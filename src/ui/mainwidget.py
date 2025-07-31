@@ -3,6 +3,7 @@ from datetime import datetime
 from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.plot.autoscaling import ScaleIonogramCanvas
+from src.plot.xyplotcanvas import XYPlotCanvas
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.utils.siteinfo import site_dict
@@ -21,8 +22,8 @@ import subprocess
 import shutil
 
 class MainWidget(QWidget):
-    md3_options = ['Range vs Time (Freq colored)']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)', 'Scale ionogram']
+    md3_options = ['Range vs Time (Freq colored)', 'XY plot']
+    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)', 'Scale ionogram', 'XY plot']
     def __init__(self):
         super().__init__()
         self.polan_dir = None
@@ -101,6 +102,7 @@ class MainWidget(QWidget):
 
         # Custom table widget for metadata table and navigation
         self.table_widget = MetadataTableWidget()
+        self.table_widget.end_timepartitions_dropdown.setVisible(False)
 
         # Add table widget and POLAN button to the layout        
         layout.addWidget(self.table_widget, 5, 0, 2, 2)
@@ -113,12 +115,14 @@ class MainWidget(QWidget):
 
         #Initialize signal handling
         self.table_widget.dropdown_changed.connect(self._on_dropdown_changed)
+        self.table_widget.right_dropdown_changed.connect(self._on_right_dropdown_changed)
         self.table_widget.left_clicked.connect(self._prev_option)
         self.table_widget.right_clicked.connect(self._next_option)
 
         self.setLayout(layout)
         
         self._selected_timestamp = ''
+        self._right_selected_timestamp = ''
         self.directory = None
 
         #Error message dialog box
@@ -213,9 +217,22 @@ class MainWidget(QWidget):
     #Callback to handle changes in dropdown value
     def _on_dropdown_changed(self, text):
         self._selected_timestamp = text
+        self._right_selected_timestamp = text
         self._get_lpointer_rpointer(self.timepartitions, timestamp=self._selected_timestamp)
         self.table_widget.set_pointers(self.lpointer, self.rpointer)
+        self.table_widget.end_timepartitions_dropdown.setCurrentIndex(list(self.timepartitions.keys()).index(text))
         self._plot_helper()
+    
+    #Callback to handle changes in right side dropdown value
+    def _on_right_dropdown_changed(self, text):
+        if isinstance(self.canvas_widget, XYPlotCanvas):
+            self._right_selected_timestamp = text
+            self._get_lpointer_rpointer(self.timepartitions, timestamp=self._selected_timestamp)
+            self.rpointer = self.timepartitions[self._right_selected_timestamp]
+            self.table_widget.set_pointers(self.lpointer, self.rpointer)
+            self._plot_helper()
+        else:
+            pass
 
     #Get lpointer and rpointer for plotting
     def _get_lpointer_rpointer(self, timepartitions, timestamp):
