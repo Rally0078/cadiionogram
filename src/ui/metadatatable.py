@@ -56,7 +56,7 @@ class MetadataTableWidget(QWidget):
         self.timepartitions_dropdown.setCurrentIndex(0)
         self.end_timepartitions_dropdown.clear()
         self.end_timepartitions_dropdown.addItems(list(metadata['timepartitions'].keys()))
-        self.end_timepartitions_dropdown.setCurrentIndex(-1)
+        self.end_timepartitions_dropdown.setCurrentIndex(len(list(metadata['timepartitions'].keys()))-1)
         self.timepartitions_dropdown.currentTextChanged.connect(self._on_dropdown_changed)
         self.end_timepartitions_dropdown.currentTextChanged.connect(self._on_right_dropdown_changed)
         

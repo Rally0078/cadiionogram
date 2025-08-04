@@ -16,6 +16,8 @@ class PlotStateFactory:
         main_widget.polan_button.setVisible(False)
         main_widget.save_scale_button.setVisible(False)
         main_widget.table_widget.end_timepartitions_dropdown.setVisible(False)
+        main_widget.table_widget.left_button.setVisible(True)
+        main_widget.table_widget.right_button.setVisible(True)
 
         #Handle buttons common for different canvases
         if option in ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW NS timeseries plot']:
@@ -36,6 +38,8 @@ class PlotStateFactory:
             return MdxHeightDayCanvasState(main_widget)
         elif is_md3 and option == 'EW NS timeseries plot':
             main_widget.table_widget.end_timepartitions_dropdown.setVisible(True)
+            main_widget.table_widget.left_button.setVisible(False)
+            main_widget.table_widget.right_button.setVisible(False)
             return MdxXYplotCanvasState(main_widget)
         else:
             raise ValueError(f"No valid PlotState for combination: md3={is_md3}, md4={is_md4}, option={option}")

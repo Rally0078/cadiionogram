@@ -180,7 +180,7 @@ class MainWidget(QWidget):
         self.timepartitions = self.metadata['timepartitions']
         #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(self.timepartitions.keys())[0]
-        self._right_selected_timestamp = self._selected_timestamp
+        self._right_selected_timestamp = list(self.timepartitions.keys())[-1]
         
         #Set initial lpointer and rpointer
         self._get_lpointer_rpointer(self.timepartitions, self._selected_timestamp)
@@ -248,7 +248,8 @@ class MainWidget(QWidget):
         rpointer = timepartitions[timestamp]
         self.timestamp = timestamp
         self.lpointer = lpointer
-        self.rpointer = rpointer
+        if not isinstance(self.canvas_widget, XYPlotCanvas):
+            self.rpointer = rpointer
     
     #Main plotting function. Delegates the choice of canvas to PlotStateFactory based on the mdx file option and the type of plot
     def _plot_helper(self):
