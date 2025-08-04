@@ -22,7 +22,7 @@ import subprocess
 import shutil
 
 class MainWidget(QWidget):
-    md3_options = ['Range vs Time (Freq colored)', 'XY plot']
+    md3_options = ['Range vs Time (Freq colored)', 'EW NS timeseries plot']
     md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)', 'Scale ionogram', 'XY plot']
     def __init__(self):
         super().__init__()
@@ -180,6 +180,7 @@ class MainWidget(QWidget):
         self.timepartitions = self.metadata['timepartitions']
         #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(self.timepartitions.keys())[0]
+        self._right_selected_timestamp = self._selected_timestamp
         
         #Set initial lpointer and rpointer
         self._get_lpointer_rpointer(self.timepartitions, self._selected_timestamp)

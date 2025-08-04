@@ -100,6 +100,8 @@ def compute_kvector(freqs, freq_list, heights, dops, signals, sort_by_freq=False
     freq_selection, height_selection, dop_selection, signal_selection = freqs, heights, dops, signals
     good_idxs, new_freq, new_height, new_dops, new_signal_selection, xpow, xpha = compute_xpha_full(freq_selection, freq_list, 
                                                                                               height_selection, dop_selection, signal_selection)
+    if len(good_idxs) == 0:
+        good_idxs = np.arange(len(new_freq))
     k_mag = 2*np.pi/(2.998e8) * np.array(freq_list)
     output_idxs = np.array([], dtype=np.int64) 
     if sort_by_freq:
@@ -157,7 +159,7 @@ def compute_kvector(freqs, freq_list, heights, dops, signals, sort_by_freq=False
         kx = kz * new_xy[:, 0]
         ky = kz * new_xy[:, 1]
         karray = np.vstack([kx, ky, kz]).T
-        
+        output_idxs = good_idxs
     return output_idxs, karray, output_freqs, output_heights, output_df, output_signals, output_xpow
 
 def compute_vel(freqs, freq_list, heights, dops, signals, points_thres=5):
@@ -201,8 +203,23 @@ def compute_vel(freqs, freq_list, heights, dops, signals, points_thres=5):
             output_idxs = np.append(output_idxs, np.argwhere(new_freq[good_idxs] == freq).flatten())
     return output_idxs, output_freqs, v_xarr, v_yarr, v_zarr
 
-def compute_xy(freqs, freq_list, heights, dops, signals):
-    karray, output_freqs, output_heights, output_df, output_signals = compute_kvector(freqs, freq_list, heights, dops, signals, sort_by_freq=True)
-    x = karray[:,0]/karray[:,2]
-    y = karray[:,1]/karray[:,2]
-    return x, y, output_freqs, output_heights, output_df, output_signals
+def compute_xy(freqs, freq_list, heights, dops, signals, sort_by_freq=False, points_thres=5):
+    output_idxs, karray, output_freqs, output_heights, output_df, output_signals, output_xpow = compute_kvector(freqs, freq_list, heights, dops, 
+                                                                                                                signals, sort_by_freq=sort_by_freq, points_thres=points_thres)
+    kx, ky, kz = karray[:, 0], karray[:, 1], karray[:, 2]
+
+    #These sign inversions are needed to plot the EW vs range and NS vs range plots
+    kx[kz < 0] *= -1
+    ky[kz < 0] *= -1
+    kz[kz < 0] *= -1
+
+    kh = np.sqrt(ky**2 + kx**2)
+    zangle = np.atan2(kh, kz)
+    zangleEW = np.atan2(kx, kz)
+    zangleNS = np.atan2(ky, kz)
+    zpos = np.cos(zangle) * output_heights
+    good_powers = output_xpow
+    xpos = np.tan(zangleEW) * zpos
+    ypos = np.tan(zangleNS) * zpos
+    new_pow = 10*np.log10(np.sqrt(output_xpow[:, 0] * output_xpow[:, 1]))
+    return output_idxs, xpos, ypos, output_freqs, output_heights, output_df, output_signals, output_xpow

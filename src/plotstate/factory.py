@@ -18,7 +18,7 @@ class PlotStateFactory:
         main_widget.table_widget.end_timepartitions_dropdown.setVisible(False)
 
         #Handle buttons common for different canvases
-        if option in ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'XY plot']:
+        if option in ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW NS timeseries plot']:
             PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,True)
         elif option in ['Range vs Time (Freq colored)']:
             PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,False)
@@ -34,7 +34,7 @@ class PlotStateFactory:
             return Md4RealheightAnalysisState(main_widget)
         elif option == 'Range vs Time (Freq colored)':
             return MdxHeightDayCanvasState(main_widget)
-        elif option == 'XY plot':
+        elif is_md3 and option == 'EW NS timeseries plot':
             main_widget.table_widget.end_timepartitions_dropdown.setVisible(True)
             return MdxXYplotCanvasState(main_widget)
         else:
