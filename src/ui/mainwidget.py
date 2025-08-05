@@ -213,15 +213,12 @@ class MainWidget(QWidget):
     #Callback to handle changes in dropdown value
     def _on_dropdown_changed(self, text):
         self._selected_timestamp = text
-        self._right_selected_timestamp = text
-        self.table_widget.end_timepartitions_dropdown.setCurrentIndex(list(self.timepartitions.keys()).index(text))
         self._plot_helper()
     
     #Callback to handle changes in right side dropdown value
     def _on_right_dropdown_changed(self, text):
         if isinstance(self.canvas_widget, XYPlotCanvas):
             self._right_selected_timestamp = text
-            self.rpointer = self.timepartitions[self._right_selected_timestamp]
             self._plot_helper()
         else:
             pass
