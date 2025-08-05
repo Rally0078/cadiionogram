@@ -10,6 +10,7 @@ from src.utils.siteinfo import site_dict
 from src.plotstate.factory import PlotStateFactory
 from src.ionogramparser.mdxreader import MDreader
 from src.ionogramparser.sameerreader import SameerReader
+from src.utils.rawdatadiriterator import RawDataDirIterator
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout,
@@ -22,8 +23,8 @@ import subprocess
 import shutil
 
 class MainWidget(QWidget):
-    md3_options = ['Range vs Time (Freq colored)', 'EW NS timeseries plot']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)', 'Scale ionogram', 'XY plot']
+    md3_options = ['Range vs Time (Freq colored)', 'EW-NS timeseries', 'Drift velocity timeseries']
+    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)', 'Scale ionogram', 'EW-NS vs Range']
     def __init__(self):
         super().__init__()
         self.polan_dir = None
@@ -107,7 +108,7 @@ class MainWidget(QWidget):
         # Add table widget and POLAN button to the layout        
         layout.addWidget(self.table_widget, 5, 0, 2, 2)
         layout.addWidget(self.polan_button, 7, 1)
-        layout.addWidget(self.save_scale_button, 7, 2)
+        layout.addWidget(self.save_scale_button, 7,0)
 
         # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
@@ -181,9 +182,6 @@ class MainWidget(QWidget):
         #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(self.timepartitions.keys())[0]
         self._right_selected_timestamp = list(self.timepartitions.keys())[-1]
-        
-        #Set initial lpointer and rpointer
-        self._get_lpointer_rpointer(self.timepartitions, self._selected_timestamp)
 
         #Update metadata when new folder is selected
         #Disconnect signals before updating
@@ -196,9 +194,6 @@ class MainWidget(QWidget):
         # Reconnect the signals after the update to ensure the buttons work again
         self.table_widget.left_clicked.connect(self._prev_option)
         self.table_widget.right_clicked.connect(self._next_option)
-        
-        #Set initial pointers in the label
-        self.table_widget.set_pointers(self.lpointer, self.rpointer)
         
         #Do the initial plotting with the given lpointer and rpointer
         self._plot_helper()
@@ -219,8 +214,6 @@ class MainWidget(QWidget):
     def _on_dropdown_changed(self, text):
         self._selected_timestamp = text
         self._right_selected_timestamp = text
-        self._get_lpointer_rpointer(self.timepartitions, timestamp=self._selected_timestamp)
-        self.table_widget.set_pointers(self.lpointer, self.rpointer)
         self.table_widget.end_timepartitions_dropdown.setCurrentIndex(list(self.timepartitions.keys()).index(text))
         self._plot_helper()
     
@@ -228,28 +221,10 @@ class MainWidget(QWidget):
     def _on_right_dropdown_changed(self, text):
         if isinstance(self.canvas_widget, XYPlotCanvas):
             self._right_selected_timestamp = text
-            self._get_lpointer_rpointer(self.timepartitions, timestamp=self._selected_timestamp)
             self.rpointer = self.timepartitions[self._right_selected_timestamp]
-            self.table_widget.set_pointers(self.lpointer, self.rpointer)
             self._plot_helper()
         else:
             pass
-
-    #Get lpointer and rpointer for plotting
-    def _get_lpointer_rpointer(self, timepartitions, timestamp):
-        index = list(timepartitions.keys()).index(timestamp)
-        self.file_timestamp_index = index
-        lpointer = -1
-        if index == 0:
-            lpointer = 0
-        else:
-            prev_index = index - 1
-            lpointer = timepartitions[list(timepartitions.keys())[prev_index]]
-        rpointer = timepartitions[timestamp]
-        self.timestamp = timestamp
-        self.lpointer = lpointer
-        if not isinstance(self.canvas_widget, XYPlotCanvas):
-            self.rpointer = rpointer
     
     #Main plotting function. Delegates the choice of canvas to PlotStateFactory based on the mdx file option and the type of plot
     def _plot_helper(self):
@@ -300,10 +275,10 @@ class MainWidget(QWidget):
     def _save_manual_scale(self):
         if isinstance(self.canvas_widget, ScaleIonogramCanvas):
             datetime_obs: datetime = self.metadata['datetime']
-            new_timestamp = self.timestamp.replace(':', '')[:-2]
-            timestamp_hour = int(self.timestamp.replace(':', '')[:2])
-            timestamp_minute = int(self.timestamp.replace(':', '')[2:4])
-            timestamp_second = int(self.timestamp.replace(':', '')[4:6])
+            new_timestamp = self._selected_timestamp.replace(':', '')[:-2]
+            timestamp_hour = int(self._selected_timestamp.replace(':', '')[:2])
+            timestamp_minute = int(self._selected_timestamp.replace(':', '')[2:4])
+            timestamp_second = int(self._selected_timestamp.replace(':', '')[4:6])
             output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
             output_filename = f"{datetime_obs.strftime('%y%m%d')}{site_dict[self.metadata['site']].short_site}_F.tfh"
             output_file_name = f"{self.polan_dir / output_filename}"
@@ -321,7 +296,7 @@ class MainWidget(QWidget):
             with open("a.a", 'w') as polan_input:
                 polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
                 polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}{site_dict[self.metadata['site']].short_site}           {site_dict[self.metadata['site']].FH:.2f}  {site_dict[self.metadata['site']].dip:.1f}  0.0 0.00    0\n")
-                polan_input.write(f"{self.timestamp}                    0.0\n")
+                polan_input.write(f"{self._selected_timestamp}                    0.0\n")
                 for idx, (freq, height) in enumerate(zip(freqs, heights)):
                     if idx == len(freqs) - 1:
                         height = 0.0
@@ -357,8 +332,8 @@ class MainWidget(QWidget):
                         real_freqs.append(f)
                         real_heights.append(h)
             input_file_name = f"POLOUT.T"
-            new_timestamp = self.timestamp.replace(':', '')[:-2]
-            timestamp_hour = int(self.timestamp.replace(':', '')[:2])
+            new_timestamp = self._selected_timestamp.replace(':', '')[:-2]
+            timestamp_hour = int(self._selected_timestamp.replace(':', '')[:2])
             #Warn: The following line works only for H type (hourly) MDx files 
             #This might not work as intended with I type(file per observation) MDx files
             output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
@@ -384,10 +359,8 @@ class MainWidget(QWidget):
 
     def _polan_auto_helper(self):
         if isinstance(self.canvas_widget, RealHeightAnalysisCanvas):
-            freqs = self.freqs[self.lpointer:self.rpointer]
-            heights = self.heights[self.lpointer:self.rpointer]
-            dops = self.dops[self.lpointer:self.rpointer]
-            signals = self.signals[self.lpointer:self.rpointer]
+            it = RawDataDirIterator(self.metadata, self.freqs, self.heights, self.dops, self.signals)
+            freqs, heights, dops, signals = it[self._selected_timestamp]
             if self.extension == 'md4':
                 freqs_interp, heights_interp, ml_freqs, ml_heights = self.canvas_widget.draw_auto_curve(freqs, heights, dops, signals)
                 self._run_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)

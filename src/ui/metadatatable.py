@@ -27,15 +27,12 @@ class MetadataTableWidget(QWidget):
         self.end_timepartitions_dropdown.currentTextChanged.connect(self._on_right_dropdown_changed)
 
         self.end_timepartitions_dropdown.setVisible(False)
-        self.pointers_label = QLabel()
         self.left_button = QPushButton("←")
         self.right_button = QPushButton("→")
         self.timepartitions_dropdown.currentTextChanged.connect(self._on_dropdown_changed)
 
         self.left_button.clicked.connect(self.left_clicked.emit)
         self.right_button.clicked.connect(self.right_clicked.emit)
-        self.lpointer = 0
-        self.rpointer = 0
 
     def _on_dropdown_changed(self, text: str):
         self.dropdown_changed.emit(text)
@@ -106,8 +103,6 @@ class MetadataTableWidget(QWidget):
                 self.layout_table.removeItem(old_arrow_layout)
             if old_dropdown:
                 self.layout_table.removeItem(old_dropdown)
-
-            self.pointers_label.setText("")
             old_left_timedropdown = self.timepartitions_layout.itemAt(0).widget()
             old_right_timedropdown = self.timepartitions_layout.itemAt(1).widget()
             
@@ -127,7 +122,6 @@ class MetadataTableWidget(QWidget):
         self.layout_table.addWidget(metadata_table, alignment=Qt.AlignLeft)
         self.layout_table.addSpacerItem(spacer)
         self.layout_table.addLayout(self.timepartitions_layout)
-        self.layout_table.addWidget(self.pointers_label, alignment=Qt.AlignLeft)
 
         self.arrow_layout = QHBoxLayout()
         self.arrow_layout.addWidget(self.left_button)
@@ -137,10 +131,7 @@ class MetadataTableWidget(QWidget):
         self.layout_table.addLayout(self.arrow_layout) 
         self.layout_table.update()
 
-    def set_pointers(self, lpointer, rpointer):
-        self.lpointer = lpointer
-        self.rpointer = rpointer
-        self.pointers_label.setText(f"Left = {self.lpointer}, right = {self.rpointer}")
+
 
     def clear_layout(self, layout):
         while layout.count():
