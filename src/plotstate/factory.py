@@ -18,6 +18,7 @@ class PlotStateFactory:
         main_widget.table_widget.end_timepartitions_dropdown.setVisible(False)
         main_widget.table_widget.left_button.setVisible(True)
         main_widget.table_widget.right_button.setVisible(True)
+        main_widget.freq_selector.setVisible(False)
 
         #Handle buttons common for different canvases
         if option in ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS timeseries', 'Drift velocity timeseries', 'EW-NS vs Range']:
@@ -40,6 +41,9 @@ class PlotStateFactory:
             main_widget.table_widget.end_timepartitions_dropdown.setVisible(True)
             main_widget.table_widget.left_button.setVisible(False)
             main_widget.table_widget.right_button.setVisible(False)
+            main_widget.freq_selector.setVisible(True)
+
+            #main_widget.freq_selector.setVisible(True)
             return MdxXYplotCanvasState(main_widget)
         elif is_md3 and option == 'Drift velocity timeseries':
             raise NotImplementedError("Drift velocity plotting is not implemented yet.")

@@ -13,41 +13,58 @@
 """
 import numpy as np
 from typing import Tuple
+from copy import deepcopy
+from src.utils.pandasutils import PandasUtils
+import pandas as pd
 
-def compute_xpha_only(freq_selection, freq_list, height_selection, dop_selection, signal_selection) -> Tuple[np.ndarray, np.ndarray]:
-    _, _, _, _, _, xpow, xpha = compute_xpha_full(freq_selection, freq_list, height_selection, 
-                 dop_selection, signal_selection)
+def compute_xpha_only(df, freq_list) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    _, _, _, _, _, xpow, xpha = compute_xpha_full(df, freq_list)
     return xpow, xpha
 
-def compute_xpha_full(freq_selection, freq_list, height_selection, 
-                 dop_selection, signal_selection):
+def compute_xpha_full(df, freq_list):
+    freq_selection = df['freq (Hz)']
+    height_selection = df['height (km)']
+    dop_selection = df['dopplershift']
+    signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
+    sig_re_name = [f"sensor{i + 1} real" for i in range(4)]
+    sig_im_name = [f"sensor{i + 1} imag" for i in range(4)]
+    signal_selection = df[signal_col_names]
     indices_to_remove = np.array([], dtype=np.int64)
-    for idx in range(0, 8, 2):
-        rcv_re = signal_selection[:, idx]
-        rcv_im = signal_selection[:, idx+1]
-        indices_to_remove = np.union1d(indices_to_remove, np.where((rcv_re == 0) & (rcv_im == 0))[0])
-
-    new_signal_selection = np.delete(signal_selection, indices_to_remove,axis=0)
-    new_freq = np.delete(freq_selection, indices_to_remove)
-    new_height = np.delete(height_selection, indices_to_remove)
-    new_dops = np.delete(dop_selection, indices_to_remove)
+    for idx in range(4):
+            rcv_re = signal_selection[sig_re_name[idx]]
+            rcv_im = signal_selection[sig_im_name[idx]]
+            indices_to_remove = np.union1d(indices_to_remove, np.where((rcv_re == 0) & (rcv_im == 0))[0])
+    good_idxs = np.setdiff1d(np.arange(len(df)), indices_to_remove)
+    df = df.iloc[good_idxs]
+    new_signal_selection = df[signal_col_names]
+    new_freq = df['freq (Hz)']
+    new_height = df['height (km)']
+    new_dops = df['dopplershift']
     #Get cross amplitudes and phases
-    xpow = np.empty(shape=(new_signal_selection.shape[0], 2))
-    xpha = np.empty(shape=(new_signal_selection.shape[0], 2))
+    xpow = pd.DataFrame({"x1": np.empty(shape=(new_signal_selection.shape[0],)),
+                        "x2": np.empty(shape=(new_signal_selection.shape[0],))},
+                        index=df.index)
+    xpha = pd.DataFrame({"x1": np.empty(shape=(new_signal_selection.shape[0],)),
+                        "x2": np.empty(shape=(new_signal_selection.shape[0],))},
+                        index=df.index)
+
     PH2_corr=0#np.pi+0*np.pi/180, site dependent
     PH4_corr=0#np.pi-0*np.pi/180, site dependent
-    for i in range(0, 3, 2):
-        ant0_re = new_signal_selection[:, 2*i]
-        ant0_im = new_signal_selection[:, 2*i+1]
-        ant1_re = new_signal_selection[:, 2*i+2]
-        ant1_im = new_signal_selection[:, 2*i+3]
+    pairwise_antenna13 = [('sensor1 real', 'sensor1 imag'), ('sensor3 real', 'sensor3 imag')]
+    pairwise_antenna24 = [('sensor2 real', 'sensor2 imag'), ('sensor4 real', 'sensor4 imag')]
+    cross_names = ['x1', 'x2']
+    for pair1, pair2, cross_name in zip(pairwise_antenna13, pairwise_antenna24, cross_names):
+        ant0_re = new_signal_selection[pair1[0]]
+        ant0_im = new_signal_selection[pair1[1]]
+        ant1_re = new_signal_selection[pair2[0]]
+        ant1_im = new_signal_selection[pair2[1]]
 
         s = (ant0_re + 1j * ant0_im) * np.conjugate(ant1_re + 1j * ant1_im)
         s = -s  #Site dependent, use polarity to determine according to the IDL code
-        xpow[:, i//2] = np.abs(s)**2
-        xpha[:, i//2] = np.angle(s)
-    xpha[:, 1][xpha[:, 1] > np.pi] -= 2*np.pi
-    xpha[:, 1][xpha[:, 1] < -np.pi] += 2*np.pi
+        xpow[cross_name] = np.abs(s)**2
+        xpha[cross_name] = np.angle(s)
+    xpha.loc[xpha['x2'] > np.pi, 'x2'] -= 2*np.pi
+    xpha.loc[xpha['x2'] < -np.pi, 'x2'] += 2*np.pi
 
     #Reject data with cross phases outside limits
     k_mag = 2*np.pi/(2.998e8) * np.array(freq_list)
@@ -58,10 +75,13 @@ def compute_xpha_full(freq_selection, freq_list, height_selection,
         
     freq_idxs = np.digitize(new_freq, freq_list) - 1
     assert (new_freq == freq_list[freq_idxs]).all()
-    good_idxs = np.where((np.abs(xpha[:,0]) <= phase_limit[freq_idxs, 0]) & ((np.abs(xpha[:,1]) <= phase_limit[freq_idxs, 1])))[0]
-    return good_idxs, new_freq, new_height, new_dops, new_signal_selection, xpow, xpha
+    good_idxs = np.where((np.abs(xpha['x1']) <= phase_limit[freq_idxs, 0]) & ((np.abs(xpha['x2']) <= phase_limit[freq_idxs, 1])))[0]
+    output_df = df.iloc[good_idxs]
+    output_xpow = xpow.iloc[good_idxs]
+    output_xpha = xpha.iloc[good_idxs]
+    return output_df, output_xpow, output_xpha
 
-def compute_kvector(freqs, freq_list, heights, dops, signals, sort_by_freq=False, points_thres=5):
+def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5):
     """
         Computes k vector, given the raw data for one time observation.
 
@@ -87,112 +107,128 @@ def compute_kvector(freqs, freq_list, heights, dops, signals, sort_by_freq=False
         df : `pd.DataFrame`
             A DataFrame consisting of `kx`, `ky`, `kz` values, and the corresponding frequency.
     """
-
-    partitions = []
-    n_freqs = []
+    k_out_with_ts = pd.DataFrame(columns=['kx', 'ky', 'kz'])
+    all_output_heights = pd.Series([])
+    timeindex_series = pd.Series([])
+    all_output_freqs = pd.Series([])
+    all_output_pow = pd.DataFrame(columns=['x1', 'x2'])
+    df, xpow, xpha = compute_xpha_full(df, freq_list)
+    signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
+    sig_re_name = [f"sensor{i + 1} real" for i in range(4)]
+    sig_im_name = [f"sensor{i + 1} imag" for i in range(4)]
     output_df = np.array([])
     k_xarr = np.array([])
     k_yarr = np.array([])
     k_zarr = np.array([])
-    output_heights = np.array([])
-    output_xpow = np.empty(shape=(0,2))
-    output_signals = np.empty(shape=(0,signals.shape[1]))
-    freq_selection, height_selection, dop_selection, signal_selection = freqs, heights, dops, signals
-    good_idxs, new_freq, new_height, new_dops, new_signal_selection, xpow, xpha = compute_xpha_full(freq_selection, freq_list, 
-                                                                                              height_selection, dop_selection, signal_selection)
-    if len(good_idxs) == 0:
+    output_heights = pd.Series([])
+    output_xpow = pd.DataFrame(columns=['x1', 'x2'])
+    output_signals = np.empty(shape=(0,len(signal_col_names)))
+    new_signal_selection = df[signal_col_names]
+    new_freq = df['freq (Hz)']
+    new_height = df['height (km)']
+    new_dops = df['dopplershift']
+    output_freqs = pd.Series([])
+    output_dops = pd.Series([])
+
+    if len(df) == 0:
         good_idxs = np.arange(len(new_freq))
     k_mag = 2*np.pi/(2.998e8) * np.array(freq_list)
     output_idxs = np.array([], dtype=np.int64) 
     if sort_by_freq:
         for idx, freq in enumerate(freq_list):
-            n_points_per_freq = len(np.argwhere(new_freq[good_idxs] == freq))
+            df_single_freq = df[df['freq (Hz)'] == freq]
+            n_points_per_freq = len(df_single_freq)
             if n_points_per_freq >= points_thres:
-                good_phases = xpha[good_idxs, :]
-                good_powers = xpow[good_idxs, :]
 
-                y_df = new_dops[good_idxs]
-                hgts = new_height[good_idxs]
-                new_signals = new_signal_selection[good_idxs, :]
-                single_freq_idx = new_freq[good_idxs] == freq
-                good_phases = good_phases[single_freq_idx, :]
-                good_powers = good_powers[single_freq_idx, :]
-                new_freq_idxs = single_freq_idx
+                y_df = df_single_freq['dopplershift']
+                hgts = df_single_freq['height (km)']
+                new_signals = df_single_freq[signal_col_names]
+                single_freq_idx = np.where(df['freq (Hz)'] == freq)
+                good_phases = xpha.iloc[single_freq_idx]
+                good_powers = xpow.iloc[single_freq_idx]
                 
-                y_df = y_df[new_freq_idxs]
                 new_kd = np.empty(shape=(np.array(freq_list).shape[0], 2))
                 new_kd[:, 0] = k_mag * 30.1 #Site-specific
                 new_kd[:, 1] = k_mag * 30.1 #Site-specific
                 temp_xy = good_phases/new_kd[idx]
                 new_xy = temp_xy/np.sqrt(1.0 - temp_xy**2)
                 kz = - k_mag[idx] / np.sqrt(1+ np.sum(new_xy*new_xy,axis=1))
-                kx = kz * new_xy[:, 0]
-                ky = kz * new_xy[:, 1]
-                n_freqs.append(freq)
-                partitions.append(len(kx))
+                kx = kz * new_xy['x1']
+                ky = kz * new_xy['x2']
+
+                output_heights = pd.concat([output_heights if not output_heights.empty else None, hgts])
+                output_freqs = pd.concat([output_freqs if not output_freqs.empty else None, pd.Series(np.repeat(freq, len(kx)), index=hgts.index, name='freq')])
+                output_xpow = pd.concat([output_xpow if not output_xpow.empty else None, good_powers])
+                output_dops = pd.concat([output_dops if not output_dops.empty else None, y_df])
+                
                 k_xarr = np.append(k_xarr, kx)
                 k_yarr = np.append(k_yarr, ky)
                 k_zarr = np.append(k_zarr, ky)
-                output_df = np.append(output_df, y_df)
-                output_idxs = np.append(output_idxs, np.argwhere(new_freq[good_idxs] == freq).flatten())
-                output_heights = np.append(output_heights, hgts[new_freq_idxs])
-                output_signals = np.vstack([output_signals, new_signals[new_freq_idxs, :]])
-                output_xpow = np.vstack([output_xpow, good_powers])
+                timeindex_series = pd.concat([timeindex_series if not timeindex_series.empty else None, hgts.index.to_series()])
+
                 """kx[kz < 0] *= -1
                 ky[kz < 0] *= -1
                 kz[kz < 0] *= -1"""
-        output_freqs = np.repeat(n_freqs, partitions)
         karray = np.vstack([k_xarr, k_yarr, k_zarr]).T
     else:
-        new_freq_idxs = np.digitize(new_freq[good_idxs], freq_list) - 1
-        output_freqs = new_freq[good_idxs]
-        output_heights = new_height[good_idxs]
-        output_df = new_dops[good_idxs]
-        output_signals = new_signal_selection[good_idxs]
-        output_xpow = xpow[good_idxs]
+        new_freq = df['freq (Hz)']
+        new_freq_idxs = np.digitize(new_freq, freq_list) - 1
+        new_height = df['height (km)']
+        new_dops = df['dopplershift']
+        output_freqs = new_freq
+        output_heights = new_height
+        output_dops = new_dops
+        output_signals = new_signal_selection
+        good_phases = xpha
+        good_powers = xpow
+        output_xpow = pd.concat([output_xpow if not output_xpow.empty else None, good_powers])
+        timeindex_series = new_height.index
         new_kd = np.empty(shape=(np.array(freq_list).shape[0], 2))
         new_kd[:, 0] = k_mag * 30.1 #Site-specific
         new_kd[:, 1] = k_mag * 30.1 #Site-specific
-        temp_xy = xpha[good_idxs]/new_kd[new_freq_idxs]
+        temp_xy = good_phases/new_kd[new_freq_idxs]
         new_xy = temp_xy/np.sqrt(1.0 - temp_xy**2)
         kz = - k_mag[new_freq_idxs] / np.sqrt(1+ np.sum(new_xy*new_xy,axis=1))
-        kx = kz * new_xy[:, 0]
-        ky = kz * new_xy[:, 1]
+        kx = kz * new_xy['x1']
+        ky = kz * new_xy['x2']
         karray = np.vstack([kx, ky, kz]).T
-        output_idxs = good_idxs
-    return output_idxs, karray, output_freqs, output_heights, output_df, output_signals, output_xpow
+    if karray.shape[0] > 0:
+        df_tmp = pd.DataFrame({'kx': karray[:,0], 'ky': karray[:,1], 'kz': karray[:,2]}, index=timeindex_series)
+        k_out_with_ts = pd.concat([k_out_with_ts if not k_out_with_ts.empty else None, df_tmp])
+        all_output_heights = pd.concat([all_output_heights if not all_output_heights.empty else None, output_heights])
+        all_output_freqs = pd.concat([all_output_freqs if not all_output_freqs.empty else None, output_freqs])
+        all_output_pow = pd.concat([all_output_pow if not all_output_pow.empty else None, output_xpow])
+    return k_out_with_ts, output_freqs, output_heights, output_dops, output_signals, output_xpow
 
-def compute_vel(freqs, freq_list, heights, dops, signals, points_thres=5):
-    freq_selection, height_selection, dop_selection, signal_selection = freqs, heights, dops, signals
-    good_idxs, new_freq, new_height, new_dops, new_signal_selection, xpow, xpha = compute_xpha_full(freq_selection, freq_list, 
-                                                                                               height_selection, dop_selection, signal_selection)
-    v_xarr = np.array([])
-    v_yarr = np.array([])
-    v_zarr = np.array([])
-    output_freqs = np.array([])
-    output_idxs = np.array([])
+def compute_vel(df, freq_list, points_thres=5):
+
+    df, output_xpow, output_xpha = compute_xpha_full(df, freq_list)
+    signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
     k_mag = 2*np.pi/(2.998e8) * np.array(freq_list)
     for idx, freq in enumerate(freq_list):
-        n_points_per_freq = len(np.argwhere(new_freq[good_idxs] == freq))
+        df_single_freq = df[df['freq (Hz)'] == freq]
+        n_points_per_freq = len(df_single_freq)
         if n_points_per_freq >= points_thres:
-            good_phases = xpha[good_idxs, :]
-            y_df = new_dops[good_idxs]
-            hgts = new_height[good_idxs]
-            new_signals = new_signal_selection[good_idxs, :]
-            single_freq_idx = new_freq[good_idxs] == freq
-            good_phases = good_phases[single_freq_idx]
-            new_freq_idxs = single_freq_idx
+
+            y_df = df_single_freq['dopplershift']
+            hgts = df_single_freq['height (km)']
+            new_signals = df_single_freq[signal_col_names]
+            single_freq_idx = np.where(df['freq (Hz)'] == freq)
+            good_phases = output_xpha.iloc[single_freq_idx]
+            good_powers = output_xpow.iloc[single_freq_idx]
             
-            y_df = y_df[new_freq_idxs]
             new_kd = np.empty(shape=(np.array(freq_list).shape[0], 2))
             new_kd[:, 0] = k_mag * 30.1 #Site-specific
             new_kd[:, 1] = k_mag * 30.1 #Site-specific
             temp_xy = good_phases/new_kd[idx]
             new_xy = temp_xy/np.sqrt(1.0 - temp_xy**2)
             kz = - k_mag[idx] / np.sqrt(1+ np.sum(new_xy*new_xy,axis=1))
-            kx = kz * new_xy[:, 0]
-            ky = kz * new_xy[:, 1]
-            output_freqs = np.append(output_freqs, freq)
+            kx = kz * new_xy['x1']
+            ky = kz * new_xy['x2']
+
+            output_heights = pd.concat([output_heights if not output_heights.empty else None, hgts])
+            output_freqs = pd.concat([output_freqs if not output_freqs.empty else None, pd.Series(np.repeat(freq, len(kx)), index=hgts.index, name='freq')])
+            output_xpow = pd.concat([output_xpow if not output_xpow.empty else None, good_powers])
             karray = np.vstack([kx, ky, kz]).T
             v = np.linalg.pinv(karray/np.pi) @ y_df
             v_horizontal = np.sqrt(np.sum(np.square(v[:2])))
@@ -203,10 +239,9 @@ def compute_vel(freqs, freq_list, heights, dops, signals, points_thres=5):
             output_idxs = np.append(output_idxs, np.argwhere(new_freq[good_idxs] == freq).flatten())
     return output_idxs, output_freqs, v_xarr, v_yarr, v_zarr
 
-def compute_xy(freqs, freq_list, heights, dops, signals, sort_by_freq=False, points_thres=5):
-    output_idxs, karray, output_freqs, output_heights, output_df, output_signals, output_xpow = compute_kvector(freqs, freq_list, heights, dops, 
-                                                                                                                signals, sort_by_freq=sort_by_freq, points_thres=points_thres)
-    kx, ky, kz = karray[:, 0], karray[:, 1], karray[:, 2]
+def compute_xy(df, freq_list, sort_by_freq=False, points_thres=5):
+    karray, output_freqs, output_heights, output_df, output_signals, output_xpow = compute_kvector(df, freq_list, sort_by_freq=sort_by_freq, points_thres=points_thres)
+    kx, ky, kz = karray['kx'], karray['ky'], karray['kz']
 
     #These sign inversions are needed to plot the EW vs range and NS vs range plots
     kx[kz < 0] *= -1
@@ -221,5 +256,5 @@ def compute_xy(freqs, freq_list, heights, dops, signals, sort_by_freq=False, poi
     good_powers = output_xpow
     xpos = np.tan(zangleEW) * zpos
     ypos = np.tan(zangleNS) * zpos
-    new_pow = 10*np.log10(np.sqrt(output_xpow[:, 0] * output_xpow[:, 1]))
-    return output_idxs, xpos, ypos, output_freqs, output_heights, output_df, output_signals, output_xpow
+    new_pow = 10*np.log10(np.sqrt(output_xpow['x1'] * output_xpow['x2']))
+    return xpos, ypos, output_freqs, output_heights, output_df, output_signals, output_xpow

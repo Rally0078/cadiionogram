@@ -6,6 +6,7 @@ from src.plot.autoscaling import ScaleIonogramCanvas
 from src.plot.xyplotcanvas import XYPlotCanvas
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
+from src.ui.freq_list_dropdown import CheckableDropdown
 from src.utils.siteinfo import site_dict
 from src.plotstate.factory import PlotStateFactory
 from src.ionogramparser.mdxreader import MDreader
@@ -85,6 +86,8 @@ class MainWidget(QWidget):
         self.mode_dropdown_layout.addWidget(self.mode_dropdown)
         self.mode_dropdown_layout.addWidget(self.run_button)
         self.run_button.clicked.connect(self._run_button_callback)
+        self.freq_selector = CheckableDropdown(text="Select Frequencies")
+        self.freq_selector.selectionChanged.connect(self._on_freq_selector_updated)
         
         # Grid layout
         layout = QGridLayout()
@@ -107,6 +110,7 @@ class MainWidget(QWidget):
 
         # Add table widget and POLAN button to the layout        
         layout.addWidget(self.table_widget, 5, 0, 2, 2)
+        layout.addWidget(self.freq_selector, 7,2)
         layout.addWidget(self.polan_button, 7, 1)
         layout.addWidget(self.save_scale_button, 7,0)
 
@@ -178,6 +182,7 @@ class MainWidget(QWidget):
         self.extension = extension
         #Note: Throws FolderNotContainingData exception if md3/4 is not found in the directory
         self.files_list, self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension)
+        self.freq_selector.setItems(items=[str(freq/1e6) for freq in self.freqs_list])
         self.timepartitions = self.metadata['timepartitions']
         #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(self.timepartitions.keys())[0]
@@ -197,7 +202,11 @@ class MainWidget(QWidget):
         
         #Do the initial plotting with the given lpointer and rpointer
         self._plot_helper()
-    
+
+    def _on_freq_selector_updated(self, sel):
+        if isinstance(self.canvas_widget, XYPlotCanvas):
+            self._plot_helper()
+
     #Callback to handle tickboxes
     def _on_tickbox_changed(self):
         if self.md3_checkbox.isChecked():
