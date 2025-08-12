@@ -192,12 +192,8 @@ def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5):
         kx = kz * new_xy['x1']
         ky = kz * new_xy['x2']
         karray = np.vstack([kx, ky, kz]).T
-    if karray.shape[0] > 0:
-        df_tmp = pd.DataFrame({'kx': karray[:,0], 'ky': karray[:,1], 'kz': karray[:,2]}, index=timeindex_series)
-        k_out_with_ts = pd.concat([k_out_with_ts if not k_out_with_ts.empty else None, df_tmp])
-        all_output_heights = pd.concat([all_output_heights if not all_output_heights.empty else None, output_heights])
-        all_output_freqs = pd.concat([all_output_freqs if not all_output_freqs.empty else None, output_freqs])
-        all_output_pow = pd.concat([all_output_pow if not all_output_pow.empty else None, output_xpow])
+
+    k_out_with_ts = pd.DataFrame({'kx': karray[:,0], 'ky': karray[:,1], 'kz': karray[:,2]}, index=timeindex_series)
     return k_out_with_ts, output_freqs, output_heights, output_dops, output_signals, output_xpow
 
 def compute_vel(df, freq_list, points_thres=5):
