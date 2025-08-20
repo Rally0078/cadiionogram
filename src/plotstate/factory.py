@@ -13,49 +13,52 @@ class PlotStateFactory:
         is_md4 = main_widget.md4_checkbox.isChecked()
         is_iono = main_widget.iono_checkbox.isChecked()
         option = main_widget.mode_dropdown.currentText()
+
+        PlotStateFactory._reset_visibility(main_widget)
+
+        try:
+            options_states_md4_dict = {
+                'Scale ionogram': Md4ScaleIonogramState,
+                'Display ionogram': Md4DisplayIonogramState,
+                'Real height analysis': Md4RealheightAnalysisState,
+                'EW-NS vs Range': NotImplementedError,
+            }
+            options_states_md3_dict = {
+                'Range vs Time (Freq colored)': MdxHeightDayCanvasState,
+                'EW-NS timeseries': MdxXYplotCanvasState,
+                'Drift velocity timeseries': NotImplementedError
+            }
+            if is_md4 or is_iono:
+                PlotStateFactory._set_tablewidget_buttons_visibility(main_widget, False)
+                new_plotstate = options_states_md4_dict[option]
+                if new_plotstate == NotImplementedError:
+                    raise KeyError("Not implemented")
+            elif is_md3:
+                PlotStateFactory._set_tablewidget_buttons_visibility(main_widget, True)
+                new_plotstate = options_states_md3_dict[option]
+                if new_plotstate == NotImplementedError:
+                    raise KeyError("Not implemented")
+            else:
+                raise KeyError
+            return new_plotstate(main_widget)
+        except KeyError:
+            raise ValueError(f"No valid PlotState for combination: md3={is_md3}, md4={is_md4}, option={option}")
+        
+    @staticmethod 
+    def _set_tablewidget_buttons_visibility(main_widget, state):
+        """Handles buttons common for MD3"""
+        main_widget.table_widget.end_timepartitions_dropdown.setVisible(state)
+        main_widget.table_widget.left_button.setVisible(~state)
+        main_widget.table_widget.right_button.setVisible(~state)
+        main_widget.freq_selector.setVisible(state)
+        if state is False:
+            main_widget.table_widget.end_timepartitions_dropdown.setVisible(state)
+    
+    @staticmethod
+    def _reset_visibility(main_widget):
         main_widget.polan_button.setVisible(False)
         main_widget.save_scale_button.setVisible(False)
         main_widget.table_widget.end_timepartitions_dropdown.setVisible(False)
         main_widget.table_widget.left_button.setVisible(True)
         main_widget.table_widget.right_button.setVisible(True)
         main_widget.freq_selector.setVisible(False)
-
-        #Handle buttons common for different canvases
-        if option in ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS timeseries', 'Drift velocity timeseries', 'EW-NS vs Range']:
-            PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,True)
-        elif option in ['Range vs Time (Freq colored)']:
-            PlotStateFactory._set_tablewidget_buttons_visibility(main_widget,False)
-        
-        #Handle buttons and canvases for each state
-        if (is_md4 or is_iono) and (option == 'Scale ionogram'):
-            main_widget.save_scale_button.setVisible(True)
-            return Md4ScaleIonogramState(main_widget)
-        if (is_md4 or is_iono) and option == 'Display ionogram':
-            return Md4DisplayIonogramState(main_widget)
-        elif (is_md4 or is_iono) and option == 'Real height analysis':
-            main_widget.polan_button.setVisible(True)
-            return Md4RealheightAnalysisState(main_widget)
-        elif option == 'Range vs Time (Freq colored)':
-            return MdxHeightDayCanvasState(main_widget)
-        elif is_md3 and option == 'EW-NS timeseries':
-            main_widget.table_widget.end_timepartitions_dropdown.setVisible(True)
-            main_widget.table_widget.left_button.setVisible(False)
-            main_widget.table_widget.right_button.setVisible(False)
-            main_widget.freq_selector.setVisible(True)
-
-            #main_widget.freq_selector.setVisible(True)
-            return MdxXYplotCanvasState(main_widget)
-        elif is_md3 and option == 'Drift velocity timeseries':
-            raise NotImplementedError("Drift velocity plotting is not implemented yet.")
-        elif is_md4 and option == 'EW-NS vs Range':
-            raise NotImplementedError("EW-NS vs range plotting is not implemented yet.")
-        else:
-            raise ValueError(f"No valid PlotState for combination: md3={is_md3}, md4={is_md4}, option={option}")
-        
-    @staticmethod 
-    def _set_tablewidget_buttons_visibility(main_widget, state):
-        main_widget.table_widget.left_button.setVisible(state)
-        main_widget.table_widget.right_button.setVisible(state)
-        main_widget.table_widget.timepartitions_dropdown.setVisible(state)
-        if state is False:
-            main_widget.table_widget.end_timepartitions_dropdown.setVisible(state)

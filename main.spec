@@ -4,14 +4,12 @@
 a = Analysis(
     ['src\\plot\\main.py'],
     pathex=[],
-    binaries=[('.\\mainWidget.cp313-win_amd64.pyd', '.'), ('.\\mainGUI.cp313-win_amd64.pyd', '.'), 
-    ('.\\metadatatable.cp313-win_amd64.pyd', '.'), ('.\\mdxreader.cp313-win_amd64.pyd', '.')],
     datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PyQt5', 'tkinter', 'PyQt6', 'torch', 'pillow', 'IPython', 'numba', 'jupyter_client', 'jupyter_code', 'jupyterlab_widgets'],
+    excludes=['PyQt5', 'tkinter', 'PyQt6', 'torch', 'cython', 'pillow', 'IPython', 'numba', 'jupyter_client', 'jupyter_code', 'jupyterlab_widgets'],
     noarchive=False,
     optimize=1,
 )

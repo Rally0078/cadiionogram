@@ -22,6 +22,7 @@ class XYPlotCanvas(FigureCanvas):
         self.axs = [self.ax_range, self.ax_ew, self.ax_ns]
         self.is_hidden = False
         self.setHidden(self.is_hidden)
+        self.cbar = None
 
     def _set_plot_ax(self, site):
         self.ax_range.set_ylabel("Range (km)")
@@ -33,7 +34,7 @@ class XYPlotCanvas(FigureCanvas):
             ax.xaxis.set_major_formatter(date_format)
             #ax.grid()
 
-    def plot_scatter(self, time_index, heights, freqs, x, y, xpow, output_freqs, selected_frequencies, date, site):
+    def plot_scatter(self, time_index, heights, freqs, power, x, y, xpow, output_freqs, selected_frequencies, date, site):
         for ax in self.axs:
             ax.clear()
         self.fig.tight_layout(pad=3)
@@ -42,10 +43,19 @@ class XYPlotCanvas(FigureCanvas):
         legend.remove()
         self.fig.suptitle(f"NS, EW, Range timeseries plot at site: {site} on {date.day:02d}-{date.month:02d}-{date.year:04d} {site_dict[site].timezone}")
         print(f"Selected frequencies: {selected_frequencies}")
+        if len(selected_frequencies) == 1:
+            selected_heights = heights.iloc[np.argwhere(np.isclose(freqs, selected_frequencies[0], atol=1e-12)).flatten()]
+            sc = self.ax_range.scatter(selected_heights.index, selected_heights, s=3, c=power[np.argwhere(np.isclose(freqs, selected_frequencies[0], atol=1e-12)).flatten()], 
+                                  label=f"{selected_frequencies[0]/1e6} MHz")
+            if not self.cbar:
+                self.cbar = self.fig.colorbar(sc, ax=self.ax_range)
+            else:
+                self.cbar.update_ticks()
+        else:
+            for freq in np.unique(selected_frequencies):
+                self.ax_range.plot(heights.iloc[np.argwhere(np.isclose(freqs, freq, atol=1e-12)).flatten()], marker='s', linewidth=0, markersize=3, label=f"{freq/1e6} MHz")  
         for freq in np.unique(selected_frequencies):
-            self.ax_range.plot(heights.iloc[np.argwhere(np.isclose(freqs, freq, atol=1e-12)).flatten()], marker='s', linewidth=0, markersize=3, label=f"{freq/1e6} MHz")
             self.ax_ew.plot(x.iloc[np.argwhere(np.isclose(output_freqs, freq, atol=1e-12)).flatten()], linewidth=0, marker='s', markersize=3, label=f"{freq/1e6} MHz")
-            
             self.ax_ew.set_ylim(-1000, 1000)
             self.ax_ns.plot(y.iloc[np.argwhere(np.isclose(output_freqs, freq, atol=1e-12)).flatten()], linewidth=0, marker='s', markersize=3, label=f"{freq/1e6} MHz")
             self.ax_ns.set_ylim(-1000, 1000)    
