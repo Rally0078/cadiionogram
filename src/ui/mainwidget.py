@@ -25,7 +25,7 @@ import shutil
 
 class MainWidget(QWidget):
     md3_options = ['Range vs Time (Freq colored)', 'EW-NS timeseries', 'Drift velocity timeseries']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Range vs Time (Freq colored)', 'Scale ionogram', 'EW-NS vs Range']
+    md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range']
     def __init__(self):
         super().__init__()
         self.polan_dir = None
@@ -87,6 +87,7 @@ class MainWidget(QWidget):
         self.mode_dropdown_layout.addWidget(self.run_button)
         self.run_button.clicked.connect(self._run_button_callback)
         self.freq_selector = CheckableDropdown(text="Select Frequencies")
+        self.freq_selector.setVisible(False)
         self.freq_selector.selectionChanged.connect(self._on_freq_selector_updated)
         
         # Grid layout
