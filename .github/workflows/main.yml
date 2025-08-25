@@ -21,12 +21,12 @@ jobs:
           auto-activate-base: false
 
       - name: Run tests
-        shell: bash -e {0}
+        shell: bash -l {0}
         run: |
           conda activate cadiionogram
           pytest
 
-      - name: Bump version and push tag (Semantic Versioning)
+      - name: Bump version and push tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.2
         with:
