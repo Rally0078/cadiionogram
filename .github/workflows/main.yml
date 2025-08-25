@@ -37,7 +37,8 @@ jobs:
           activate-environment: cadiionogram
           environment-file: environment-build.yml
           use-mamba: true
-          miniforge-variant: Mambaforge
+          miniforge-variant: Miniforge3
+          miniforge-version: latest
           auto-activate-base: false
           pkgs-dirs: ~/conda_pkgs_dir
 
