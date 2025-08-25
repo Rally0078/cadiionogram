@@ -20,12 +20,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cached Conda environment
+        id: cache-conda
+        uses: actions/cache@v4
+        with:
+          path: ~/conda_env
+          key: ${{runner.os}}-conda-${{hashFiles('environment-build.yml')}}
+          restore-keys: |
+            ${{runner.os}}-conda-
+      
       - name: Set up Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: cadiionogram
           environment-file: environment-build.yml
+          use-mamba: true
           auto-activate-base: false
+          prefix: ~/conda_env
 
       - name: Run tests
         shell: bash -l {0}
@@ -78,7 +89,7 @@ jobs:
       
       - name: Rename artifacts
         run: |
-          VERSION="${{ steps.tag_version.output.new_tag}}"
+          VERSION="${{ steps.tag_version.outputs.new_tag}}"
           echo "Using version: $VERSION"
           for dir in artifacts/*; do
             OS_TAG=$(basename "$dir" | sed 's/build-//')
