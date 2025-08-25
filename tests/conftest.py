@@ -67,7 +67,7 @@ def test_get_all_files():
 
 @pytest.fixture
 def test_raw_files_day():
-    return [Path("E:\\vimal\\data\\250409TI"), Path("E:\\vimal\\data\\250410TI")]
+    return [Path(".\\rawfiles\\250409TI"), Path(".\\rawfiles\\250410TI")]
 
 @pytest.fixture
 def test_files_md3_day():
