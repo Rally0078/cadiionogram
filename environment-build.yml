@@ -19,7 +19,6 @@ dependencies:
   - seaborn
   - tqdm
   - nomkl
-  - fortls
   - itables
   - scikit-image
   - pyinstaller
