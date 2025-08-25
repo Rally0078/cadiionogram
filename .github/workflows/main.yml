@@ -24,7 +24,9 @@ jobs:
         id: cache-conda
         uses: actions/cache@v4
         with:
-          path: ~/conda_env
+          path: |
+            ~/conda_pkgs_dir
+            ~/conda_envs_dir
           key: ${{runner.os}}-conda-${{hashFiles('environment-build.yml')}}
           restore-keys: |
             ${{runner.os}}-conda-
@@ -35,8 +37,9 @@ jobs:
           activate-environment: cadiionogram
           environment-file: environment-build.yml
           use-mamba: true
+          miniforge-variant: Mambaforge
           auto-activate-base: false
-          prefix: ~/conda_env
+          pkgs-dirs: ~/conda_pkgs_dir
 
       - name: Run tests
         shell: bash -l {0}
