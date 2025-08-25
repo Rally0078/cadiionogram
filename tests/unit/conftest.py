@@ -3,10 +3,7 @@ import struct
 import os
 from datetime import datetime
 import numpy as np
-import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
-from unittest.mock import patch
+import tempfile
 
 
 @pytest.fixture
@@ -55,10 +52,10 @@ def mock_raw_file():
             mock_bytes.extend(struct.pack("<B", 226))   #hflag, stop if hflag > 224
     mock_bytes.extend(struct.pack("<B", 255))   #time_min, stop if time_min == 255
 
-    r, w = os.pipe()
-    with open(w, 'wb') as f:
-        f.write(bytes(mock_bytes))
-    return r
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        f.write(mock_bytes)
+        f.flush()
+        return f.name
 
 @pytest.fixture
 def mock_data():
