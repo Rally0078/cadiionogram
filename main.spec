@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['src\\plot\\main.py'],
+    ['src/plot/main.py'],
     pathex=[],
     datas=[],
     hiddenimports=[],
