@@ -78,7 +78,7 @@ jobs:
       
       - name: Rename artifacts
         run: |
-          VERSION="${{ steps.tag_version.output.new_tag}}""
+          VERSION="${{ steps.tag_version.output.new_tag}}"
           echo "Using version: $VERSION"
           for dir in artifacts/*; do
             OS_TAG=$(basename "$dir" | sed 's/build-//')
