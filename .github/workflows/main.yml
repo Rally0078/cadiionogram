@@ -32,7 +32,11 @@ jobs:
         run: |
           conda activate cadiionogram
           pytest
-
+      - name: Debug steps
+        shell: bash -l {0}
+        run: |
+          ls -l
+          pwd
       - name: Build with pyinstaller
         shell: bash -l {0}
         run: |
