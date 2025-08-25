@@ -4,6 +4,7 @@ channels:
 dependencies:
   - joblib
   - matplotlib
+  - nomkl
   - nodejs
   - numpy
   - pandas
@@ -16,7 +17,5 @@ dependencies:
   - scipy
   - seaborn
   - tqdm
-  - nomkl
-  - itables
   - scikit-image
   - pyinstaller

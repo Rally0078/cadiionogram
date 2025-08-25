@@ -16,7 +16,7 @@ jobs:
       - name: Set up Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          activate-environment: myenv
+          activate-environment: cadiionogram
           environment-file: environment-build.yml
           auto-activate-base: false
 
