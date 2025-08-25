@@ -26,7 +26,9 @@ def pytest_collection_modifyitems(items):
    
     items[:] = sorted_items
 
-
+@pytest.fixture
+def test_raw_dir():
+    return Path(__file__).parent / Path("rawfiles")
 @pytest.fixture
 def test_raw_reader():
     return MDreader
@@ -36,15 +38,15 @@ def test_raw_reader():
 
 @pytest.fixture
 def test_files_md4():
-    return Path(".\\rawfiles\\250409TI").glob('5D09*.md4')
+    return Path("250409TI").glob('5D09*.md4')
 
 @pytest.fixture
 def test_files_md3():
-    return Path(".\\rawfiles\\250409TI").glob('5D09*.md3')
+    return Path("250409TI").glob('5D09*.md3')
 
 @pytest.fixture
 def test_files_single_folder():
-    return Path(".\\rawfiles\\250409TI")
+    return Path("250409TI")
 
 @pytest.fixture
 def test_get_types():
@@ -60,14 +62,14 @@ def test_get_types():
 @pytest.fixture
 def test_get_all_files():
 
-    folder_1 = Path(".\\tests\\rawfiles\\250409TI").glob('5D09*.md4')
-    folder_2 = Path(".\\tests\\rawfiles\\250410TI").glob('5D10*.md4')
+    folder_1 = Path("250409TI").glob('5D09*.md4')
+    folder_2 = Path("250410TI").glob('5D10*.md4')
 
     return chain(folder_1, folder_2)
 
 @pytest.fixture
 def test_raw_files_day():
-    return [Path(".\\tests\\rawfiles\\250409TI"), Path(".\\tests\\rawfiles\\250410TI")]
+    return [Path("250409TI"), Path("250410TI")]
 
 @pytest.fixture
 def test_files_md3_day():
