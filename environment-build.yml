@@ -2,8 +2,6 @@ name: cadiionogram
 channels:
   - defaults
 dependencies:
-  - ipykernel
-  - ipympl
   - joblib
   - matplotlib
   - nodejs
@@ -22,9 +20,3 @@ dependencies:
   - itables
   - scikit-image
   - pyinstaller
-  - sphinx
-  - numpydoc
-  - sphinx-autodoc-typehints
-  - pydata-sphinx-theme
-  - cython
-  - xarray
