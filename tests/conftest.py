@@ -60,14 +60,14 @@ def test_get_types():
 @pytest.fixture
 def test_get_all_files():
 
-    folder_1 = Path(".\\rawfiles\\250409TI").glob('5D09*.md4')
-    folder_2 = Path(".\\rawfiles\\250410TI").glob('5D10*.md4')
+    folder_1 = Path(".\\tests\\rawfiles\\250409TI").glob('5D09*.md4')
+    folder_2 = Path(".\\tests\\rawfiles\\250410TI").glob('5D10*.md4')
 
     return chain(folder_1, folder_2)
 
 @pytest.fixture
 def test_raw_files_day():
-    return [Path(".\\rawfiles\\250409TI"), Path(".\\rawfiles\\250410TI")]
+    return [Path(".\\tests\\rawfiles\\250409TI"), Path(".\\tests\\rawfiles\\250410TI")]
 
 @pytest.fixture
 def test_files_md3_day():
