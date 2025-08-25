@@ -23,6 +23,7 @@ jobs:
       - name: Run tests
         shell: bash -e {0}
         run: |
+          conda activate cadiionogram
           pytest
 
       - name: Bump version and push tag (Semantic Versioning)
