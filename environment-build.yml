@@ -1,5 +1,6 @@
 name: cadiionogram
 channels:
+  - conda-forge
   - defaults
 dependencies:
   - joblib
