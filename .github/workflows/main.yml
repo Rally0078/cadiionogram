@@ -93,15 +93,30 @@ jobs:
       
       - name: Rename artifacts
         run: |
-          VERSION="${{ steps.tag_version.outputs.new_tag}}"
+          VERSION="${{ steps.tag_version.outputs.new_tag }}"
           echo "Using version: $VERSION"
+      
+          mkdir renamed
+      
           for dir in artifacts/*; do
             OS_TAG=$(basename "$dir" | sed 's/build-//')
+      
             for f in "$dir"/*; do
               base=$(basename "$f")
-              mv "$f" "artifacts/${base%.*}-${VERSION}-${OS_TAG}.${base##*.}"
+      
+              if [ -f "$f" ]; then
+                # Single-file artifact
+                mv "$f" "renamed/${base%.*}-${VERSION}-${OS_TAG}.${base##*.}"
+              elif [ -d "$f" ]; then
+                # Folder artifact → zip it
+                zip -r "renamed/${base}-${VERSION}-${OS_TAG}.zip" "$f"
+              fi
             done
           done
+      
+          # Move back into artifacts/ so release step picks them up
+          rm -rf artifacts/*
+          mv renamed/* artifacts/
       
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
