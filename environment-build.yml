@@ -1,0 +1,30 @@
+name: cadiionogram
+channels:
+  - defaults
+dependencies:
+  - ipykernel
+  - ipympl
+  - joblib
+  - matplotlib
+  - nodejs
+  - numpy
+  - pandas
+  - pip
+  - pyarrow
+  - pyside6
+  - pytest
+  - python=3.13
+  - scikit-learn
+  - scipy
+  - seaborn
+  - tqdm
+  - nomkl
+  - itables
+  - scikit-image
+  - pyinstaller
+  - sphinx
+  - numpydoc
+  - sphinx-autodoc-typehints
+  - pydata-sphinx-theme
+  - cython
+  - xarray
