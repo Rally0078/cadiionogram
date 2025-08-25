@@ -1,4 +1,4 @@
-name: cadiionogram
+name: cadiionogram-release
 channels:
   - conda-forge
   - defaults
@@ -6,7 +6,6 @@ dependencies:
   - joblib
   - matplotlib
   - nomkl
-  - nodejs
   - numpy
   - pandas
   - pip
@@ -14,9 +13,6 @@ dependencies:
   - pyside6
   - pytest
   - python=3.13
-  - scikit-learn
   - scipy
-  - seaborn
-  - tqdm
   - scikit-image
   - pyinstaller
