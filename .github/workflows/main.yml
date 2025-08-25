@@ -38,7 +38,7 @@ jobs:
         run: |
           conda activate cadiionogram
           cd $GITHUB_WORKSPACE
-          pyinstaller main.spec
+          python -m PyInstaller main.spec
 
       - name: Prepare artifacts
         shell: bash -l {0}
