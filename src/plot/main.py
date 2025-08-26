@@ -21,6 +21,8 @@ class MainWindow(QMainWindow):
                                         "polanoutputdirectory": "C:\\cdata",
                                         "cachedir": "C:\\cdata\\parquetcache"}
             self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
+            self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
+            self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
         else:
