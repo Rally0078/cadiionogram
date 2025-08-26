@@ -27,6 +27,8 @@ For manually building the GUI executable, run the following:
 ```
 The GH Actions should do all these automatically and create a release for each push into the main branch.
 
+When running the GUI executable for the first time, it creates a config.ini file. The config.ini file consists of the directories used by the GUI to save processed data, as well as the default location of the raw data. Edit the configuration so that the program uses the correct directories.
+
 ## Running as a python script
 To run as a python script, run the following. Run it the same way to debug the GUI.
 ```
