@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 )
 from pathlib import Path
 import configparser
-
+import platform
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -13,13 +13,24 @@ class MainWindow(QMainWindow):
 
         self.config = configparser.ConfigParser()
         self.cfg_file = Path("./config.ini")
+        os_name = platform.system()
 
         if not self.cfg_file.exists():
             self.cfg_file.touch()
-            self.config['Locations'] = {'DefaultInputDirectory': 'C:\\CADIinput',
-                                        'DefaultOutputDirectory': 'C:\\CADIoutput',
-                                        "polanoutputdirectory": "C:\\cdata",
-                                        "cachedir": "C:\\cdata\\parquetcache"}
+            if os_name == "Windows":
+                self.config['Locations'] = {'DefaultInputDirectory': 'C:\\CADIinput',
+                                            'DefaultOutputDirectory': 'C:\\CADIoutput',
+                                            "polanoutputdirectory": "C:\\cdata",
+                                            "cachedir": "C:\\cdata\\parquetcache"}
+            elif os_name == "Linux" or os_name == "Darwin":
+                self.config['Locations'] = {'DefaultInputDirectory': '~/CADIinput',
+                                            'DefaultOutputDirectory': '~/CADIoutput',
+                                            "polanoutputdirectory": "~/cdata",
+                                            "cachedir": "~/cdata/parquetcache"}
+            else:
+                print("OS is not supported!")
+                return                
+                
             self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
             self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
             self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
