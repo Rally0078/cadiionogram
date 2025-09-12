@@ -11,8 +11,9 @@ For using the CADI-related libraries, install the conda environment and activate
 
 Then import the libraries in Python to use them:
 ```py
-    #Add these lines to your Python code that requires the library
+    #Add these lines to your Python code that requires the CADI library
     import sys
+    from pathlib import Path
     #The following two lines are for importing modules from a different folder
     import_path = Path("path/to/the/repo")
     sys.path.append(str(import_path))
