@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 import subprocess
 import shutil
+from math import isnan
 
 class MainWidget(QWidget):
     md3_options = ['Range vs Time (Freq colored)', 'EW-NS timeseries', 'Drift velocity timeseries']
@@ -32,7 +33,7 @@ class MainWidget(QWidget):
         # Canvas parameters to be used later
         self.canvas_layout_row = 2
         self.canvas_layout_col = 3
-        self.canvas_layout_rowspan = 6
+        self.canvas_layout_rowspan = 7
         self.canvas_layout_colspan = 3
         self.canvas_widget = None
         self.lpointer = -1
@@ -64,7 +65,22 @@ class MainWidget(QWidget):
         #Save Scaling button
         self.save_scale_button = QPushButton("Save Scaling")
         self.save_scale_button.setVisible(False)  # Hidden initially
-        self.save_scale_button.clicked.connect(self._save_manual_scale)        
+        self.save_scale_button.clicked.connect(self._save_manual_scale)
+        self.clear_scale_button = QPushButton("Clear Scaling")
+        self.clear_scale_button.setVisible(False)  # Hidden initially
+        self.clear_scale_button.clicked.connect(self._clean_scaled_canvas)
+        #Manual scaling modes
+        self.scale_mode_group = QButtonGroup()
+        self.f_scale_box = QCheckBox('Scale F')
+        self.e_scale_box = QCheckBox('Scale E')
+        self.ie_scale_box = QCheckBox('Scale IE')
+        self.scale_mode_group.addButton(self.f_scale_box)
+        self.scale_mode_group.addButton(self.e_scale_box)
+        self.scale_mode_group.addButton(self.ie_scale_box)
+        self.scale_mode_group.setExclusive(True)
+        self.f_scale_box.setVisible(False)
+        self.e_scale_box.setVisible(False)
+        self.ie_scale_box.setVisible(False)
         
         # Mode selection dropdown
         self.mode_dropdown = QComboBox()
@@ -109,12 +125,15 @@ class MainWidget(QWidget):
         self.table_widget = MetadataTableWidget()
         self.table_widget.end_timepartitions_dropdown.setVisible(False)
 
-        # Add table widget and POLAN button to the layout        
-        layout.addWidget(self.table_widget, 5, 0, 2, 2)
-        layout.addWidget(self.freq_selector, 7,2)
-        layout.addWidget(self.polan_button, 7, 1)
-        layout.addWidget(self.save_scale_button, 7,0)
-
+        # Add table widget, POLAN, and scaling buttons to the layout        
+        layout.addWidget(self.table_widget, 4, 0, 2, 2)
+        layout.addWidget(self.f_scale_box, 5,0)
+        layout.addWidget(self.e_scale_box, 5,1)
+        layout.addWidget(self.ie_scale_box, 5,2)
+        layout.addWidget(self.freq_selector, 6,2)
+        layout.addWidget(self.polan_button, 6, 1)
+        layout.addWidget(self.save_scale_button, 6,0)
+        layout.addWidget(self.clear_scale_button, 6, 1)
         # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
@@ -289,10 +308,26 @@ class MainWidget(QWidget):
             output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
             output_filename = f"{datetime_obs.strftime('%y%m%d')}{site_dict[self.metadata['site']].short_site}_F.tfh"
             output_file_name = f"{self.polan_dir / output_filename}"
+            scaled_values_state = self.canvas_widget.scaled_values_lines
+            scaled_values_state.set_region('F')
+            fof = scaled_values_state.f
+            hprimef = scaled_values_state.h
+            scaled_values_state.set_region('E')
+            foe = scaled_values_state.f
+            hprimee = scaled_values_state.h
+            scaled_values_state.set_region('IE')
+            foie = scaled_values_state.f
+            hprimeie = scaled_values_state.h
             with open(output_file_name, 'a') as f:
-                f.write(f"{timestamp_hour} {timestamp_minute} {timestamp_second} {self.canvas_widget.fof2/1e6:.2f} {self.canvas_widget.hprimef2:.2f}\n")
+                f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} " \
+                f"{'NaN ' if isnan(fof) else f'{fof:.2f}'} {'NaN ' if isnan(hprimef) else f'{hprimef:.2f}'} " \
+                f"{'NaN ' if isnan(foe) else f'{foe:.2f}'} {'NaN ' if isnan(hprimee) else f'{hprimee:.2f}'} " \
+                f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'}\n"))
         else:
             print(f"Not scaling canvas! Use the appropriate canvas")
+    def _clean_scaled_canvas(self):
+        if isinstance(self.canvas_widget, ScaleIonogramCanvas):
+            self.canvas_widget.clean_canvas()
 
     # Run POLAN by outputting fit curve into a file and executing the POLAN executable, then read from the POLAN's output text file POLOUT.T
     def _run_polan(self, freqs, heights, ml_freqs, ml_heights):

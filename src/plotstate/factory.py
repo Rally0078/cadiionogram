@@ -58,6 +58,10 @@ class PlotStateFactory:
     def _reset_visibility(main_widget):
         main_widget.polan_button.setVisible(False)
         main_widget.save_scale_button.setVisible(False)
+        main_widget.f_scale_box.setVisible(False)
+        main_widget.e_scale_box.setVisible(False)
+        main_widget.ie_scale_box.setVisible(False)
+        main_widget.clear_scale_button.setVisible(False)
         main_widget.table_widget.end_timepartitions_dropdown.setVisible(False)
         main_widget.table_widget.left_button.setVisible(True)
         main_widget.table_widget.right_button.setVisible(True)
