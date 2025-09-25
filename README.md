@@ -1,22 +1,37 @@
 # CADI Ionogram Plotting Software
 
-Written in Python using Qt6. 
+Primarily developed to process and plot CADI raw data in various forms. Written in Python using Qt6. 
 
-Run tests before using
-```
-    pytest -v
-```
-
-Installation:
-```
+## Installation:
+For using the CADI-related libraries, install the conda environment and activate it the following way:
+```bash
     conda env create -f environment.yml
     conda activate cadiionogram
-    python -m PyInstaller ./src/ui/main.py -D --distpath ./cadireader --exclude PyQt5 --exclude tkinter --exclude  matplotlib --exclude PyQt6 --exclude scipy --exclude pillow --exclude IPython --exclude PIL --exclude numba
-    python -m PyInstaller ./src/plot/main.py -D --distpath . --exclude PyQt5 --exclude tkinter --exclude PyQt6 --exclude torch --exclude pillow --exclude IPython --exclude numba --exclude jupyter_client --exclude jupyter_code --exclude jupyterlab_widgets
 ```
 
-Running as a python script
+Then import the libraries in Python to use them:
+```py
+    #Add these lines to your Python code that requires the CADI library
+    import sys
+    from pathlib import Path
+    #The following two lines are for importing modules from a different folder
+    import_path = Path("path/to/the/repo")
+    sys.path.append(str(import_path))
 ```
-    python -m src.ui.main.py
+
+For manually building the GUI executable, run the following:
+```bash
+    conda env create -f environment-build.yml
+    conda activate cadiionogram-release
+    pytest -v
+    python -m PyInstaller main.spec
+```
+The GH Actions should do all these automatically and create a release for each push into the main branch.
+
+When running the GUI executable for the first time, it creates a config.ini file. The config.ini file consists of the directories used by the GUI to save processed data, as well as the default location of the raw data. Edit the configuration so that the program uses the correct directories.
+
+## Running as a python script
+To run as a python script, run the following. Run it the same way to debug the GUI.
+```
     python -m src.plot.main.py
 ```
