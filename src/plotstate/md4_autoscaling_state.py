@@ -13,6 +13,10 @@ class Md4ScaleIonogramState(PlotState):
 
     def update_canvas(self, canvas):
         self.main.save_scale_button.setVisible(True)
+        self.main.f_scale_box.setVisible(True)
+        self.main.e_scale_box.setVisible(True)
+        self.main.ie_scale_box.setVisible(True)
+        self.main.clear_scale_button.setVisible(True)
         it = RawDataDirIterator(self.main.metadata, self.main.freqs, self.main.heights, self.main.dops, self.main.signals)
         freqs, heights, dops, signals = it[self.main._selected_timestamp]
         if self.main.extension == 'iono':

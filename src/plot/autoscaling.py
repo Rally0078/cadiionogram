@@ -5,11 +5,12 @@ from matplotlib.ticker import ScalarFormatter, MultipleLocator
 from datetime import datetime
 import numpy as np
 from src.utils.siteinfo import site_dict
+from src.plotstate.scaling_region_state import ScaleRegionValues
 
 class ScaleIonogramCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure(figsize=(16, 9))
-        
+        self.main = parent
         super().__init__(self.fig)
         self.is_hidden = True
         self.ax = self.fig.add_subplot(111)
@@ -19,10 +20,7 @@ class ScaleIonogramCanvas(FigureCanvas):
         self.freq_limits = (1e6, 18e6)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
-        self.line_h = None
-        self.line_f = None
-        self.fof2 = 0
-        self.hprimef2 = 0
+        self.scaled_values_lines = ScaleRegionValues(self.ax)
         self._set_plot_ax()
         self.mpl_connect("button_press_event", self.on_mouse_press)
         self.legend = None
@@ -64,32 +62,51 @@ class ScaleIonogramCanvas(FigureCanvas):
         self._set_plot_ax()
         #self.fig.tight_layout()
         self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)
-        # Reset line
-        self.line_h = None
-        self.line_f = None
-
-        self.ax.legend()
+        # Reset lines
+        self.scaled_values_lines.clear_all()
+        self.legend = self.ax.legend()
         self.draw()
+
     def on_mouse_press(self, event):
+        #Get current scale region mode
+        if self.main.f_scale_box.isChecked():
+            text_legend = 'F'
+        elif self.main.e_scale_box.isChecked():
+            text_legend = 'E'
+        elif self.main.ie_scale_box.isChecked():
+            text_legend = 'IE'
+        else:
+            raise KeyError("No valid region selected for manual scaling")
+        self.scaled_values_lines.set_region(text_legend)
         # Only respond to left or right clicks inside axes
         if event.inaxes != self.ax:
             return
         if event.button == 1:  # Left click -> scale height
             # Create a new line or clear old one
-            if self.line_h is None:
-                self.line_h = self.ax.axhline(event.ydata, color='red', linewidth=2, linestyle='--', label=r"$h'F_2$ = {:.2f} km".format(event.ydata))
-            else:
-                self.line_h.set_data([self.line_h.get_xdata()], [event.ydata])
-            self.hprimef2 = event.ydata
+            self.scaled_values_lines.h = event.ydata
 
         elif event.button == 3:  # Right click -> scale frequency
-            if self.line_f is None:
-                self.line_f = self.ax.axvline(event.xdata, color='blue', linewidth=2, linestyle='--', label=r"$f_oF_2$ = {:.2f} MHz".format(event.xdata/1e6))
-            else:
-                self.line_f.set_data([event.xdata], [self.line_f.get_ydata()])
-            self.fof2 = event.xdata   
-        if self.legend == None:
-            self.legend = self.ax.legend()
-        else:
-            self.legend = self.ax.legend([self.line_h, self.line_f], [r"$h'F_2$ = {:.2f} km".format(self.hprimef2), r"$f_oF_2$ = {:.2f} MHz".format(self.fof2/1e6)])
+            self.scaled_values_lines.f = event.xdata
+        self.handle_legend()
+        self.draw()
+
+    def handle_legend(self):
+        if self.legend is not None:
+            self.legend.remove()
+            self.draw()
+        lines = []
+        for s in self.scaled_values_lines._state.values():
+            for line in [s['hline'], s['fline']]:
+                if line is not None:
+                    lines.append(line)
+        if not lines:
+            return
+        labels = [line.get_label() for line in lines]
+        
+        self.legend = self.ax.legend(handles=lines, labels=labels)
+    def clean_canvas(self):
+        self.scaled_values_lines.clear_all()
+        if self.legend is not None:
+            self.legend.remove()
+            self.legend = None
         self.draw()
