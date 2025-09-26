@@ -33,7 +33,7 @@ class MainWidget(QWidget):
         # Canvas parameters to be used later
         self.canvas_layout_row = 2
         self.canvas_layout_col = 3
-        self.canvas_layout_rowspan = 7
+        self.canvas_layout_rowspan = 8
         self.canvas_layout_colspan = 3
         self.canvas_widget = None
         self.lpointer = -1
@@ -127,13 +127,13 @@ class MainWidget(QWidget):
 
         # Add table widget, POLAN, and scaling buttons to the layout        
         layout.addWidget(self.table_widget, 4, 0, 2, 2)
-        layout.addWidget(self.f_scale_box, 5,0)
-        layout.addWidget(self.e_scale_box, 5,1)
-        layout.addWidget(self.ie_scale_box, 5,2)
-        layout.addWidget(self.freq_selector, 6,2)
-        layout.addWidget(self.polan_button, 6, 1)
-        layout.addWidget(self.save_scale_button, 6,0)
-        layout.addWidget(self.clear_scale_button, 6, 1)
+        layout.addWidget(self.f_scale_box, 6,0)
+        layout.addWidget(self.e_scale_box, 6,1)
+        layout.addWidget(self.ie_scale_box, 6,2)
+        layout.addWidget(self.freq_selector, 7,2)
+        layout.addWidget(self.polan_button, 7, 1)
+        layout.addWidget(self.save_scale_button, 7,0)
+        layout.addWidget(self.clear_scale_button, 7, 1)
         # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
