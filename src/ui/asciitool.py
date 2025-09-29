@@ -24,32 +24,48 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QFont
 from PySide6.QtCore import QSize, Qt
-from src.cadiparser import mdxreader, csvio
+from src.ionogramparser.mdxreader import MDreader
 import sys
 import time
 from datetime import datetime
 import configparser
 from pathlib import Path
 from itertools import starmap
+import platform
 
 class CADIreader(QMainWindow):
     def __init__(self):
         super().__init__()
         self.config = configparser.ConfigParser()
         self.cfg_file = Path("./config.ini")
+        os_name = platform.system()
 
         if not self.cfg_file.exists():
             self.cfg_file.touch()
-            self.config['Locations'] = {'DefaultInputDirectory': 'C:\\CADIinput',
-                                        'DefaultOutputDirectory': 'C:\\CADIoutput'}
-            self.input_dir = Path("C:\\CADIinput")
-            self.output_dir = Path("C:\\CADIoutput")
+            if os_name == "Windows":
+                self.config['Locations'] = {'DefaultInputDirectory': 'C:\\CADIinput',
+                                            'DefaultOutputDirectory': 'C:\\CADIoutput',
+                                            "polanoutputdirectory": "C:\\cdata",
+                                            "cachedir": "C:\\cdata\\parquetcache"}
+            elif os_name == "Linux" or os_name == "Darwin":
+                self.config['Locations'] = {'DefaultInputDirectory': '~/CADIinput',
+                                            'DefaultOutputDirectory': '~/CADIoutput',
+                                            "polanoutputdirectory": "~/cdata",
+                                            "cachedir": "~/cdata/parquetcache"}
+            else:
+                print("OS is not supported!")
+                return                
+                
+            self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
+            self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
+            self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
         else:
             self.config.read(self.cfg_file)
+            self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
             self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
-            self.output_dir = Path(self.config['Locations']['DefaultOutputDirectory'])
+            self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
         self._setup_ui()
 
     def _setup_ui(self):
