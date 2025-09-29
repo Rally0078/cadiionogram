@@ -25,6 +25,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont
 from PySide6.QtCore import QSize, Qt
 from src.ionogramparser.mdxreader import MDreader
+from src.utils.pandasutils import PandasUtils
+from src.ui.metadatatable import MetadataTableWidget
+from src.ui.metadatakeys import cadi_keys_list
+import json
 import sys
 import time
 from datetime import datetime
@@ -58,6 +62,7 @@ class CADIreader(QMainWindow):
                 
             self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
             self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
+            self.output_dir = Path(self.config['Locations']['DefaultOutputDirectory'])
             self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
@@ -65,6 +70,7 @@ class CADIreader(QMainWindow):
             self.config.read(self.cfg_file)
             self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
             self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
+            self.output_dir = Path(self.config['Locations']['DefaultOutputDirectory'])
             self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
         self._setup_ui()
 
@@ -85,7 +91,7 @@ class CADIreader(QMainWindow):
         self.button_group = QButtonGroup()
         self.button_group.addButton(self.md3_checkbox)
         self.button_group.addButton(self.md4_checkbox)
-        self.button_group.setExclusive(False)
+        self.button_group.setExclusive(True)
         self.read_button.clicked.connect(self._read_button_click)
         self.set_data_folder_button.clicked.connect(self._set_input_dir)
         self.set_output_folder_button.clicked.connect(self._set_output_dir)
@@ -136,11 +142,11 @@ class CADIreader(QMainWindow):
         self.dlg = QDialog(self)
         self.dlg.setWindowTitle("Error!")
         self.layout_window_dlg = QVBoxLayout()
-        self.textbox_errormsg = QLabel("")
+        self.textbox_msg = QLabel("")
         self.button_dlg_close = QDialogButtonBox.StandardButton.Close
         self.buttonBox_dlg = QDialogButtonBox(self.button_dlg_close)
         self.buttonBox_dlg.clicked.connect(self.dlg.close)
-        self.layout_window_dlg.addWidget(self.textbox_errormsg)
+        self.layout_window_dlg.addWidget(self.textbox_msg)
         self.layout_window_dlg.addWidget(self.buttonBox_dlg)
         self.dlg.setLayout(self.layout_window_dlg)
 
@@ -150,73 +156,61 @@ class CADIreader(QMainWindow):
     def _read_button_click(self):
         location = QFileDialog.getExistingDirectory(self, 'Open Folder containing data',dir=str(self.input_dir))
         if not (self.md3_checkbox.isChecked()) and not (self.md4_checkbox.isChecked()):
-            self.textbox_errormsg.setText("You must choose atleast one extension using the checkboxes.")
-            self.dlg.exec()
+            self._display_dialog('Error!', "You must choose atleast one extension using the checkboxes.")
             return
         if len(location) == 0:
-            print(f"Path cant be empty")
+            print(f"Data directory cant be empty!")
+            self._display_dialog('Error!', "Data directory cant be empty!")
             return
         else:
             self.directory = location
             print(f"Currently chosen directory: {self.directory}")
             self.input_textbox.setText(f"Currently chosen directory: {self.directory}")
-            csv_writer = csvio.CSVtools()
-            raw_reader = mdxreader.MDreader()
+            csv_writer = PandasUtils
             args = []
+            filetype = ''
             if self.md3_checkbox.isChecked():
-                args.append((Path(self.directory), 'md3', Path(self.output_dir), raw_reader, True, 'loky'))
-            if self.md4_checkbox.isChecked():
-                args.append((Path(self.directory), 'md4', Path(self.output_dir), raw_reader, True, 'loky'))
+                filetype = 'MD3'
+                for file in Path(self.directory).glob('*.md3'):
+                    args.append((file, ))
+            elif self.md4_checkbox.isChecked():
+                filetype = 'MD4'
+                for file in Path(self.directory).glob('*.md4'):
+                    args.append((file, ))
             start_time = time.perf_counter()
-            results = list(starmap(csv_writer.write_csv_day, args))
+            raw_data_all = list(starmap(MDreader.read_raw_data, args))
+            if len(raw_data_all) == 0:
+                self._display_dialog('Error!', "No data found!")
+                return
             end_time = time.perf_counter()
-            keys_list = ['site', 'datetime', 'extension', 'ndops', 'filetype', 'nfreqs', 'minheight', 'maxheight', 'pps', 'dtime']
-            print(len(self.layout_window_tables))
-            for idx, result in enumerate(results):
-                metadata, path = result
-                metadata_table = QTableWidget()
-                metadata_table.setRowCount(len(keys_list))
-                metadata_table.setColumnCount(2)
-                metadata_table.setHorizontalHeaderLabels(['Property', 'Value'])
-                metadata_table.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
-                #metadata_table.setSizePolicy(QSizePolicy.Expanding, QAbstractScrollArea.AdjustToContents)
-                for idy, key in enumerate(keys_list):
-                    header_key = QTableWidgetItem(key)
-                    if type(metadata[key]) == datetime:
-                        header_value = QTableWidgetItem(metadata[key].strftime("%Y-%m-%d"))
-                    else:
-                        header_value = QTableWidgetItem(str(metadata[key]))
-                    metadata_table.setItem(idy, 0, header_key)
-                    metadata_table.setItem(idy, 1, header_value)
-                metadata_title = QLabel(f"{metadata['extension']} header in folder")
-                spacer = QSpacerItem(25, 200)
-                
-                
-                if not self.layout_window_tables[idx].isEmpty():
-                    old_title = self.layout_window_tables[idx].itemAt(0).widget()
-                    old_table = self.layout_window_tables[idx].itemAt(1).widget()
-                    old_spacer = self.layout_window_tables[idx].itemAt(2)
-                    self.layout_window_tables[idx].removeWidget(old_table)
-                    self.layout_window_tables[idx].removeWidget(old_title)
-                    self.layout_window_tables[idx].removeItem(old_spacer)
-                    old_table.deleteLater()
-                    old_title.deleteLater()
-                    
-                self.layout_window_tables[idx].addWidget(metadata_title, alignment=Qt.AlignmentFlag.AlignLeft)
-                self.layout_window_tables[idx].addWidget(metadata_table, alignment=Qt.AlignmentFlag.AlignLeft)
-                self.layout_window_tables[idx].addSpacerItem(spacer)
-
-                if idx == 0 and not self.layout_window_tables[1].isEmpty():
-                    old_title = self.layout_window_tables[1].itemAt(0).widget()
-                    old_table = self.layout_window_tables[1].itemAt(1).widget()
-                    old_spacer = self.layout_window_tables[1].itemAt(2)
-                    self.layout_window_tables[1].removeWidget(old_table)
-                    self.layout_window_tables[1].removeWidget(old_title)
-                    self.layout_window_tables[1].removeItem(old_spacer)
-                    old_table.deleteLater()
-                    old_title.deleteLater()
-                
+            output_folder_name = raw_data_all[0][1]['datetime'].strftime('%d%m%Y')
+            root_output_path = Path(self.output_dir) / Path(filetype) / Path(output_folder_name)
+            root_output_path.mkdir(parents=True, exist_ok=True)
+            for raw_data in raw_data_all:
+                file_list, metadata, height, frequency, freqs, dop_shifts, complex_signal = raw_data
+                if isinstance(metadata['datetime'], datetime):
+                    time_str = metadata['datetime'].strftime('%H%M%S')
+                else:
+                    continue
+                file_name = file_list[0]
+                metadata_path = root_output_path / Path(f"header{time_str}.json")
+                sensors_path = root_output_path / Path(f"sensor_data{time_str}.csv")
+                df = csv_writer.create_pandas_from_arrays(metadata, frequency, height, dop_shifts, complex_signal)
+                with open(metadata_path, 'w') as f:
+                    json.dump(metadata, f, indent=4, default=str)
+                df.to_csv(sensors_path, date_format='%Y-%m-%d %H:%M:%S')
             print(f"Output files written in {(end_time-start_time):.4f} seconds")
+            self._display_dialog('Done!', f"Saved ASCII decoded data to {root_output_path}")
+
+    def _display_dialog(self, title, message):
+        self.dlg.setWindowTitle(title)
+        self.textbox_msg.setText(message)
+        self.dlg.exec()
+        self._cleanup_dlg()
+
+    def _cleanup_dlg(self):
+        self.dlg.setWindowTitle("")
+        self.textbox_msg.setText("")
 
     def _set_input_dir(self):
         location = QFileDialog.getExistingDirectory(self, 'Open folder to set as default input folder',dir=str(self.input_dir))
@@ -228,7 +222,9 @@ class CADIreader(QMainWindow):
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
         else:
-            print(f"Path cant be empty")
+            print(f"Input directory cant be empty!")
+            self._display_dialog('Error!', "Input directory cant be empty!")
+            return
 
     def _set_output_dir(self):
         location = QFileDialog.getExistingDirectory(self, 'Open folder to set as default output folder',dir=str(self.output_dir))
@@ -240,7 +236,9 @@ class CADIreader(QMainWindow):
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
         else:
-            print(f"Path cant be empty")
+            print(f"Output directory cant be empty!")
+            self._display_dialog('Error!', "Output directory cant be empty!")
+            return
         
 if __name__ == '__main__':
     app = QApplication(sys.argv)
