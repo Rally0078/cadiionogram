@@ -13,26 +13,25 @@ class MetadataTableWidget(QWidget):
     right_dropdown_changed = Signal(str)
     left_clicked = Signal()
     right_clicked = Signal()
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, needs_buttons=True):
         super().__init__(parent)
-
+        self.needs_buttons = needs_buttons
         self.layout_table = QVBoxLayout(self)
         self.layout_table.setContentsMargins(10, 0, 10, 0)
         self.layout_table.setSpacing(10)
-        self.timepartitions_layout = QHBoxLayout()
-        self.timepartitions_dropdown = QComboBox()
-        self.timepartitions_dropdown.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        self.end_timepartitions_dropdown = QComboBox()
-        self.end_timepartitions_dropdown.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        self.end_timepartitions_dropdown.currentTextChanged.connect(self._on_right_dropdown_changed)
-
-        self.end_timepartitions_dropdown.setVisible(False)
-        self.left_button = QPushButton("←")
-        self.right_button = QPushButton("→")
-        self.timepartitions_dropdown.currentTextChanged.connect(self._on_dropdown_changed)
-
-        self.left_button.clicked.connect(self.left_clicked.emit)
-        self.right_button.clicked.connect(self.right_clicked.emit)
+        if self.needs_buttons:
+            self.timepartitions_layout = QHBoxLayout()
+            self.timepartitions_dropdown = QComboBox()
+            self.timepartitions_dropdown.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+            self.end_timepartitions_dropdown = QComboBox()
+            self.end_timepartitions_dropdown.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+            self.end_timepartitions_dropdown.setVisible(False)
+            self.left_button = QPushButton("←")
+            self.right_button = QPushButton("→")
+            self.timepartitions_dropdown.currentTextChanged.connect(self._on_dropdown_changed)
+            self.end_timepartitions_dropdown.currentTextChanged.connect(self._on_right_dropdown_changed)
+            self.left_button.clicked.connect(self.left_clicked.emit)
+            self.right_button.clicked.connect(self.right_clicked.emit)
 
     def _on_dropdown_changed(self, text: str):
         self.dropdown_changed.emit(text)
@@ -42,20 +41,21 @@ class MetadataTableWidget(QWidget):
 
     #Update metadata table
     def update_metadata(self, metadata: dict, keys_list: list[str]):       
-        #Disconnect signal if already connected    
-        try:
-            self.timepartitions_dropdown.currentTextChanged.disconnect(self._on_dropdown_changed)
-            self.end_timepartitions_dropdown.currentTextChanged.disconnect(self._on_right_dropdown_changed)
-        except TypeError:
-            pass    
-        self.timepartitions_dropdown.clear()
-        self.timepartitions_dropdown.addItems(list(metadata['timepartitions'].keys()))
-        self.timepartitions_dropdown.setCurrentIndex(0)
-        self.end_timepartitions_dropdown.clear()
-        self.end_timepartitions_dropdown.addItems(list(metadata['timepartitions'].keys()))
-        self.end_timepartitions_dropdown.setCurrentIndex(len(list(metadata['timepartitions'].keys()))-1)
-        self.timepartitions_dropdown.currentTextChanged.connect(self._on_dropdown_changed)
-        self.end_timepartitions_dropdown.currentTextChanged.connect(self._on_right_dropdown_changed)
+        #Disconnect signal if already connected 
+        if self.needs_buttons:   
+            try:
+                self.timepartitions_dropdown.currentTextChanged.disconnect(self._on_dropdown_changed)
+                self.end_timepartitions_dropdown.currentTextChanged.disconnect(self._on_right_dropdown_changed)
+            except TypeError:
+                pass    
+            self.timepartitions_dropdown.clear()
+            self.timepartitions_dropdown.addItems(list(metadata['timepartitions'].keys()))
+            self.timepartitions_dropdown.setCurrentIndex(0)
+            self.end_timepartitions_dropdown.clear()
+            self.end_timepartitions_dropdown.addItems(list(metadata['timepartitions'].keys()))
+            self.end_timepartitions_dropdown.setCurrentIndex(len(list(metadata['timepartitions'].keys()))-1)
+            self.timepartitions_dropdown.currentTextChanged.connect(self._on_dropdown_changed)
+            self.end_timepartitions_dropdown.currentTextChanged.connect(self._on_right_dropdown_changed)
         
         # Create new widgets
         metadata_title = QLabel(f"{metadata['extension']} header")
@@ -94,34 +94,36 @@ class MetadataTableWidget(QWidget):
                 if item.layout() == self.arrow_layout:  # safer check
                     old_arrow_layout = item
                     continue
-                elif item.layout() == self.timepartitions_layout:
+                elif self.needs_buttons and item.layout() == self.timepartitions_layout:
                     old_dropdown = item
                     continue
             
 
             if old_arrow_layout:
                 self.layout_table.removeItem(old_arrow_layout)
-            if old_dropdown:
+            if self.needs_buttons and old_dropdown:
                 self.layout_table.removeItem(old_dropdown)
-            old_left_timedropdown = self.timepartitions_layout.itemAt(0).widget()
-            old_right_timedropdown = self.timepartitions_layout.itemAt(1).widget()
+            if self.needs_buttons:
+                old_left_timedropdown = self.timepartitions_layout.itemAt(0).widget()
+                old_right_timedropdown = self.timepartitions_layout.itemAt(1).widget()
+                self.timepartitions_layout.removeWidget(old_left_timedropdown)
+                self.timepartitions_layout.removeWidget(old_right_timedropdown)
             
             # Remove old dynamic widgets
             self.layout_table.removeWidget(old_table)
             self.layout_table.removeWidget(old_title)
             self.layout_table.removeItem(old_spacer)
-            self.timepartitions_layout.removeWidget(old_left_timedropdown)
-            self.timepartitions_layout.removeWidget(old_right_timedropdown)
             
             old_table.deleteLater()
             old_title.deleteLater()
-        
-        self.timepartitions_layout.addWidget(self.timepartitions_dropdown, alignment=Qt.AlignLeft)
-        self.timepartitions_layout.addWidget(self.end_timepartitions_dropdown, alignment=Qt.AlignLeft)
+        if self.needs_buttons:
+            self.timepartitions_layout.addWidget(self.timepartitions_dropdown, alignment=Qt.AlignLeft)
+            self.timepartitions_layout.addWidget(self.end_timepartitions_dropdown, alignment=Qt.AlignLeft)
         self.layout_table.addWidget(metadata_title, alignment=Qt.AlignLeft)
         self.layout_table.addWidget(metadata_table, alignment=Qt.AlignLeft)
         self.layout_table.addSpacerItem(spacer)
-        self.layout_table.addLayout(self.timepartitions_layout)
+        if self.needs_buttons:
+            self.layout_table.addLayout(self.timepartitions_layout)
 
         self.arrow_layout = QHBoxLayout()
         self.arrow_layout.addWidget(self.left_button)
