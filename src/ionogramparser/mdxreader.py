@@ -191,12 +191,14 @@ class MDreader(DataReader):
                 time_partitions = dict()
 
                 time_min = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                
                 # Read complex sensor data from all receivers of all observations till eof.
-                while f.tell() < eof and time_min != 255:
+                while f.tell() < eof and time_min != 255 and  time_min < 60:
                     #Iterate through each time of observation
                     time_sec = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                     flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # gainflag
                     timex += 1
+                    print(time_min)
                     time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec, tzinfo=timezone.utc)
                     for freqx in range(nfreqs):
                         #Iterate through each frequency at a given time of observation
