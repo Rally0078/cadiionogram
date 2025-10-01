@@ -22,11 +22,14 @@ from PySide6.QtWidgets import (
     QSpacerItem,
     QAbstractScrollArea
 )
+import pandas as pd
 from PySide6.QtGui import QFont
 from PySide6.QtCore import QSize, Qt
 from src.ionogramparser.mdxreader import MDreader
 from src.utils.pandasutils import PandasUtils
+from src.utils.powerpreprocessing import convert_amplitude_to_power
 from src.ui.metadatatable import MetadataTableWidget
+import csv
 from src.ui.metadatakeys import cadi_keys_list
 import json
 import sys
@@ -195,10 +198,16 @@ class CADIreader(QMainWindow):
                 file_name = file_list[0]
                 metadata_path = root_output_path / Path(f"header{time_str}.json")
                 sensors_path = root_output_path / Path(f"sensor_data{time_str}.csv")
-                df = csv_writer.create_pandas_from_arrays(metadata, frequency, height, dop_shifts, complex_signal)
+                df: pd.DataFrame = csv_writer.create_pandas_from_arrays(metadata, frequency, height, dop_shifts, complex_signal)
+                heights: pd.Series = df['height (km)']
+                new_heights = heights.convert_dtypes(convert_integer=True)
+                power = convert_amplitude_to_power(complex_signal)
+                df['height (km)'] = new_heights
+                df['power'] = power
+                df["freq (Hz)"] /=1e6
                 with open(metadata_path, 'w') as f:
                     json.dump(metadata, f, indent=4, default=str)
-                df.to_csv(sensors_path, date_format='%Y-%m-%d %H:%M:%S')
+                df.to_csv(sensors_path, date_format='%d %m %Y %H %M %S', sep='\t', float_format='%.3f', header=False)
             print(f"Output files written in {(end_time-start_time):.4f} seconds")
             self._display_dialog('Done!', f"Saved ASCII decoded data to {root_output_path}")
 
