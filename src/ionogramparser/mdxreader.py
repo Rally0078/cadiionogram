@@ -198,7 +198,6 @@ class MDreader(DataReader):
                     time_sec = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                     flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # gainflag
                     timex += 1
-                    print(time_min)
                     time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec, tzinfo=timezone.utc)
                     for freqx in range(nfreqs):
                         #Iterate through each frequency at a given time of observation
