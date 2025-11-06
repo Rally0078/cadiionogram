@@ -4,6 +4,7 @@ from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.plot.autoscaling import ScaleIonogramCanvas
 from src.plot.xyplotcanvas import XYPlotCanvas
+from src.ui.height_selection import HeightSelector
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.ui.freq_list_dropdown import CheckableDropdown
@@ -106,6 +107,8 @@ class MainWidget(QWidget):
         self.freq_selector.setVisible(False)
         self.freq_selector.selectionChanged.connect(self._on_freq_selector_updated)
         
+        # Height selection for ionogram-style displays
+        self.height_selector = HeightSelector()
         # Grid layout
         layout = QGridLayout()
 
@@ -134,6 +137,7 @@ class MainWidget(QWidget):
         layout.addWidget(self.polan_button, 7, 1)
         layout.addWidget(self.save_scale_button, 7,0)
         layout.addWidget(self.clear_scale_button, 7, 1)
+        layout.addWidget(self.height_selector,8,0,1,3)
         # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
