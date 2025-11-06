@@ -29,6 +29,7 @@ from src.ionogramparser.mdxreader import MDreader
 from src.utils.pandasutils import PandasUtils
 from src.utils.powerpreprocessing import convert_amplitude_to_power
 from src.ui.metadatatable import MetadataTableWidget
+from src.errorhandlers.errorhandling import BadIndicesInData
 import csv
 from src.ui.metadatakeys import cadi_keys_list
 import json
@@ -129,7 +130,8 @@ class CADIreader(QMainWindow):
         self.layout_window.setContentsMargins(25, 0, 100, 0)
         self.layout_window.setSpacing(0)
         self.layout_window_h.addLayout(self.layout_window)
-
+        self.metadata_table = MetadataTableWidget(needs_buttons=False)
+        self.layout_window_h.addWidget(self.metadata_table)
         self.layout_window_tables = [QVBoxLayout(), QVBoxLayout()]
         for layout_table in self.layout_window_tables:
             layout_table.setContentsMargins(0, 0, 0, 0)
@@ -166,50 +168,60 @@ class CADIreader(QMainWindow):
             self._display_dialog('Error!', "Data directory cant be empty!")
             return
         else:
-            self.directory = location
-            print(f"Currently chosen directory: {self.directory}")
-            self.input_textbox.setText(f"Currently chosen directory: {self.directory}")
-            csv_writer = PandasUtils
-            args = []
-            filetype = ''
-            if self.md3_checkbox.isChecked():
-                filetype = 'MD3'
-                for file in Path(self.directory).glob('*.md3'):
-                    args.append((file, ))
-            elif self.md4_checkbox.isChecked():
-                filetype = 'MD4'
-                for file in Path(self.directory).glob('*.md4'):
-                    args.append((file, ))
-            start_time = time.perf_counter()
-            raw_data_all = list(starmap(MDreader.read_raw_data, args))
-            if len(raw_data_all) == 0:
-                self._display_dialog('Error!', "No data found!")
-                return
-            end_time = time.perf_counter()
-            output_folder_name = raw_data_all[0][1]['datetime'].strftime('%d%m%Y')
-            root_output_path = Path(self.output_dir) / Path(filetype) / Path(output_folder_name)
-            root_output_path.mkdir(parents=True, exist_ok=True)
-            for raw_data in raw_data_all:
-                file_list, metadata, height, frequency, freqs, dop_shifts, complex_signal = raw_data
-                if isinstance(metadata['datetime'], datetime):
-                    time_str = metadata['datetime'].strftime('%H%M%S')
-                else:
-                    continue
-                file_name = file_list[0]
-                metadata_path = root_output_path / Path(f"header{time_str}.json")
-                sensors_path = root_output_path / Path(f"sensor_data{time_str}.csv")
-                df: pd.DataFrame = csv_writer.create_pandas_from_arrays(metadata, frequency, height, dop_shifts, complex_signal)
-                heights: pd.Series = df['height (km)']
-                new_heights = heights.convert_dtypes(convert_integer=True)
-                power = convert_amplitude_to_power(complex_signal)
-                df['height (km)'] = new_heights
-                df['power'] = power
-                df["freq (Hz)"] /=1e6
-                with open(metadata_path, 'w') as f:
-                    json.dump(metadata, f, indent=4, default=str)
-                df.to_csv(sensors_path, date_format='%d %m %Y %H %M %S', sep='\t', float_format='%.3f', header=False)
-            print(f"Output files written in {(end_time-start_time):.4f} seconds")
-            self._display_dialog('Done!', f"Saved ASCII decoded data to {root_output_path}")
+            try:
+                self.directory = location
+                print(f"Currently chosen directory: {self.directory}")
+                self.input_textbox.setText(f"Currently chosen directory: {self.directory}")
+                csv_writer = PandasUtils
+                args = []
+                filetype = ''
+                if self.md3_checkbox.isChecked():
+                    filetype = 'MD3'
+                    for file in Path(self.directory).glob('*.md3'):
+                        args.append((file, ))
+                elif self.md4_checkbox.isChecked():
+                    filetype = 'MD4'
+                    for file in Path(self.directory).glob('*.md4'):
+                        args.append((file, ))
+                start_time = time.perf_counter()
+                raw_data_all = list(starmap(MDreader.read_raw_data, args))
+                if len(raw_data_all) == 0:
+                    self._display_dialog('Error!', "No data found!")
+                    return
+                end_time = time.perf_counter()
+                output_folder_name = raw_data_all[0][1]['datetime'].strftime('%d%m%Y')
+                root_output_path = Path(self.output_dir) / Path(filetype) / Path(output_folder_name)
+                root_output_path.mkdir(parents=True, exist_ok=True)
+                for raw_data in raw_data_all:
+                    file_list, metadata, height, frequency, freqs, dop_shifts, complex_signal = raw_data
+                    len_data = len(complex_signal)
+                    final_partition_rindex = list(metadata['timepartitions'].values())[-1]
+                    if len_data != final_partition_rindex:
+                        raise BadIndicesInData(metadata, complex_signal, file_list[0])
+                    if isinstance(metadata['datetime'], datetime):
+                        time_str = metadata['datetime'].strftime('%H%M%S')
+                    else:
+                        continue
+                    file_name = file_list[0]
+                    metadata_path = root_output_path / Path(f"header{time_str}.json")
+                    sensors_path = root_output_path / Path(f"sensor_data{time_str}.csv")
+                    df: pd.DataFrame = csv_writer.create_pandas_from_arrays(metadata, frequency, height, dop_shifts, complex_signal)
+                    heights: pd.Series = df['height (km)']
+                    new_heights = heights.convert_dtypes(convert_integer=True)
+                    power = convert_amplitude_to_power(complex_signal)
+                    df['height (km)'] = new_heights
+                    df['power'] = power
+                    df["freq (Hz)"] /=1e6
+                    with open(metadata_path, 'w') as f:
+                        json.dump(metadata, f, indent=4, default=str)
+                    df.to_csv(sensors_path, date_format='%d %m %Y %H %M %S', sep='\t', float_format='%.3f', header=False)
+                print(f"Output files written in {(end_time-start_time):.4f} seconds")
+                self._display_dialog('Done!', f"Saved ASCII decoded data to {root_output_path}")
+            except BadIndicesInData as e:
+                print(e)
+                self._display_dialog('Error!', str(e))
+            except Exception as e:
+                print(f"An error has occurred: {e}")
 
     def _display_dialog(self, title, message):
         self.dlg.setWindowTitle(title)
@@ -253,5 +265,4 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = CADIreader()
     window.show()
-
     app.exec()
