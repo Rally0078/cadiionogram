@@ -109,6 +109,7 @@ class MainWidget(QWidget):
         
         # Height selection for ionogram-style displays
         self.height_selector = HeightSelector()
+        self.height_selector.setVisible(False)
         # Grid layout
         layout = QGridLayout()
 
@@ -167,6 +168,8 @@ class MainWidget(QWidget):
         self.dlg.setLayout(self.layout_dlg)
         self.prev_checkbox = None
         self.last_folder_path = None
+        self.start_height = 0
+        self.end_height = 1024
         
     def open_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", dir=str(self.input_dir))
