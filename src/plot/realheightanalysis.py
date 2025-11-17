@@ -6,6 +6,7 @@ from matplotlib.lines import Line2D
 import numpy as np
 from datetime import datetime
 from scipy.interpolate import PchipInterpolator
+from scipy.integrate import cumulative_trapezoid
 from src.ionogramfiltering.noisereduction import *
 from src.utils.siteinfo import site_dict
 
@@ -157,7 +158,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
                 height_new_y = np.append(height_new_y, np.median(hgts))
             prev_len = len(hgts)
         points = np.array([(x, y) for x, y in zip(freq_new_x, height_new_y)])
-        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points, spacing=0.2)
+        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points, spacing=0.1)
         if len(heights_interp) >= 1:
             self.plot_interp(freqs_interp, heights_interp)
         return freqs_interp, heights_interp, unique_freqs, avg_heights
@@ -173,7 +174,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points)
         return freqs_interp, heights_interp, unique_freqs, avg_heights
 
-    def compute_matched_curve(self, points, spacing=0.5):
+    def compute_matched_curve(self, points, spacing=0.1, max_points=54):
         """
             Interpolate a curve based on some sample inputs(automatic or hand drawn), and return an output curve at fixed frequency steps. 
             Required for POLAN.
@@ -184,21 +185,72 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         freqs_mhz = freqs_hz / 1e6
         freqs_rounded = np.round(freqs_mhz, 1)
 
-        unique_freqs, inverse_indices = np.unique(freqs_rounded, return_inverse=True)
+        unique_freqs, inverse_indices = np.unique(freqs_rounded,
+                                                return_inverse=True)
         avg_heights = np.zeros_like(unique_freqs)
-
         for i in range(len(unique_freqs)):
             avg_heights[i] = heights[inverse_indices == i].mean()
 
-        f_min = np.floor(unique_freqs.min() * 10) / 10
-        f_max = np.ceil(unique_freqs.max() * 10) / 10
-        num_points = int(np.round((f_max - f_min) / spacing)) + 1
-        freqs_interp = np.round(np.linspace(f_min, f_max, num_points), 1)
+        fmin = unique_freqs.min()
+        fmax = unique_freqs.max()
 
-        interpolator = PchipInterpolator(unique_freqs, avg_heights, extrapolate=False)
-        heights_interp = interpolator(freqs_interp)
-        mask = ~np.isnan(heights_interp)
-        freqs_interp = freqs_interp[mask]
-        heights_interp = heights_interp[mask]
+        interpolator = PchipInterpolator(unique_freqs, avg_heights,
+                                        extrapolate=False)
+        dense_x = np.linspace(fmin, fmax, 2000)
+        dy_dx = interpolator.derivative()(dense_x)
 
-        return freqs_interp, heights_interp, unique_freqs, avg_heights
+        arc = np.sqrt(1.0 + dy_dx**2)
+        s = cumulative_trapezoid(arc, dense_x, initial=0)
+        s_norm = s / s[-1]
+
+        raw_freqs = np.interp(np.linspace(0, 1, max_points), s_norm, dense_x)
+
+        raw_freqs = np.round(raw_freqs, 2)
+        raw_freqs = np.sort(raw_freqs)
+
+        raw_freqs[0] = np.round(fmin, 2)
+        raw_freqs[-1] = np.round(fmax, 2)
+
+        min_step = 0.01
+        filtered = [raw_freqs[0]]
+
+        for f in raw_freqs[1:]:
+            if f - filtered[-1] >= min_step - 1e-12:
+                filtered.append(f)
+            else:
+                filtered[-1] = f
+
+        freqs = np.array(filtered)
+
+        max_step = 0.1
+        expanded = [freqs[0]]
+        for i in range(1, len(freqs)):
+            prev = freqs[i - 1]
+            curr = freqs[i]
+            gap = curr - prev
+
+            if gap > max_step + 1e-12:
+                # insert missing midpoints at <= 0.1 step
+                n_insert = int(np.floor(gap / max_step))
+                for k in range(1, n_insert + 1):
+                    new_f = prev + k * max_step
+                    new_f = np.round(new_f, 2)
+                    if new_f < curr - 1e-12:
+                        expanded.append(new_f)
+
+            expanded.append(curr)
+
+        freqs_final = np.array(expanded)
+
+        if len(freqs_final) > max_points:
+            keep_start = max_points // 2
+            keep_end = max_points - keep_start
+            freqs_final = np.concatenate([freqs_final[:keep_start],
+                                        freqs_final[-keep_end:]])
+
+        heights_final = interpolator(freqs_final)
+        mask = ~np.isnan(heights_final)
+        freqs_final = freqs_final[mask]
+        heights_final = heights_final[mask]
+
+        return freqs_final, heights_final, unique_freqs, avg_heights
