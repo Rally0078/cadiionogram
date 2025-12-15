@@ -19,8 +19,8 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
         self.colorbar = None
-        self.freq_ticks = [1e6, 2e6, 4e6, 6e6, 8e6, 10e6, 15e6, 20e6]
-        self.freq_limits = (1e6, 20e6)
+        self.freq_ticks = [1, 2, 4, 6, 8, 10, 15, 20]
+        self.freq_limits = (1, 18)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
         self.user_points = []
@@ -49,19 +49,17 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax.set_xlabel("Frequency (MHz)")
         self.ax.set_ylabel("Virtual height (km)")
         formatter = ScalarFormatter(useMathText=True)
-        formatter.set_powerlimits((6, 6))  # Force 1e6 scale
+        formatter.set_powerlimits((0, 0))  # Force 1e6 scale
         self.ax.xaxis.set_major_formatter(formatter)
         self.ax.yaxis.set_minor_locator(MultipleLocator(5))
         self.ax.grid()
 
     def plot_scatter(self, freqs, heights, dops, power, timestamp, date: datetime, site):
-        self.freqs = freqs
-        self.heights = heights
         self.ax.clear()
         self.fig.tight_layout(pad=3)
         self.setHidden(self.is_hidden)
         
-        self.scatter = self.ax.scatter(freqs, heights, s=6, c=power, cmap='turbo_r', marker='s')
+        self.scatter = self.ax.scatter(freqs/1e6, heights, s=6, c=power, cmap='turbo_r', marker='s')
         self.scatter.set_clim(0, 50)
 
         if self.colorbar:
