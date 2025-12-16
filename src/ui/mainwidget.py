@@ -25,7 +25,7 @@ import shutil
 from math import isnan
 
 class MainWidget(QWidget):
-    md3_options = ['Range vs Time (Freq colored)', 'EW-NS timeseries', 'Drift velocity timeseries']
+    md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries']
     md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range']
     def __init__(self):
         super().__init__()
