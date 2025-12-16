@@ -133,7 +133,7 @@ def plot_timestamp(metadata: dict, freqs: np.ndarray, heights: np.ndarray, dop_s
     ax_top.set_yticks(np.arange(0, 1100, 50))
     ax_top.set_ylim(50, 1100)
     formatter = ScalarFormatter(useMathText=True)
-    formatter.set_powerlimits((6, 6))  # Force 1e6 scale
+    formatter.set_powerlimits((0, 0))  # Force 1e6 scale
 
     ax_top.yaxis.set_minor_locator(ticker.MultipleLocator(5))
     ax_top.xaxis.set_major_formatter(formatter)
@@ -159,7 +159,7 @@ def plot_timestamp(metadata: dict, freqs: np.ndarray, heights: np.ndarray, dop_s
     ax_bottom.set_yticks(np.arange(0, 1100, 50))
     ax_bottom.set_ylim(50, 1100)
     formatter = ScalarFormatter(useMathText=True)
-    formatter.set_powerlimits((6, 6))  # Force 1e6 scale
+    formatter.set_powerlimits((0, 0))  # Force 1e6 scale
 
     ax_bottom.yaxis.set_minor_locator(ticker.MultipleLocator(5))
     ax_bottom.xaxis.set_major_formatter(formatter)

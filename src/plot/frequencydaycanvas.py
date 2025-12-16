@@ -26,7 +26,7 @@ class FrequencyDayCanvas(FigureCanvas):
         self.ax.set_ylabel("Frequency (MHz)")
         self.ax.set_xlabel("Time (UTC)")
         formatter = ScalarFormatter(useMathText=True)
-        formatter.set_powerlimits((6, 6))  # Force 1e6 scale
+        formatter.set_powerlimits((0, 0))  # Force 1e6 scale
         self.ax.yaxis.set_major_formatter(formatter)
         self.ax.grid()
 
@@ -34,7 +34,7 @@ class FrequencyDayCanvas(FigureCanvas):
         self.ax.clear()
         self.fig.tight_layout(pad=3)
         self.setHidden(self.is_hidden)
-        self.time_height_plot = self.ax.scatter(time_index, freqs, s=34, 
+        self.time_height_plot = self.ax.scatter(time_index, freqs/1e6, s=34, 
                            c=dops, cmap='turbo_r', vmin=-3, vmax=3, linewidth=0, marker=',')
         if self.colorbar:
             self.colorbar.update_ticks()
