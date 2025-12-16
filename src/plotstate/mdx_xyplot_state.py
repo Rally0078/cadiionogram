@@ -5,7 +5,7 @@ from datetime import datetime
 from src.utils.pandasutils import PandasUtils
 from src.utils.cadikvector import compute_xy
 from src.utils.powerpreprocessing import convert_amplitude_to_power
-from decimal import Decimal, ROUND_HALF_UP, getcontext
+from decimal import Decimal
 import pytz
 
 class MdxXYplotCanvasState(PlotState):

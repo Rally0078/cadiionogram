@@ -5,6 +5,7 @@ from src.plotstate.md4_realheight_state import Md4RealheightAnalysisState
 from src.plotstate.mdx_height_day_state import MdxHeightDayCanvasState
 from src.plotstate.md4_autoscaling_state import Md4ScaleIonogramState
 from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
+from src.plotstate.mdx_rangetimeintens_state import MdxRangeTimeIntensState
 
 class PlotStateFactory:
     @staticmethod
@@ -24,7 +25,8 @@ class PlotStateFactory:
                 'EW-NS vs Range': NotImplementedError,
             }
             options_states_md3_dict = {
-                'Range vs Time (Freq colored)': MdxHeightDayCanvasState,
+                'Range Time Frequency': MdxHeightDayCanvasState,
+                'Range Time Intensity': MdxRangeTimeIntensState,
                 'EW-NS timeseries': MdxXYplotCanvasState,
                 'Drift velocity timeseries': NotImplementedError
             }
@@ -48,11 +50,10 @@ class PlotStateFactory:
     def _set_tablewidget_buttons_visibility(main_widget, state):
         """Handles buttons common for MD3"""
         main_widget.table_widget.end_timepartitions_dropdown.setVisible(state)
-        main_widget.table_widget.left_button.setVisible(~state)
-        main_widget.table_widget.right_button.setVisible(~state)
+        main_widget.table_widget.left_button.setVisible(not state)
+        main_widget.table_widget.right_button.setVisible(not state)
         main_widget.freq_selector.setVisible(state)
-        if state is False:
-            main_widget.table_widget.end_timepartitions_dropdown.setVisible(state)
+        main_widget.table_widget.end_timepartitions_dropdown.setVisible(state)
     
     @staticmethod
     def _reset_visibility(main_widget):
