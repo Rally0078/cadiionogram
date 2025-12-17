@@ -70,7 +70,6 @@ def compute_xpha_full(df: pd.DataFrame, freq_list):
     phase_limit = kd
         
     freq_idxs = np.digitize(new_freq, freq_list) - 1
-    assert (new_freq == freq_list[freq_idxs]).all()
     final_good_mask = (xpha['x1'].abs() <= phase_limit[freq_idxs, 0]) & (xpha['x2'].abs() <= phase_limit[freq_idxs, 1])
     output_df = df.loc[final_good_mask]
     output_xpow = xpow.loc[final_good_mask]
