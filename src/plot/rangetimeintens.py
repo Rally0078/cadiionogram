@@ -42,6 +42,7 @@ class RangeTimeIntensCanvas(FigureCanvas):
         self.setHidden(self.is_hidden)
         self.time_height_plot = self.ax.scatter(time_index, heights, s=25, 
                            c=pow_signal, cmap='turbo_r', vmin=0, vmax=40, linewidth=0, marker=',')
+        self.ax.set_xlim(time_index[0], time_index[-1])
         if self.colorbar:
             self.colorbar.update_ticks()
             #self.colorbar.set_clim(signals.min(), signals.max())  # Update color limits
