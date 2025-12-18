@@ -5,7 +5,7 @@ def convert_amplitude_to_power(signal: Annotated[np.typing.NDArray[np.int8], Lit
     sensors_abs = np.empty(shape=(signal.shape[0],signal.shape[1]//2))
     sensors_median = np.empty(shape=(sensors_abs.shape[0],))
     for idx in range(0, signal.shape[1]-1, 2):
-        abs_squared = signal[:, idx].astype(np.int16)**2 + signal[:, idx+1].astype(np.int16)**2
+        abs_squared = signal[:, idx].astype(np.int32)**2 + signal[:, idx+1].astype(np.int32)**2
         sensors_abs[:, idx//2] = np.sqrt(abs_squared)
     sensors_median = np.median(sensors_abs, axis=1)
     power_median = np.zeros_like(sensors_median)
