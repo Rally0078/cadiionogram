@@ -26,7 +26,7 @@ from math import isnan
 
 class MainWidget(QWidget):
     md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range']
+    md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity']
     def __init__(self):
         super().__init__()
         self.polan_dir = None

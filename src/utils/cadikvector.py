@@ -43,19 +43,20 @@ def compute_xpha_full(df: pd.DataFrame, freq_list):
     xpha = pd.DataFrame({"x1": np.empty(shape=(new_signal_selection.shape[0],)),
                         "x2": np.empty(shape=(new_signal_selection.shape[0],))},
                         index=df.index)
-
     PH2_corr=0#np.pi+0*np.pi/180, site dependent
     PH4_corr=0#np.pi-0*np.pi/180, site dependent
+    PH2_corr=np.pi+45*np.pi/180
+    PH4_corr=np.pi-20*np.pi/180
+    ph_corrections = [PH2_corr, PH4_corr]
     pairwise_antenna13 = [('sensor1 real', 'sensor1 imag'), ('sensor3 real', 'sensor3 imag')]
     pairwise_antenna24 = [('sensor2 real', 'sensor2 imag'), ('sensor4 real', 'sensor4 imag')]
     cross_names = ['x1', 'x2']
-    for pair1, pair2, cross_name in zip(pairwise_antenna13, pairwise_antenna24, cross_names):
+    for pair1, pair2, cross_name, ph_corr in zip(pairwise_antenna13, pairwise_antenna24, cross_names, ph_corrections):
         ant0_re = new_signal_selection[pair1[0]]
         ant0_im = new_signal_selection[pair1[1]]
         ant1_re = new_signal_selection[pair2[0]]
         ant1_im = new_signal_selection[pair2[1]]
-
-        s = (ant0_re + 1j * ant0_im) * np.conjugate(ant1_re + 1j * ant1_im)
+        s = (ant0_re + 1j * ant0_im) * np.conjugate((ant1_re + 1j * ant1_im))
         s = -s  #Site dependent, use polarity to determine according to the IDL code
         xpow[cross_name] = np.abs(s)**2
         xpha[cross_name] = np.angle(s)
@@ -205,7 +206,8 @@ def compute_vel(df, freq_list, points_thres=5):
                 "freq (Hz)": freq,
                 "vx": v[0],
                 "vy": v[1],
-                "vz": v[2]
+                "vz": v[2],
+                "n_points": len(y_df)
             }, index=np.unique(df.index))])
     return df_output
 
@@ -225,4 +227,14 @@ def compute_xy(df, freq_list, sort_by_freq=False, points_thres=5):
     zpos = np.cos(zangle) * output_heights
     xpos = np.tan(zangleEW) * zpos
     ypos = np.tan(zangleNS) * zpos
-    return xpos, ypos, zpos, output_freqs, output_heights, output_dops, output_signals, output_xpow
+    azangle = np.degrees(np.atan2(xpos, ypos))
+    zangle = np.degrees(zangle)
+    azangle[azangle < 0] += 360
+    df_output = pd.DataFrame({
+        'xpos': xpos,
+        'ypos': ypos,
+        'zpos': zpos,
+        'zenith': zangle,
+        'azimuth': azangle
+    })
+    return df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow
