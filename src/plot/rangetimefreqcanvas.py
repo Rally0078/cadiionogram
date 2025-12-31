@@ -7,7 +7,7 @@ from datetime import datetime
 import matplotlib.dates as mdates
 
 
-class HeightDayCanvas(FigureCanvas):
+class RangeTimeFreqCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure(figsize=(16, 9))
         
