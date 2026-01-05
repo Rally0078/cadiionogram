@@ -6,9 +6,12 @@ from src.plot.rangetimefreqcanvas import RangeTimeFreqCanvas
 from src.plot.rangetimeintenscanvas import RangeTimeIntensCanvas
 from src.plot.autoscaling import ScaleIonogramCanvas
 from src.plot.xyplotcanvas import XYPlotCanvas
+from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.ui.freq_list_dropdown import CheckableDropdown
+from src.utils.cadikvector import compute_xy
+from src.utils.pandasutils import PandasUtils
 from src.utils.siteinfo import site_dict
 from src.plotstate.factory import PlotStateFactory
 from src.ionogramparser.mdxreader import MDreader
@@ -23,6 +26,9 @@ from PySide6.QtWidgets import (
     QComboBox, QHBoxLayout
 )
 import subprocess
+import numpy as np
+import pandas as pd
+import pytz
 import shutil
 from math import isnan
 
@@ -266,6 +272,9 @@ class MainWidget(QWidget):
             not isinstance(self.current_plot_state, type(new_state)) or 
             not self.prev_checkbox == curr_checkbox
         )
+        if need_new_canvas:
+            self.has_handled_calculation = False
+            self._handle_computation(new_state)
         print(f"is new canvas needed: {need_new_canvas}, prev_checkbox={self.prev_checkbox}, curr_checkbox={curr_checkbox}, equal? {self.prev_checkbox == curr_checkbox}")
         if need_new_canvas:
             # Remove and delete the existing canvas widget if it exists
@@ -286,16 +295,38 @@ class MainWidget(QWidget):
                 self.canvas_layout_colspan,
             )
             self.canvas_widget.setHidden(False)
-
-        # Update the canvas using the new state
+            self.current_plot_state = new_state
+        # If state needs no change, just update the canvas
         else:
-            new_state.update_canvas(self.canvas_widget)
+            self.current_plot_state.update_canvas(self.canvas_widget)
         self.prev_checkbox = curr_checkbox
-        # Track the current state
-        self.current_plot_state = new_state
         self._polan_auto_helper()
         self._autoscale_helper()
-    
+        
+    def _handle_computation(self, new_state):
+        if not self.has_handled_calculation and isinstance(new_state, MdxXYplotCanvasState):
+            df = PandasUtils.create_pandas_from_arrays(self.metadata, self.freqs, self.heights, self.dops, self.signals)
+            date_of_obs = self.metadata['datetime']
+            start_time = datetime.strptime(self._selected_timestamp, "%H:%M:%S")
+            
+            end_time = datetime.strptime(self._right_selected_timestamp, "%H:%M:%S")
+            start_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
+                                hour=start_time.hour, minute=start_time.minute, second=start_time.second)
+            end_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
+                                hour=end_time.hour, minute=end_time.minute, second=end_time.second)
+            start_dtime = start_dtime.replace(tzinfo=pytz.UTC)
+            end_dtime = end_dtime.replace(tzinfo=pytz.utc)
+            df_selection = df.loc[start_dtime:end_dtime]
+            df_all_outputs = pd.DataFrame()
+            all_output_freqs = np.array([])
+            for dtime in np.unique(df_selection.index):
+                df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow = compute_xy(df_selection.loc[dtime], self.freqs_list, sort_by_freq=False)
+                df_all_outputs = pd.concat([df_all_outputs if not df_all_outputs.empty else None, df_output])
+                all_output_freqs = np.concatenate([all_output_freqs, output_freqs])
+            self.df_all_outputs = df_all_outputs
+            self.all_output_freqs = all_output_freqs
+            self.has_handled_calculation = True
+
     #TODO
     def _autoscale_helper(self):
         pass
