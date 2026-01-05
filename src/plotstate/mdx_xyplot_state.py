@@ -6,6 +6,8 @@ from src.utils.pandasutils import PandasUtils
 from src.utils.cadikvector import compute_xy
 from src.utils.powerpreprocessing import convert_amplitude_to_power
 from decimal import Decimal
+import numpy as np
+import pandas as pd
 import pytz
 
 class MdxXYplotCanvasState(PlotState):
@@ -30,8 +32,6 @@ class MdxXYplotCanvasState(PlotState):
         selected_frequencies = self.main.freq_selector.selectedItems()
         selected_frequencies_decimals = [Decimal(freq) for freq in selected_frequencies]
         selected_frequencies_rounded = [float(item.quantize(Decimal(f"1e-3"))) * 1e6 for item in selected_frequencies_decimals]
-
-        df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow = compute_xy(df_selection, self.main.freqs_list, sort_by_freq=False)
         signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
         power = convert_amplitude_to_power(df_selection[signal_col_names].to_numpy())
         canvas.plot_scatter(
@@ -39,10 +39,9 @@ class MdxXYplotCanvasState(PlotState):
             df_selection['height (km)'],
             df_selection['freq (Hz)'],
             power,
-            df_output['xpos'],
-            df_output['ypos'], 
-            output_xpow,
-            output_freqs,
+            self.main.df_all_outputs['xpos'],
+            self.main.df_all_outputs['ypos'], 
+            self.main.all_output_freqs,
             selected_frequencies_rounded,
             self.main.metadata['datetime'],
             self.main.metadata['site']
