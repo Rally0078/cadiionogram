@@ -36,5 +36,6 @@ class MdxRangeTimeFreqState(PlotState):
             df_selection['dopplershift'],
             df_selection['freq (Hz)'], 
             self.main.metadata['datetime'],
-            self.main.metadata['site']
+            self.main.metadata['site'],
+            selected_frequencies_rounded
         )
