@@ -42,20 +42,25 @@ class RangeTimeIntensCanvas(FigureCanvas):
         self.colorbar.set_ticks(ticks=np.arange(0, 41,5))
         self.ax.grid()
 
-    def plot_scatter(self, time_index, heights, pow_signal, freqs, date: datetime, site, selected_frequencies):
+    def plot_scatter(self, time_index, heights, pow_signal, freqs, date: datetime, site, needs_freq_selection=False, selected_frequencies=None):
+        if needs_freq_selection and selected_frequencies is None:
+            raise ValueError("Must provide a list of selected frequencies")
         self.ax.clear()
         self.fig.tight_layout(pad=3)
         self.setHidden(self.is_hidden)
-        for freq in np.unique(selected_frequencies):
-            matched_idxs = np.argwhere(np.isclose(freqs, freq, atol=1e-12)).flatten()
-            self.time_height_plot = self.ax.scatter(time_index[matched_idxs], heights.iloc[matched_idxs], s=25, 
-                           c=pow_signal[matched_idxs], cmap='turbo_r', vmin=0, vmax=40, linewidth=0, marker=',')
-            self.ax.set_xlim(time_index[0], time_index[-1])
-            xaxis_timedelta = timedelta(hours=3) if len(np.unique(time_index)) > 72 else timedelta(hours=2) if len(np.unique(time_index)) > 36 else timedelta(minutes=30) if len(np.unique(time_index)) > 12 else timedelta(minutes=15)
-            self.ax.set_xticks(np.arange(datetime(year=time_index[0].year, month=time_index[0].month, day=time_index[0].day, 
-                                            hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
-                                            hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
-            self.ax.margins(x=0,y=0)
+        if needs_freq_selection:
+            for freq in np.unique(selected_frequencies):
+                matched_idxs = np.argwhere(np.isclose(freqs, freq, atol=1e-12)).flatten()
+                self.time_height_plot = self.ax.scatter(time_index[matched_idxs], heights.iloc[matched_idxs], s=25, 
+                            c=pow_signal[matched_idxs], cmap='turbo_r', vmin=0, vmax=40, linewidth=0, marker=',')
+        else:
+            self.time_height_plot = self.ax.scatter(time_index, heights, s=25, 
+                            c=pow_signal, cmap='turbo_r', vmin=0, vmax=40, linewidth=0, marker=',')
+        xaxis_timedelta = timedelta(hours=3) if len(np.unique(time_index)) > 72 else timedelta(hours=2) if len(np.unique(time_index)) > 36 else timedelta(minutes=30) if len(np.unique(time_index)) > 12 else timedelta(minutes=15)
+        self.ax.set_xticks(np.arange(datetime(year=time_index[0].year, month=time_index[0].month, day=time_index[0].day, 
+                                                hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
+                                                hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
+        self.ax.margins(x=0,y=0)
         self.ax.set_xlim(time_index[0], time_index[-1])
         
         self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} UTC")
