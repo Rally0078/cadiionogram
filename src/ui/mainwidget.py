@@ -2,6 +2,8 @@ from pathlib import Path
 from datetime import datetime
 from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
+from src.plot.rangetimefreqcanvas import RangeTimeFreqCanvas
+from src.plot.rangetimeintenscanvas import RangeTimeIntensCanvas
 from src.plot.autoscaling import ScaleIonogramCanvas
 from src.plot.xyplotcanvas import XYPlotCanvas
 from src.ui.metadatatable import MetadataTableWidget
@@ -224,7 +226,7 @@ class MainWidget(QWidget):
         self._plot_helper()
 
     def _on_freq_selector_updated(self, sel):
-        if isinstance(self.canvas_widget, XYPlotCanvas):
+        if isinstance(self.canvas_widget, (XYPlotCanvas, RangeTimeFreqCanvas, RangeTimeIntensCanvas)):
             self._plot_helper()
 
     #Callback to handle tickboxes
@@ -246,7 +248,7 @@ class MainWidget(QWidget):
     
     #Callback to handle changes in right side dropdown value
     def _on_right_dropdown_changed(self, text):
-        if isinstance(self.canvas_widget, XYPlotCanvas):
+        if isinstance(self.canvas_widget, (XYPlotCanvas, RangeTimeFreqCanvas, RangeTimeIntensCanvas)):
             self._right_selected_timestamp = text
             self._plot_helper()
         else:

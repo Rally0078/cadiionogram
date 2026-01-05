@@ -1,5 +1,5 @@
 #Concrete implementation for range-time-freq plot
-from src.plot.rangetimeintens import RangeTimeIntensCanvas
+from src.plot.rangetimeintenscanvas import RangeTimeIntensCanvas
 from src.plotstate.base import PlotState
 from src.utils.powerpreprocessing import convert_amplitude_to_power
 from src.utils.pandasutils import PandasUtils
@@ -38,5 +38,6 @@ class MdxRangeTimeIntensState(PlotState):
             power,
             df_selection['freq (Hz)'], 
             self.main.metadata['datetime'],
-            self.main.metadata['site']
+            self.main.metadata['site'],
+            selected_frequencies_rounded
         )
