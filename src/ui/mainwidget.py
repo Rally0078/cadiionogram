@@ -382,11 +382,11 @@ class MainWidget(QWidget):
             
             new_output_file_name = output_file_nominute_name + new_timestamp
             output_file_name = f"{self.polan_dir / new_output_file_name}.pol"
-            ml_output_filename = f"{self.polan_dir / new_output_file_name}.txt"
+            # ml_output_filename = f"{self.polan_dir / new_output_file_name}.txt"
             shutil.copyfile(input_file_name, output_file_name)
-            with open(ml_output_filename, 'w') as f:
+            """with open(ml_output_filename, 'w') as f:
                 for freq, height in zip(ml_freqs, ml_heights):
-                    f.write(f"{freq}, {float(round(height)):.2f}\n")
+                    f.write(f"{freq}, {float(round(height)):.2f}\n")"""
             self.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
         else:
             print("No drawn curve or ionogram data to match.")

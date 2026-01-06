@@ -157,7 +157,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
                 height_new_y = np.append(height_new_y, np.median(hgts))
             prev_len = len(hgts)
         points = np.array([(x, y) for x, y in zip(freq_new_x, height_new_y)])
-        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points, spacing=0.2)
+        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points, spacing=0.1)
         if len(heights_interp) >= 1:
             self.plot_interp(freqs_interp, heights_interp)
         return freqs_interp, heights_interp, unique_freqs, avg_heights
@@ -170,10 +170,10 @@ class RealHeightAnalysisCanvas(FigureCanvas):
             return np.array([]), np.array([])
         if points.shape[0] < 2:
             return np.array([]), np.array([])
-        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points)
+        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points, spacing=0.05)
         return freqs_interp, heights_interp, unique_freqs, avg_heights
 
-    def compute_matched_curve(self, points, spacing=0.5):
+    def compute_matched_curve(self, points, spacing=0.1):
         """
             Interpolate a curve based on some sample inputs(automatic or hand drawn), and return an output curve at fixed frequency steps. 
             Required for POLAN.
@@ -192,8 +192,8 @@ class RealHeightAnalysisCanvas(FigureCanvas):
 
         f_min = np.floor(unique_freqs.min() * 10) / 10
         f_max = np.ceil(unique_freqs.max() * 10) / 10
-        num_points = int(np.round((f_max - f_min) / spacing)) + 1
-        freqs_interp = np.round(np.linspace(f_min, f_max, num_points), 1)
+        num_points = min(54, int(np.round((f_max - f_min) / spacing)) + 1)
+        freqs_interp = np.round(np.linspace(f_min, f_max, num_points), 2)
 
         interpolator = PchipInterpolator(unique_freqs, avg_heights, extrapolate=False)
         heights_interp = interpolator(freqs_interp)
