@@ -170,7 +170,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
             return np.array([]), np.array([])
         if points.shape[0] < 2:
             return np.array([]), np.array([])
-        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points)
+        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points, spacing=0.05)
         return freqs_interp, heights_interp, unique_freqs, avg_heights
 
     def compute_matched_curve(self, points, spacing=0.1):
@@ -193,7 +193,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         f_min = np.floor(unique_freqs.min() * 10) / 10
         f_max = np.ceil(unique_freqs.max() * 10) / 10
         num_points = min(54, int(np.round((f_max - f_min) / spacing)) + 1)
-        freqs_interp = np.round(np.linspace(f_min, f_max, num_points), 1)
+        freqs_interp = np.round(np.linspace(f_min, f_max, num_points), 2)
 
         interpolator = PchipInterpolator(unique_freqs, avg_heights, extrapolate=False)
         heights_interp = interpolator(freqs_interp)
