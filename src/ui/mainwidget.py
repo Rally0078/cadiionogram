@@ -5,7 +5,6 @@ from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.plot.autoscaling import ScaleIonogramCanvas
 from src.plot.xyplotcanvas import XYPlotCanvas
 from src.ui.height_selection import HeightSelector
-from src.ui.height_selection import HeightSelector
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.ui.freq_list_dropdown import CheckableDropdown
@@ -140,7 +139,6 @@ class MainWidget(QWidget):
         layout.addWidget(self.save_scale_button, 7,0)
         layout.addWidget(self.clear_scale_button, 7, 1)
         layout.addWidget(self.height_selector,8,0,1,3)
-        layout.addWidget(self.height_selector,8,0,1,3)
         # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
@@ -170,8 +168,6 @@ class MainWidget(QWidget):
         self.dlg.setLayout(self.layout_dlg)
         self.prev_checkbox = None
         self.last_folder_path = None
-        self.start_height = 0
-        self.end_height = 1024
         self.start_height = 0
         self.end_height = 1024
         
