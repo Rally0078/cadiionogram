@@ -170,19 +170,21 @@ class MainWidget(QWidget):
         self.layout_dlg.addWidget(self.buttonBox_dlg)
         self.dlg.setLayout(self.layout_dlg)
         self.prev_checkbox = None
-        self.last_folder_path = None
+        self.folder_path = None
+        self.prev_folder_path = None
+        self.folder_changed = False
         
     def open_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", dir=str(self.input_dir))
         folder_path = Path(folder_path)
-        self.last_folder_path = folder_path
+        self.folder_path = folder_path
         self._run_button_callback()
         
     def _run_button_callback(self):
-        if self.last_folder_path:
+        if self.folder_path:
             try:
-                self.plot_widget_table(self.last_folder_path)
-                self.label.setText(f"Selected: {self.last_folder_path.parent.parent.name +  self.last_folder_path.parent.name + self.last_folder_path.name}")
+                self.plot_widget_table(self.folder_path)
+                self.label.setText(f"Selected: {self.folder_path.parent.parent.name +  self.folder_path.parent.name + self.folder_path.name}")
                 self.run_button.setEnabled(True)
             except FolderNotContainingData:
                 self.textbox_errormsg.setText("You must choose a folder containing the data.")
@@ -227,7 +229,7 @@ class MainWidget(QWidget):
         # Reconnect the signals after the update to ensure the buttons work again
         self.table_widget.left_clicked.connect(self._prev_option)
         self.table_widget.right_clicked.connect(self._next_option)
-        
+
         #Do the initial plotting with the given lpointer and rpointer
         self._plot_helper()
 
@@ -272,9 +274,20 @@ class MainWidget(QWidget):
             not isinstance(self.current_plot_state, type(new_state)) or 
             not self.prev_checkbox == curr_checkbox
         )
-        if need_new_canvas:
+
+        if self.folder_path is not None:
+            if self.folder_path != self.prev_folder_path:
+                self.folder_changed = True
+                self.prev_folder_path = self.folder_path
+            else:
+                self.folder_changed = False
+        else:
+            self.folder_changed = True
+
+        if self.folder_changed or need_new_canvas:
             self.has_handled_calculation = False
             self._handle_computation(new_state)
+            self.folder_changed = False
         print(f"is new canvas needed: {need_new_canvas}, prev_checkbox={self.prev_checkbox}, curr_checkbox={curr_checkbox}, equal? {self.prev_checkbox == curr_checkbox}")
         if need_new_canvas:
             # Remove and delete the existing canvas widget if it exists
