@@ -34,7 +34,7 @@ class XYPlotCanvas(FigureCanvas):
         self.ax_ew.set_ylabel("EW (km)")
         self.cbar.set_label('Power (dB)')
         for ax in self.axs:
-            ax.set_xlabel(f"Time in {site_dict[site].timezone}")
+            ax.set_xlabel(f"Time in {site_dict[site].get_tzstr(date)}")
             date_format = mdates.DateFormatter("%H:%M")
             ax.xaxis.set_major_formatter(date_format)
             #ax.grid()
@@ -46,7 +46,7 @@ class XYPlotCanvas(FigureCanvas):
         self.setHidden(self.is_hidden)
         legend = self.fig.legend()
         legend.remove()
-        self.fig.suptitle(f"NS, EW, Range timeseries plot at site: {site} on {date.day:02d}-{date.month:02d}-{date.year:04d} {site_dict[site].timezone}")
+        self.fig.suptitle(f"NS, EW, Range timeseries plot at site: {site} on {date.day:02d}-{date.month:02d}-{date.year:04d} {site_dict[site].get_tzstr(date)}")
         print(f"Selected frequencies: {selected_frequencies}")
         if len(selected_frequencies) == 1:
             selected_heights = heights.iloc[np.argwhere(np.isclose(freqs, selected_frequencies[0], atol=1e-12)).flatten()]

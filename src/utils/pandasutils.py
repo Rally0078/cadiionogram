@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from src.utils.siteinfo import site_dict
 
 class PandasUtils:
     def __init__(self):
@@ -50,8 +51,8 @@ class PandasUtils:
         base_date_str = f"{date_of_obs.year:04d}-{date_of_obs.month:02d}-{date_of_obs.day:02d}"
         repeating_indices = np.repeat(list(metadata['timepartitions'].keys()), timepartitions)
         datetime_strs = np.char.add(base_date_str + ' ', repeating_indices)
-        datetime_strs = np.char.add(datetime_strs, "+00:00")
-        time_index = pd.to_datetime(datetime_strs, format='%Y-%m-%d %H:%M:%S%z', utc=True)
+        time_index = pd.to_datetime(datetime_strs, format='%Y-%m-%d %H:%M:%S')
+        time_index = time_index.tz_localize(site_dict[metadata['site']].get_tzinfo(date_of_obs))
         df_sensors = pd.DataFrame.from_dict(dict(zip(column_names, table_data)))
         df_sensors = df_sensors.set_index(time_index)
 
