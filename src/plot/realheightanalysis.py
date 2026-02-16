@@ -19,7 +19,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.scatter = None
         self.colorbar = None
         self.freq_ticks = [1e6, 2e6, 4e6, 6e6, 8e6, 10e6, 15e6, 20e6]
-        self.freq_limits = (1e6, 20e6)
+        self.freq_limits = (1e6, 15e6)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
         self.user_points = []
@@ -35,14 +35,16 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.mpl_connect("button_press_event", self.on_mouse_press)
         self.mpl_connect("motion_notify_event", self.on_mouse_move)
         self.mpl_connect("button_release_event", self.on_mouse_release)
+        self.mpl_connect("scroll_event", self.on_mouse_scroll)
+        self.zoom_factor = 1.2
         self._set_plot_ax()
         self.is_hidden = False
         self.setHidden(self.is_hidden)
 
     def _set_plot_ax(self):
         self.ax.set_xscale('log')
-        self.ax.set_xlim(self.freq_limits)
         self.ax.set_xticks(self.freq_ticks)
+        self.ax.set_xlim(self.freq_limits)
         self.ax.set_yticks(self.height_ticks)
         self.ax.set_ylim(self.height_limits)
         self.ax.set_xlabel("Frequency (MHz)")
@@ -60,16 +62,16 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.fig.tight_layout(pad=3)
         self.setHidden(self.is_hidden)
         
-        self.scatter = self.ax.scatter(freqs, heights, s=6, c=power, cmap='turbo_r', marker='s')
-        self.scatter.set_clim(0, 50)
+        self.scatter = self.ax.scatter(freqs, heights, s=self.main.scatter_size, c=power, cmap=self.main.colormap, marker='s')
+        self.scatter.set_clim(0, self.main.power_limit)
 
         if self.colorbar:
             self.colorbar.update_ticks()
         else:
             self.colorbar = self.figure.colorbar(self.scatter, ax=self.ax)
             self.colorbar.set_label("Power (dB)")
-            self.colorbar.set_ticks(np.arange(0, 51, 5))  # Fixed ticks from 0 to 50 with step of 5
-            self.scatter.set_clim(0, 50)  # Set color limits on scatter plot
+            self.colorbar.set_ticks(np.arange(0, self.main.power_limit + 1, 5))  # Fixed ticks from 0 to power_limit with step of 5
+            self.scatter.set_clim(0, self.main.power_limit)  # Set color limits on scatter plot
         self.ax.set_title(f"Ionogram site: {site} at time {timestamp} {date.day:02d}-{date.month:02d}-{date.year:04d} {site_dict[site].get_tzstr(date)}")
         self._set_plot_ax()
         self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)
@@ -138,6 +140,36 @@ class RealHeightAnalysisCanvas(FigureCanvas):
     def on_mouse_release(self, event):
         if event.button == 1 and self.drawing:
             self.drawing = False
+
+    def on_mouse_scroll(self, event):
+        if event.inaxes != self.ax:
+            return
+
+        xdata, ydata = event.xdata, event.ydata
+        cur_xlim = self.ax.get_xlim()
+        cur_ylim = self.ax.get_ylim()
+
+        if event.button == 'up':  # Zoom in
+            scale_factor = 1 / self.zoom_factor
+        elif event.button == 'down':  # Zoom out
+            scale_factor = self.zoom_factor
+        else:
+            return
+
+        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
+        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
+
+        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
+        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
+
+        self.ax.set_xlim([xdata - new_width * (1 - relx), xdata + new_width * relx])
+        self.ax.set_ylim([ydata - new_height * (1 - rely), ydata + new_height * rely])
+        self.draw_idle()
+
+    def reset_zoom(self):
+        self.ax.set_xlim(self.freq_limits)
+        self.ax.set_ylim(self.height_limits)
+        self.draw_idle()
 
     def draw_auto_curve(self, freqs, heights, dops, signals):
         noise_idx, _, _ = freq_filter(freqs, heights)

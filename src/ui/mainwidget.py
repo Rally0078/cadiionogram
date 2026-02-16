@@ -70,6 +70,10 @@ class MainWidget(QWidget):
         self.polan_button = QPushButton("POLAN")
         self.polan_button.setVisible(False)  # Hidden initially
         self.polan_button.clicked.connect(self._polan_manual_helper)
+        # Add Reset Zoom button
+        self.reset_zoom_button = QPushButton("Reset Zoom")
+        self.reset_zoom_button.setVisible(False)  # Hidden initially
+        self.reset_zoom_button.clicked.connect(self._reset_zoom_helper)
         #Save Scaling button
         self.save_scale_button = QPushButton("Save Scaling")
         self.save_scale_button.setVisible(False)  # Hidden initially
@@ -90,6 +94,17 @@ class MainWidget(QWidget):
         self.e_scale_box.setVisible(False)
         self.ie_scale_box.setVisible(False)
         
+        # ES Scaling controls
+        self.es_scaling_label = QLabel("ES scaling")
+        self.es_scaling_label.setVisible(False)
+        self.es_scaling_dropdown = QComboBox()
+        self.es_scaling_options = ["None", "ES(Q)", "ES(B)", "ES(H)", "ES(S)"]
+        self.es_scaling_dropdown.addItems(self.es_scaling_options)
+        self.es_scaling_dropdown.setCurrentIndex(0)
+        self.es_scaling_dropdown.setVisible(False)
+        self.es_scaling_dropdown.currentIndexChanged.connect(self._on_es_scaling_changed)
+        self._es_scaling_mode = 0
+
         # Mode selection dropdown
         self.mode_dropdown = QComboBox()
         
@@ -138,10 +153,13 @@ class MainWidget(QWidget):
         layout.addWidget(self.f_scale_box, 6,0)
         layout.addWidget(self.e_scale_box, 6,1)
         layout.addWidget(self.ie_scale_box, 6,2)
-        layout.addWidget(self.freq_selector, 7,2)
-        layout.addWidget(self.polan_button, 7, 1)
-        layout.addWidget(self.save_scale_button, 7,0)
-        layout.addWidget(self.clear_scale_button, 7, 1)
+        layout.addWidget(self.es_scaling_label, 7, 0)
+        layout.addWidget(self.es_scaling_dropdown, 7, 1)
+        layout.addWidget(self.freq_selector, 8,0)
+        layout.addWidget(self.polan_button, 8, 0)
+        layout.addWidget(self.reset_zoom_button, 8, 2)
+        layout.addWidget(self.save_scale_button, 8,0)
+        layout.addWidget(self.clear_scale_button, 8, 1)
         # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
@@ -319,16 +337,14 @@ class MainWidget(QWidget):
     def _handle_computation(self, new_state):
         if not self.has_handled_calculation and isinstance(new_state, MdxXYplotCanvasState):
             df = PandasUtils.create_pandas_from_arrays(self.metadata, self.freqs, self.heights, self.dops, self.signals)
-            date_of_obs = self.metadata['datetime']
+            date_of_obs: datetime = self.metadata['datetime']
             start_time = datetime.strptime(self._selected_timestamp, "%H:%M:%S")
             
             end_time = datetime.strptime(self._right_selected_timestamp, "%H:%M:%S")
             start_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
-                                hour=start_time.hour, minute=start_time.minute, second=start_time.second)
+                                hour=start_time.hour, minute=start_time.minute, second=start_time.second, tzinfo=date_of_obs.tzinfo)
             end_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
-                                hour=end_time.hour, minute=end_time.minute, second=end_time.second)
-            start_dtime = start_dtime.replace(tzinfo=pytz.UTC)
-            end_dtime = end_dtime.replace(tzinfo=pytz.utc)
+                                hour=end_time.hour, minute=end_time.minute, second=end_time.second, tzinfo=date_of_obs.tzinfo)
             df_selection = df.loc[start_dtime:end_dtime]
             df_all_outputs = pd.DataFrame()
             all_output_freqs = np.array([])
@@ -368,7 +384,8 @@ class MainWidget(QWidget):
                 f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} " \
                 f"{'NaN ' if isnan(fof) else f'{fof:.2f}'} {'NaN ' if isnan(hprimef) else f'{hprimef:.2f}'} " \
                 f"{'NaN ' if isnan(foe) else f'{foe:.2f}'} {'NaN ' if isnan(hprimee) else f'{hprimee:.2f}'} " \
-                f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'}\n"))
+                f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'} " \
+                f"{self._es_scaling_mode}\n"))
         else:
             print(f"Not scaling canvas! Use the appropriate canvas")
     def _clean_scaled_canvas(self):
@@ -456,6 +473,15 @@ class MainWidget(QWidget):
                 print("Automatic curvefitting for .iono files is not implemented yet")
         else:
             print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
+
+    def _reset_zoom_helper(self):
+        if hasattr(self.canvas_widget, 'reset_zoom') and callable(self.canvas_widget.reset_zoom):
+            self.canvas_widget.reset_zoom()
+        else:
+            print("Current canvas does not support zoom reset.")
+    def _on_es_scaling_changed(self, index):
+        self._es_scaling_mode = index
+
     #Callback to handle clicking left arrow or pressing left arrow key
     #Setting current index in dropdown calls the _on_dropdown_changed() with the new index as timestamp
     def _prev_option(self):

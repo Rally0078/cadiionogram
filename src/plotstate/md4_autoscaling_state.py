@@ -17,6 +17,9 @@ class Md4ScaleIonogramState(PlotState):
         self.main.e_scale_box.setVisible(True)
         self.main.ie_scale_box.setVisible(True)
         self.main.clear_scale_button.setVisible(True)
+        self.main.reset_zoom_button.setVisible(True)
+        self.main.es_scaling_label.setVisible(True)
+        self.main.es_scaling_dropdown.setVisible(True)
         it = RawDataDirIterator(self.main.metadata, self.main.freqs, self.main.heights, self.main.dops, self.main.signals)
         freqs, heights, dops, signals = it[self.main._selected_timestamp]
         if self.main.extension == 'iono':

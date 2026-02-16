@@ -28,7 +28,7 @@ class XYPlotCanvas(FigureCanvas):
         self.setHidden(self.is_hidden)
         self.cbar = self.fig.colorbar(mappable=cm.ScalarMappable(norm, cmap), ax=self.ax_range)
 
-    def _set_plot_ax(self, site):
+    def _set_plot_ax(self, site, date):
         self.ax_range.set_ylabel("Range (km)")
         self.ax_ns.set_ylabel("NS (km)")
         self.ax_ew.set_ylabel("EW (km)")
@@ -68,7 +68,7 @@ class XYPlotCanvas(FigureCanvas):
             ax.margins(x=0,y=0)
         self.ax_ew.set_ylim(-1000, 1000)
         self.ax_ns.set_ylim(-1000, 1000)    
-        self._set_plot_ax(site)
+        self._set_plot_ax(site, date)
         self._update_legend()
 
         self.fig.subplots_adjust(left=0.1, right=0.95, bottom=0.075, top=0.95)

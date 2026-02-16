@@ -30,10 +30,15 @@ class MainWindow(QMainWindow):
             else:
                 print("OS is not supported!")
                 return                
-                
+            self.config['plotting'] = {'colormap': 'jet_r',
+                                       'scattersize': '6',
+                                       'powerlimit': '50'}
             self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
             self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
             self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
+            self.colormap = self.config['plotting']['colormap']
+            self.scatter_size = self.config.getint('plotting', 'scattersize')
+            self.power_limit = self.config.getint('plotting', 'powerlimit')
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
         else:
@@ -41,10 +46,18 @@ class MainWindow(QMainWindow):
             self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
             self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
             self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
+            # Read plotting options from config
+            self.colormap = self.config['plotting']['colormap']
+            self.scatter_size = self.config.getint('plotting', 'scattersize')
+            self.power_limit = self.config.getint('plotting', 'powerlimit')
         self.main_widget = MainWidget()
         self.main_widget.polan_dir = self.polan_dir
         self.main_widget.input_dir = self.input_dir
         self.main_widget.parquet_cache_dir = self.parquet_cache_dir
+        # Pass plotting options to main_widget
+        self.main_widget.colormap = self.colormap
+        self.main_widget.scatter_size = self.scatter_size
+        self.main_widget.power_limit = self.power_limit
         self.setWindowTitle("CADI Ionogram Plotter")
         self.setCentralWidget(self.main_widget)
         self.resize(1366, 768)
