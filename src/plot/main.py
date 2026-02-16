@@ -36,36 +36,15 @@ class MainWindow(QMainWindow):
             self.config['realheightanalysis'] = {
                 'interpmode': 'old'
             }
-            self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
-            self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
-            self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
-            self.colormap = self.config['plotting']['colormap']
-            self.scatter_size = self.config.getint('plotting', 'scattersize')
-            self.power_limit = self.config.getint('plotting', 'powerlimit')
-            self.polan_interp_mode = self.config.get('realheightanalysis', 'interpmode')
+            self.config['scaling'] = {
+                'linewidth': '2'
+            }
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
         else:
             self.config.read(self.cfg_file)
-            self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
-            self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
-            self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
-            # Read plotting options from config
-            self.colormap = self.config['plotting']['colormap']
-            self.scatter_size = self.config.getint('plotting', 'scattersize')
-            self.power_limit = self.config.getint('plotting', 'powerlimit')
-            self.polan_interp_mode = self.config.get('realheightanalysis', 'interpmode')
         self.main_widget = MainWidget()
-        self.main_widget.polan_dir = self.polan_dir
-        self.main_widget.input_dir = self.input_dir
-        self.main_widget.parquet_cache_dir = self.parquet_cache_dir
-        # Pass plotting options to main_widget
-        self.main_widget.colormap = self.colormap
-        self.main_widget.scatter_size = self.scatter_size
-        self.main_widget.power_limit = self.power_limit
-        if self.polan_interp_mode not in ['old', 'new', 'OLD', 'NEW']:
-            raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
-        self.main_widget.polan_interp_mode = self.polan_interp_mode
+        self.main_widget.init_config(config=self.config)
         self.setWindowTitle("CADI Ionogram Plotter")
         self.setCentralWidget(self.main_widget)
         self.resize(1366, 768)

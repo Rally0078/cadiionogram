@@ -1,3 +1,4 @@
+from configparser import ConfigParser
 from pathlib import Path
 from datetime import datetime
 from src.errorhandlers.errorhandling import FolderNotContainingData
@@ -191,6 +192,19 @@ class MainWidget(QWidget):
         self.folder_path = None
         self.prev_folder_path = None
         self.folder_changed = False
+        
+    def init_config(self, config: ConfigParser):
+        self.polan_dir = Path(config['Locations']['polanoutputdirectory'])
+        self.input_dir = Path(config['Locations']['DefaultInputDirectory'])
+        self.parquet_cache_dir = Path(config['Locations']['cachedir'])
+        # Read plotting options from config
+        self.colormap = config['plotting']['colormap']
+        self.scatter_size = config.getint('plotting', 'scattersize')
+        self.power_limit = config.getint('plotting', 'powerlimit')
+        self.polan_interp_mode = config.get('realheightanalysis', 'interpmode')
+        self.scaling_line_width = config.getfloat('scaling', 'linewidth')
+        if self.polan_interp_mode not in ['old', 'new', 'OLD', 'NEW']:
+            raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
         
     def open_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", dir=str(self.input_dir))

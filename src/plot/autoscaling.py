@@ -20,7 +20,7 @@ class ScaleIonogramCanvas(FigureCanvas):
         self.freq_limits = (1, 15)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
-        self.scaled_values_lines = ScaleRegionValues(self.ax)
+        self.scaled_values_lines = ScaleRegionValues(self.ax, self.main.scaling_line_width)
         self._set_plot_ax()
         self.mpl_connect("button_press_event", self.on_mouse_press)
         self.mpl_connect("scroll_event", self.on_mouse_scroll)
