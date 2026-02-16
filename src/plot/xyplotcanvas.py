@@ -12,7 +12,7 @@ from src.utils.siteinfo import site_dict
 class XYPlotCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure(figsize=(10, 8))
-        
+        self.main = parent
         super().__init__(self.fig)
         self.is_hidden = True
         self.ax_range = self.fig.add_subplot(311)
@@ -21,8 +21,8 @@ class XYPlotCanvas(FigureCanvas):
         self.scatter_range = None
         self.scatter_ew = None
         self.scatter_ns = None
-        cmap = cm.get_cmap('viridis')
-        norm = colors.Normalize(vmin=0, vmax=40)
+        cmap = cm.get_cmap(self.main.colormap)
+        norm = colors.Normalize(vmin=0, vmax=self.main.power_limit)
         self.axs = [self.ax_range, self.ax_ew, self.ax_ns]
         self.is_hidden = False
         self.setHidden(self.is_hidden)
@@ -51,7 +51,7 @@ class XYPlotCanvas(FigureCanvas):
         if len(selected_frequencies) == 1:
             selected_heights = heights.iloc[np.argwhere(np.isclose(freqs, selected_frequencies[0], atol=1e-12)).flatten()]
             sc = self.ax_range.scatter(selected_heights.index, selected_heights, s=3, c=power[np.argwhere(np.isclose(freqs, selected_frequencies[0], atol=1e-12)).flatten()], 
-                                  label=f"{selected_frequencies[0]/1e6} MHz")
+                                  label=f"{selected_frequencies[0]/1e6} MHz", cmap=self.main.colormap, vmin=0, vmax=self.main.power_limit, linewidth=0, marker='s')
         else:
             for freq in np.unique(selected_frequencies):
                 self.ax_range.plot(heights.iloc[np.argwhere(np.isclose(freqs, freq, atol=1e-12)).flatten()], marker='s', linewidth=0, markersize=3, label=f"{freq/1e6} MHz")  

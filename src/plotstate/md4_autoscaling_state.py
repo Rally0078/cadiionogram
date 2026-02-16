@@ -25,11 +25,12 @@ class Md4ScaleIonogramState(PlotState):
         if self.main.extension == 'iono':
             power_prethres = signals[:, 1]
             power = power_prethres[power_prethres >=0 ]
-            freqs = freqs[power_prethres >= 0] * 1e6
+            freqs = freqs[power_prethres >= 0]
             heights = heights[power_prethres >= 0]
             dops = dops[power_prethres >=0 ]
         elif self.main.extension in ['md3', 'md4']:
             power = convert_amplitude_to_power(signals)
+            freqs = freqs
         else:
             raise TypeError("Input data is not the correct type for this canvas")
 

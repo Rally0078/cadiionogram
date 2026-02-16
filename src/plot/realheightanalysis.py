@@ -1,7 +1,7 @@
 #PySide6 FigureCanvas to plot MD4 Ionogram as scatterplot
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.ticker import ScalarFormatter, MultipleLocator
+from matplotlib.ticker import ScalarFormatter, MultipleLocator, FuncFormatter
 from matplotlib.lines import Line2D
 import numpy as np
 from datetime import datetime
@@ -12,14 +12,14 @@ from src.utils.siteinfo import site_dict
 class RealHeightAnalysisCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure(figsize=(16, 9))
-        
+        self.main = parent
         super().__init__(self.fig)
         self.is_hidden = True
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
         self.colorbar = None
-        self.freq_ticks = [1e6, 2e6, 4e6, 6e6, 8e6, 10e6, 15e6, 20e6]
-        self.freq_limits = (1e6, 15e6)
+        self.freq_ticks = [1, 2, 4, 6, 8, 10, 15, 20]
+        self.freq_limits = (1, 15)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
         self.user_points = []
@@ -49,9 +49,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax.set_ylim(self.height_limits)
         self.ax.set_xlabel("Frequency (MHz)")
         self.ax.set_ylabel("Virtual height (km)")
-        formatter = ScalarFormatter(useMathText=True)
-        formatter.set_powerlimits((6, 6))  # Force 1e6 scale
-        self.ax.xaxis.set_major_formatter(formatter)
+        self.ax.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:g}'))
         self.ax.yaxis.set_minor_locator(MultipleLocator(5))
         self.ax.grid()
 
@@ -62,7 +60,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.fig.tight_layout(pad=3)
         self.setHidden(self.is_hidden)
         
-        self.scatter = self.ax.scatter(freqs, heights, s=self.main.scatter_size, c=power, cmap=self.main.colormap, marker='s')
+        self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=power, cmap=self.main.colormap, marker='s')
         self.scatter.set_clim(0, self.main.power_limit)
 
         if self.colorbar:
@@ -87,7 +85,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.draw()
     
     def plot_interp(self, interp_freqs, interp_heights):
-        interp_freqs = np.array(interp_freqs) * 1e6
+        interp_freqs = np.array(interp_freqs) # Removed Hz conversion as interp_freqs should already be in MHz
         if self.interp_line is not None and self.interp_line in self.ax.lines:
             self.interp_line.remove()
         self.interp_line = Line2D(interp_freqs, interp_heights, color='magenta', linewidth=1.5, linestyle='--')
@@ -96,8 +94,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.draw_idle()
 
     def plot_polan(self, freqs, real_heights, interp_freqs, interp_heights):
-        freqs = np.array(freqs)
-        freqs = freqs * 1e6
+        freqs = np.array(freqs) # Removed Hz conversion as freqs should already be in MHz
         self.plot_interp(interp_freqs, interp_heights)
         if self.line_polan is None:
             self.line_polan = Line2D(freqs, real_heights, color='green', linewidth=2, linestyle='--')
@@ -172,6 +169,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.draw_idle()
 
     def draw_auto_curve(self, freqs, heights, dops, signals):
+        freqs = freqs / 1e6 # Convert freqs from Hz to MHz
         noise_idx, _, _ = freq_filter(freqs, heights)
         freqs_filtered = np.delete(freqs, noise_idx)
         heights_filtered = np.delete(heights, noise_idx)
@@ -202,7 +200,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
             return np.array([]), np.array([])
         if points.shape[0] < 2:
             return np.array([]), np.array([])
-        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points)
+        freqs_interp, heights_interp, unique_freqs, avg_heights = self.compute_matched_curve(points, spacing=0.1)
         return freqs_interp, heights_interp, unique_freqs, avg_heights
 
     def compute_matched_curve(self, points, spacing=0.5):
@@ -210,10 +208,9 @@ class RealHeightAnalysisCanvas(FigureCanvas):
             Interpolate a curve based on some sample inputs(automatic or hand drawn), and return an output curve at fixed frequency steps. 
             Required for POLAN.
         """
-        freqs_hz = points[:, 0]
+        freqs_mhz = points[:, 0] # points[:, 0] is already in MHz from event.xdata
         heights = points[:, 1]
 
-        freqs_mhz = freqs_hz / 1e6
         freqs_rounded = np.round(freqs_mhz, 1)
 
         unique_freqs, inverse_indices = np.unique(freqs_rounded, return_inverse=True)
@@ -224,7 +221,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
 
         f_min = np.floor(unique_freqs.min() * 10) / 10
         f_max = np.ceil(unique_freqs.max() * 10) / 10
-        num_points = int(np.round((f_max - f_min) / spacing)) + 1
+        num_points = min(int(np.round((f_max - f_min) / spacing)) + 1, 55)
         freqs_interp = np.round(np.linspace(f_min, f_max, num_points), 1)
 
         interpolator = PchipInterpolator(unique_freqs, avg_heights, extrapolate=False)

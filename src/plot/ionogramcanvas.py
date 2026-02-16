@@ -1,7 +1,7 @@
 #PySide6 FigureCanvas to plot MD4 Ionogram as scatterplot
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.ticker import ScalarFormatter, MultipleLocator
+from matplotlib.ticker import ScalarFormatter, MultipleLocator, FuncFormatter
 from datetime import datetime
 import numpy as np
 from src.utils.siteinfo import site_dict
@@ -15,8 +15,8 @@ class IonogramCanvas(FigureCanvas):
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
         self.colorbar = None
-        self.freq_ticks = [1e6, 2e6, 4e6, 6e6, 8e6, 10e6, 15e6, 20e6]
-        self.freq_limits = (1e6, 15e6)
+        self.freq_ticks = [1, 2, 4, 6, 8, 10, 15, 20]
+        self.freq_limits = (1, 15)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
 
@@ -35,9 +35,7 @@ class IonogramCanvas(FigureCanvas):
         self.ax.set_ylim(self.height_limits)
         self.ax.set_xlabel("Frequency (MHz)")
         self.ax.set_ylabel("Virtual height (km)")
-        formatter = ScalarFormatter(useMathText=True)
-        formatter.set_powerlimits((6, 6))  # Force 1e6 scale
-        self.ax.xaxis.set_major_formatter(formatter)
+        self.ax.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:g}'))
         self.ax.yaxis.set_minor_locator(MultipleLocator(5))
         self.ax.grid()
 
@@ -46,7 +44,7 @@ class IonogramCanvas(FigureCanvas):
         self.fig.tight_layout(pad=3)
         self.setHidden(self.is_hidden)
         # Use configurable plotting options
-        self.scatter = self.ax.scatter(freqs, heights, s=self.main.scatter_size, c=signals, cmap=self.main.colormap, marker='s')
+        self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=signals, cmap=self.main.colormap, marker='s')
         self.scatter.set_clim(0, self.main.power_limit)
 
         if self.colorbar:
