@@ -1,5 +1,6 @@
 import numpy as np
 import polars as pl
+from src.utils.siteinfo import site_dict
 
 class PolarsUtils:
     def __init__(self):
@@ -62,9 +63,7 @@ class PolarsUtils:
             format='%Y-%m-%d %H:%M:%S%z',
             strict=False
         )
-        # Ensure timezone is set to UTC if not already set
-        if datetime_series.dtype.time_zone is None:
-            datetime_series = datetime_series.dt.replace_time_zone('UTC')
+        datetime_series = datetime_series.dt.replace_time_zone(str(site_dict[metadata['site']].get_tzinfo(date_of_obs)))
         
         data_dict["datetime"] = datetime_series
         df_sensors = pl.DataFrame(data_dict)
