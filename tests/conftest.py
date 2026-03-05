@@ -1,19 +1,21 @@
 import pytest
 from pathlib import Path
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from itertools import chain
 from ionogramparser.mdxreader import MDreader
 import struct
 import os
 import random
 import tempfile
+from utils.siteinfo import site_dict
 
 #from cadiparser.csvio import CSVtools
 
 def pytest_collection_modifyitems(items):
     """Modifies test items in place to ensure test classes run in a given order."""
-    CLASS_ORDER = ["TestCADIRaw", "TestPandasUtils", 
+    CLASS_ORDER = ["TestCADIRaw", "TestSiteInfo","TestPandasUtils", 
     "TestParquetRaw", "TestCADIRawIntegration", "TestPandasPolarsEquality"]
     sorted_items = items.copy()
       # read the class names from default items
@@ -86,6 +88,7 @@ def mock_raw_file():
         f.flush()
         return f.name
 
+
 @pytest.fixture
 def mock_data():
     file_list = 'mockfile.md4'
@@ -118,6 +121,43 @@ def mock_data():
     dop_shifts = np.random.choice(np.linspace(-5, 5, 4), size=578)
     sensors = np.random.uniform(0, 256, size=(578, 8))
     return file_list, metadata, heights, frequencies, freq_list, dop_shifts, sensors
+
+@pytest.fixture
+def mock_data_UT():
+    file_list = 'mockfile.md4'
+    metadata = dict({
+        "site": 'TIR',
+        "datetime": datetime(year=2035, month=1, day=15, hour=12, minute=34, second=56),
+        "source": 'mockfile.md4',
+        "filetype": 'H',
+        "ndops": 4,
+        "nfreqs": 2,
+        "nheights": 10,
+        "minheight": 90,
+        "maxheight": 1020,
+        "dheight": 3,
+        "pps": 10,
+        "npulses_avgd": 3,
+        "dtime": 60,
+        "extension": 'md4',
+        "noofreceivers": 4,
+        "timepartitions": {'12:00:00': 100,
+                '12:10:00': 150,
+                '12:20:00': 250,
+                '12:30:00': 450,
+                '12:40:00': 500,
+                '12:50:00': 578},
+        })
+    freq_list = [4e6, 6e6]
+    heights = np.random.uniform(90, 800, 578)
+    frequencies = np.random.choice(freq_list, replace=True, size=578)
+    dop_shifts = np.random.choice(np.linspace(-5, 5, 4), size=578)
+    sensors = np.random.uniform(0, 256, size=(578, 8))
+    return file_list, metadata, heights, frequencies, freq_list, dop_shifts, sensors
+
+@pytest.fixture
+def mock_multi_TZ_data(mock_data, mock_data_UT):
+    return [mock_data, mock_data_UT]
 
 @pytest.fixture
 def expected_column_names():
