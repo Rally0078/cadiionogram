@@ -1,12 +1,18 @@
+from configparser import ConfigParser
 from pathlib import Path
 from datetime import datetime
 from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
+from src.plot.rangetimefreqcanvas import RangeTimeFreqCanvas
+from src.plot.rangetimeintenscanvas import RangeTimeIntensCanvas
 from src.plot.autoscaling import ScaleIonogramCanvas
 from src.plot.xyplotcanvas import XYPlotCanvas
+from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.ui.freq_list_dropdown import CheckableDropdown
+from src.utils.cadikvector import compute_xy
+from src.utils.pandasutils import PandasUtils
 from src.utils.siteinfo import site_dict
 from src.plotstate.factory import PlotStateFactory
 from src.ionogramparser.mdxreader import MDreader
@@ -21,12 +27,15 @@ from PySide6.QtWidgets import (
     QComboBox, QHBoxLayout
 )
 import subprocess
+import numpy as np
+import pandas as pd
+import pytz
 import shutil
 from math import isnan
 
 class MainWidget(QWidget):
-    md3_options = ['Range vs Time (Freq colored)', 'EW-NS timeseries', 'Drift velocity timeseries']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range']
+    md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries']
+    md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity']
     def __init__(self):
         super().__init__()
         self.polan_dir = None
@@ -62,6 +71,10 @@ class MainWidget(QWidget):
         self.polan_button = QPushButton("POLAN")
         self.polan_button.setVisible(False)  # Hidden initially
         self.polan_button.clicked.connect(self._polan_manual_helper)
+        # Add Reset Zoom button
+        self.reset_zoom_button = QPushButton("Reset Zoom")
+        self.reset_zoom_button.setVisible(False)  # Hidden initially
+        self.reset_zoom_button.clicked.connect(self._reset_zoom_helper)
         #Save Scaling button
         self.save_scale_button = QPushButton("Save Scaling")
         self.save_scale_button.setVisible(False)  # Hidden initially
@@ -82,6 +95,17 @@ class MainWidget(QWidget):
         self.e_scale_box.setVisible(False)
         self.ie_scale_box.setVisible(False)
         
+        # ES Scaling controls
+        self.es_scaling_label = QLabel("ES scaling")
+        self.es_scaling_label.setVisible(False)
+        self.es_scaling_dropdown = QComboBox()
+        self.es_scaling_options = ["None", "ES(Q)", "ES(B)", "ES(H)", "ES(S)"]
+        self.es_scaling_dropdown.addItems(self.es_scaling_options)
+        self.es_scaling_dropdown.setCurrentIndex(0)
+        self.es_scaling_dropdown.setVisible(False)
+        self.es_scaling_dropdown.currentIndexChanged.connect(self._on_es_scaling_changed)
+        self._es_scaling_mode = 0
+
         # Mode selection dropdown
         self.mode_dropdown = QComboBox()
         
@@ -130,10 +154,13 @@ class MainWidget(QWidget):
         layout.addWidget(self.f_scale_box, 6,0)
         layout.addWidget(self.e_scale_box, 6,1)
         layout.addWidget(self.ie_scale_box, 6,2)
-        layout.addWidget(self.freq_selector, 7,2)
-        layout.addWidget(self.polan_button, 7, 1)
-        layout.addWidget(self.save_scale_button, 7,0)
-        layout.addWidget(self.clear_scale_button, 7, 1)
+        layout.addWidget(self.es_scaling_label, 7, 0)
+        layout.addWidget(self.es_scaling_dropdown, 7, 1)
+        layout.addWidget(self.freq_selector, 8,0)
+        layout.addWidget(self.polan_button, 8, 0)
+        layout.addWidget(self.reset_zoom_button, 8, 2)
+        layout.addWidget(self.save_scale_button, 8,0)
+        layout.addWidget(self.clear_scale_button, 8, 1)
         # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
@@ -162,19 +189,34 @@ class MainWidget(QWidget):
         self.layout_dlg.addWidget(self.buttonBox_dlg)
         self.dlg.setLayout(self.layout_dlg)
         self.prev_checkbox = None
-        self.last_folder_path = None
+        self.folder_path = None
+        self.prev_folder_path = None
+        self.folder_changed = False
+        
+    def init_config(self, config: ConfigParser):
+        self.polan_dir = Path(config['Locations']['polanoutputdirectory'])
+        self.input_dir = Path(config['Locations']['DefaultInputDirectory'])
+        self.parquet_cache_dir = Path(config['Locations']['cachedir'])
+        # Read plotting options from config
+        self.colormap = config['plotting']['colormap']
+        self.scatter_size = config.getint('plotting', 'scattersize')
+        self.power_limit = config.getint('plotting', 'powerlimit')
+        self.polan_interp_mode = config.get('realheightanalysis', 'interpmode')
+        self.scaling_line_width = config.getfloat('scaling', 'linewidth')
+        if self.polan_interp_mode not in ['old', 'new', 'OLD', 'NEW']:
+            raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
         
     def open_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", dir=str(self.input_dir))
         folder_path = Path(folder_path)
-        self.last_folder_path = folder_path
+        self.folder_path = folder_path
         self._run_button_callback()
         
     def _run_button_callback(self):
-        if self.last_folder_path:
+        if self.folder_path:
             try:
-                self.plot_widget_table(self.last_folder_path)
-                self.label.setText(f"Selected: {self.last_folder_path.parent.parent.name +  self.last_folder_path.parent.name + self.last_folder_path.name}")
+                self.plot_widget_table(self.folder_path)
+                self.label.setText(f"Selected: {self.folder_path.parent.parent.name +  self.folder_path.parent.name + self.folder_path.name}")
                 self.run_button.setEnabled(True)
             except FolderNotContainingData:
                 self.textbox_errormsg.setText("You must choose a folder containing the data.")
@@ -219,12 +261,12 @@ class MainWidget(QWidget):
         # Reconnect the signals after the update to ensure the buttons work again
         self.table_widget.left_clicked.connect(self._prev_option)
         self.table_widget.right_clicked.connect(self._next_option)
-        
+
         #Do the initial plotting with the given lpointer and rpointer
         self._plot_helper()
 
     def _on_freq_selector_updated(self, sel):
-        if isinstance(self.canvas_widget, XYPlotCanvas):
+        if isinstance(self.canvas_widget, (XYPlotCanvas, RangeTimeFreqCanvas, RangeTimeIntensCanvas)):
             self._plot_helper()
 
     #Callback to handle tickboxes
@@ -246,7 +288,7 @@ class MainWidget(QWidget):
     
     #Callback to handle changes in right side dropdown value
     def _on_right_dropdown_changed(self, text):
-        if isinstance(self.canvas_widget, XYPlotCanvas):
+        if isinstance(self.canvas_widget, (XYPlotCanvas, RangeTimeFreqCanvas, RangeTimeIntensCanvas)):
             self._right_selected_timestamp = text
             self._plot_helper()
         else:
@@ -264,6 +306,20 @@ class MainWidget(QWidget):
             not isinstance(self.current_plot_state, type(new_state)) or 
             not self.prev_checkbox == curr_checkbox
         )
+
+        if self.folder_path is not None:
+            if self.folder_path != self.prev_folder_path:
+                self.folder_changed = True
+                self.prev_folder_path = self.folder_path
+            else:
+                self.folder_changed = False
+        else:
+            self.folder_changed = True
+
+        if self.folder_changed or need_new_canvas:
+            self.has_handled_calculation = False
+            self._handle_computation(new_state)
+            self.folder_changed = False
         print(f"is new canvas needed: {need_new_canvas}, prev_checkbox={self.prev_checkbox}, curr_checkbox={curr_checkbox}, equal? {self.prev_checkbox == curr_checkbox}")
         if need_new_canvas:
             # Remove and delete the existing canvas widget if it exists
@@ -284,16 +340,36 @@ class MainWidget(QWidget):
                 self.canvas_layout_colspan,
             )
             self.canvas_widget.setHidden(False)
-
-        # Update the canvas using the new state
+            self.current_plot_state = new_state
+        # If state needs no change, just update the canvas
         else:
-            new_state.update_canvas(self.canvas_widget)
+            self.current_plot_state.update_canvas(self.canvas_widget)
         self.prev_checkbox = curr_checkbox
-        # Track the current state
-        self.current_plot_state = new_state
         self._polan_auto_helper()
         self._autoscale_helper()
-    
+        
+    def _handle_computation(self, new_state):
+        if not self.has_handled_calculation and isinstance(new_state, MdxXYplotCanvasState):
+            df = PandasUtils.create_pandas_from_arrays(self.metadata, self.freqs, self.heights, self.dops, self.signals)
+            date_of_obs: datetime = self.metadata['datetime']
+            start_time = datetime.strptime(self._selected_timestamp, "%H:%M:%S")
+            
+            end_time = datetime.strptime(self._right_selected_timestamp, "%H:%M:%S")
+            start_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
+                                hour=start_time.hour, minute=start_time.minute, second=start_time.second, tzinfo=date_of_obs.tzinfo)
+            end_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
+                                hour=end_time.hour, minute=end_time.minute, second=end_time.second, tzinfo=date_of_obs.tzinfo)
+            df_selection = df.loc[start_dtime:end_dtime]
+            df_all_outputs = pd.DataFrame()
+            all_output_freqs = np.array([])
+            for dtime in np.unique(df_selection.index):
+                df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow = compute_xy(df_selection.loc[dtime], self.freqs_list, sort_by_freq=False)
+                df_all_outputs = pd.concat([df_all_outputs if not df_all_outputs.empty else None, df_output])
+                all_output_freqs = np.concatenate([all_output_freqs, output_freqs])
+            self.df_all_outputs = df_all_outputs
+            self.all_output_freqs = all_output_freqs
+            self.has_handled_calculation = True
+
     #TODO
     def _autoscale_helper(self):
         pass
@@ -322,7 +398,8 @@ class MainWidget(QWidget):
                 f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} " \
                 f"{'NaN ' if isnan(fof) else f'{fof:.2f}'} {'NaN ' if isnan(hprimef) else f'{hprimef:.2f}'} " \
                 f"{'NaN ' if isnan(foe) else f'{foe:.2f}'} {'NaN ' if isnan(hprimee) else f'{hprimee:.2f}'} " \
-                f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'}\n"))
+                f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'} " \
+                f"{self._es_scaling_mode}\n"))
         else:
             print(f"Not scaling canvas! Use the appropriate canvas")
     def _clean_scaled_canvas(self):
@@ -382,11 +459,11 @@ class MainWidget(QWidget):
             
             new_output_file_name = output_file_nominute_name + new_timestamp
             output_file_name = f"{self.polan_dir / new_output_file_name}.pol"
-            ml_output_filename = f"{self.polan_dir / new_output_file_name}.txt"
+            #ml_output_filename = f"{self.polan_dir / new_output_file_name}.txt"
             shutil.copyfile(input_file_name, output_file_name)
-            with open(ml_output_filename, 'w') as f:
-                for freq, height in zip(ml_freqs, ml_heights):
-                    f.write(f"{freq}, {float(round(height)):.2f}\n")
+            #with open(ml_output_filename, 'w') as f:
+            #    for freq, height in zip(ml_freqs, ml_heights):
+            #        f.write(f"{freq}, {float(round(height)):.2f}\n")
             self.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
         else:
             print("No drawn curve or ionogram data to match.")
@@ -410,6 +487,15 @@ class MainWidget(QWidget):
                 print("Automatic curvefitting for .iono files is not implemented yet")
         else:
             print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
+
+    def _reset_zoom_helper(self):
+        if hasattr(self.canvas_widget, 'reset_zoom') and callable(self.canvas_widget.reset_zoom):
+            self.canvas_widget.reset_zoom()
+        else:
+            print("Current canvas does not support zoom reset.")
+    def _on_es_scaling_changed(self, index):
+        self._es_scaling_mode = index
+
     #Callback to handle clicking left arrow or pressing left arrow key
     #Setting current index in dropdown calls the _on_dropdown_changed() with the new index as timestamp
     def _prev_option(self):

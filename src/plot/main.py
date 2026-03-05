@@ -30,21 +30,21 @@ class MainWindow(QMainWindow):
             else:
                 print("OS is not supported!")
                 return                
-                
-            self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
-            self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
-            self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
+            self.config['plotting'] = {'colormap': 'jet_r',
+                                       'scattersize': '6',
+                                       'powerlimit': '50'}
+            self.config['realheightanalysis'] = {
+                'interpmode': 'old'
+            }
+            self.config['scaling'] = {
+                'linewidth': '2'
+            }
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
         else:
             self.config.read(self.cfg_file)
-            self.polan_dir = Path(self.config['Locations']['polanoutputdirectory'])
-            self.input_dir = Path(self.config['Locations']['DefaultInputDirectory'])
-            self.parquet_cache_dir = Path(self.config['Locations']['cachedir'])
         self.main_widget = MainWidget()
-        self.main_widget.polan_dir = self.polan_dir
-        self.main_widget.input_dir = self.input_dir
-        self.main_widget.parquet_cache_dir = self.parquet_cache_dir
+        self.main_widget.init_config(config=self.config)
         self.setWindowTitle("CADI Ionogram Plotter")
         self.setCentralWidget(self.main_widget)
         self.resize(1366, 768)

@@ -13,6 +13,7 @@ class Md4RealheightAnalysisState(PlotState):
 
     def update_canvas(self, canvas):
         self.main.polan_button.setVisible(True)
+        self.main.reset_zoom_button.setVisible(True)
         it = RawDataDirIterator(self.main.metadata, self.main.freqs, self.main.heights, self.main.dops, self.main.signals)
         freqs, heights, dops, signals = it[self.main._selected_timestamp]
         if self.main.extension == 'iono':

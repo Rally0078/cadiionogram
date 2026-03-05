@@ -25,6 +25,7 @@ from io import BufferedReader
 
 from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.ionogramparser.baserawreader import DataReader
+from src.utils.siteinfo import site_dict
 import numpy as np
 
 
@@ -198,7 +199,7 @@ class MDreader(DataReader):
                     time_sec = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                     flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # gainflag
                     timex += 1
-                    time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec, tzinfo=timezone.utc)
+                    time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec)
                     for freqx in range(nfreqs):
                         #Iterate through each frequency at a given time of observation
                         noise_flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # noiseflag
@@ -262,28 +263,11 @@ class MDreader(DataReader):
                 #Get absolute value of complex signal
                 #absvalue = np.sqrt(dopbin_iq[idx][receiver][0]**2 + dopbin_iq[idx][receiver][1]**2)
                 #receiver_values[receiver][idx] = absvalue
-        frequency = freqs[dopbin_x_freqx]
-        height = np.array(dopbin_x_hflag) * 3
-        
-
-        dopbin_x_dop_flag = np.array(dopbin_x_dop_flag)
-        dopsn2 = 1/(ndops * npulses_avgd/pps)
-        dop_shifts = (dopbin_x_dop_flag - ndops/2) * dopsn2
-        
-        
-        #datetime object representing time of first observation in UTC
+        #datetime object representing time of first observation in UTC or local time
         datetime_init_observation =  datetime.datetime(year=year, month=month_number,day=day, 
-                                                    hour=hour, minute=minute, second=sec,tzinfo=timezone.utc)
-        dopbin_iq = np.array(dopbin_iq)
-        #Combine the real and imaginary parts into one complex part
-        complex_signal = np.empty(shape=(len(frequency), 2 * noofreceivers), dtype=np.int8)
-        for receiver_re_im in range(2 * noofreceivers):
-            #Real component
-            if receiver_re_im % 2 == 0:
-                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 0]
-            #Imaginary component
-            else:
-                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 1]
+                                                    hour=hour, minute=minute, second=sec,
+                                                    tzinfo=site_dict[site].get_tzinfo(datetime.datetime(year, month_number, day)))
+        
         
         metadata = dict({
         "site": site,
@@ -304,6 +288,28 @@ class MDreader(DataReader):
         "timepartitions": time_partitions,
         })
 
+        if dopbinx > 0:
+            dopbin_iq = np.array(dopbin_iq).reshape((len(frequency), noofreceivers, 2))
+        else:
+            return file_list, metadata, np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
+        frequency = freqs[dopbin_x_freqx]
+        height = np.array(dopbin_x_hflag) * 3
+        #Combine the real and imaginary parts into one complex part
+        complex_signal = np.empty(shape=(len(frequency), 2 * noofreceivers), dtype=np.int8)
+
+        dopbin_x_dop_flag = np.array(dopbin_x_dop_flag)
+        dopsn2 = 1/(ndops * npulses_avgd/pps)
+        dop_shifts = (dopbin_x_dop_flag - ndops/2) * dopsn2
+        
+        
+        for receiver_re_im in range(2 * noofreceivers):
+            #Real component
+            if receiver_re_im % 2 == 0:
+                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 0]
+            #Imaginary component
+            else:
+                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 1]
+        
         height = height.astype(np.float32)
         dop_shifts = dop_shifts.astype(np.float16)
         complex_signal = complex_signal.astype(np.int8)

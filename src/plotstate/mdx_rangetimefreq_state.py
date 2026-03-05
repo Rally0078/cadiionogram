@@ -1,18 +1,14 @@
 #Concrete implementation for range-time-freq plot
-from src.plot.xyplotcanvas import XYPlotCanvas
+from src.plot.rangetimefreqcanvas import RangeTimeFreqCanvas
 from src.plotstate.base import PlotState
-from datetime import datetime
 from src.utils.pandasutils import PandasUtils
-from src.utils.cadikvector import compute_xy
-from src.utils.powerpreprocessing import convert_amplitude_to_power
+from datetime import datetime
 from decimal import Decimal
-import numpy as np
-import pandas as pd
 import pytz
 
-class MdxXYplotCanvasState(PlotState):
+class MdxRangeTimeFreqState(PlotState):
     def create_canvas(self):
-        canvas = XYPlotCanvas(self.main)
+        canvas = RangeTimeFreqCanvas(self.main)
         self.update_canvas(canvas)
         return canvas
 
@@ -33,16 +29,13 @@ class MdxXYplotCanvasState(PlotState):
         selected_frequencies_decimals = [Decimal(freq) for freq in selected_frequencies]
         selected_frequencies_rounded = [float(item.quantize(Decimal(f"1e-3"))) * 1e6 for item in selected_frequencies_decimals]
         signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
-        power = convert_amplitude_to_power(df_selection[signal_col_names].to_numpy())
+    
         canvas.plot_scatter(
             df_selection.index,
             df_selection['height (km)'],
-            df_selection['freq (Hz)'],
-            power,
-            self.main.df_all_outputs['xpos'],
-            self.main.df_all_outputs['ypos'], 
-            self.main.all_output_freqs,
-            selected_frequencies_rounded,
+            df_selection['dopplershift'],
+            df_selection['freq (Hz)'], 
             self.main.metadata['datetime'],
-            self.main.metadata['site']
+            self.main.metadata['site'],
+            selected_frequencies_rounded
         )
