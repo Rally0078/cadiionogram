@@ -1,5 +1,6 @@
 name: cadiionogram
 channels:
+  - conda-forge
   - defaults
 dependencies:
   - ipykernel
@@ -9,6 +10,7 @@ dependencies:
   - nodejs
   - numpy
   - pandas
+  - polars
   - pip
   - pyarrow
   - pyside6
