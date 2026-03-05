@@ -34,7 +34,7 @@ jobs:
       - name: Set up Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          activate-environment: cadiionogram
+          activate-environment: cadiionogram-release
           environment-file: environment-build.yml
           use-mamba: true
           miniforge-variant: Miniforge3
@@ -45,13 +45,13 @@ jobs:
       - name: Run tests
         shell: bash -l {0}
         run: |
-          conda activate cadiionogram
+          conda activate cadiionogram-release
           pytest
 
       - name: Build with pyinstaller
         shell: bash -l {0}
         run: |
-          conda activate cadiionogram
+          conda activate cadiionogram-release
           cd $GITHUB_WORKSPACE
           python -m PyInstaller main.spec
 
