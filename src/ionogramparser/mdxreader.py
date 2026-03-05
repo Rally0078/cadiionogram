@@ -43,6 +43,45 @@ class MDreader(DataReader):
         return data
     
     @staticmethod
+    def _convert_bins_to_vals(dopbin_x_freqx, dopbin_x_hflag, dopbin_x_dop_flag, dopbin_iq, noofreceivers, dopbinx, freqs, ndops, npulses_avgd, pps):
+        frequency = np.zeros(shape=(len(dopbin_iq)))
+        for idx in range(len(dopbin_iq)):
+            #Shape of data in dopbin_iq (Re, Im) component array
+            #[[  5., 239.],
+            #   [  8.,  14.],
+            #   [252.,   2.],
+            #   [  5.,   1.]])
+            # transform coordinates
+            for receiver in range(noofreceivers):
+                for component in range(2):
+                    if dopbin_iq[idx][receiver][component] > 127:
+                        dopbin_iq[idx][receiver][component] = dopbin_iq[idx][receiver][component] - 256    
+        if dopbinx > 0:
+            dopbin_iq = np.array(dopbin_iq).reshape((len(frequency), noofreceivers, 2))
+        else:
+            return np.array([]), np.array([]), np.array([]), np.array([])
+        frequency = freqs[dopbin_x_freqx]
+        height = np.array(dopbin_x_hflag) * 3
+        #Combine the real and imaginary parts into one complex part
+        complex_signal = np.empty(shape=(len(frequency), 2 * noofreceivers), dtype=np.int8)
+
+        dopbin_x_dop_flag = np.array(dopbin_x_dop_flag)
+        dopsn2 = 1/(ndops * npulses_avgd/pps)
+        dop_shifts = (dopbin_x_dop_flag - ndops/2) * dopsn2
+        
+        for receiver_re_im in range(2 * noofreceivers):
+            #Real component
+            if receiver_re_im % 2 == 0:
+                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 0]
+            #Imaginary component
+            else:
+                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 1]
+        height = height.astype(np.float32)
+        dop_shifts = dop_shifts.astype(np.float16)
+        complex_signal = complex_signal.astype(np.int8)
+        return height, frequency, dop_shifts, complex_signal
+
+    @staticmethod
     def read_raw_data(filename: Path) -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Read CADI ionogram data from mdx binary formats(x=1,2,3,4).
 
@@ -94,26 +133,55 @@ class MDreader(DataReader):
             extension = filename.suffix.replace('.', '')
         else:
             extension='unknown'
+        
         file_list = []
+        time_partitions = dict()
+        nfreqs = 0
+        noofreceivers = 0
+        times = []
+        frebins = []
+        frebins_x = []
+        frebins_gain_flag = []
+        frebins_noise_flag = []
+        frebins_noise_power10 = []
+        time_min = 0
+        time_sec = 0
+        timex = -1
+        freqx = nfreqs - 1
+        dopbinx = -1
+        frebinx = -1
+        iq_bytes = np.zeros((noofreceivers, 2))
+        dopbin_x_timex = []
+        dopbin_x_freqx = []
+        dopbin_x_hflag = []
+        dopbin_x_dop_flag = []
+        dopbin_iq = []
+        hflag = 0
+        file_list = []
+        ndops = 0
+        npulses_avgd = 0
+        pps = 0
+
+        freqs = np.array([])
         metadata = dict({
                     "site": '',
-                    "datetime": '',
+                    "datetime": datetime.datetime(year=1970,month=1,day=1, tzinfo=timezone.utc),
                     "source": filename.name if isinstance(filename, Path) else filename,
                     "filetype": '',
                     "ndops": 0,
-                    "nfreqs": 0,
+                    "nfreqs": nfreqs,
                     "nheights": 0,
                     "minheight": 0,
                     "maxheight": 0,
-                    "dheight": 0,
+                    "dheight": 0.0,
                     "pps": 0,
                     "npulses_avgd": 0,
                     "dtime": 0,
                     "extension": extension,
-                    "noofreceivers": 0,
-                    "timepartitions": 0,
+                    "noofreceivers": noofreceivers,
+                    "timepartitions": time_partitions,
         })
-        
+        header_read = False
         try:
             with open(filename, "rb") as f:
                 f.seek(-1,2)     # go to the file end.
@@ -168,31 +236,29 @@ class MDreader(DataReader):
                     max_nfrebins = min(max_ntimes * nfreqs, max_ndopbins)
 
                 nheights = int(maxheight / dheight + 1)
-
-                times = []
-                frebins = []
-                frebins_x = []
-                frebins_gain_flag = []
-                frebins_noise_flag = []
-                frebins_noise_power10 = []
-                time_min = 0
-                time_sec = 0
-                timex = -1
-                freqx = nfreqs - 1
-                dopbinx = -1
-                frebinx = -1
-                iq_bytes = np.zeros((noofreceivers, 2))
-                dopbin_x_timex = []
-                dopbin_x_freqx = []
-                dopbin_x_hflag = []
-                dopbin_x_dop_flag = []
-                dopbin_iq = []
-                hflag = 0
-                file_list = []
-                time_partitions = dict()
-
-                time_min = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                header_read = True
                 
+                        #datetime object representing time of first observation in UTC or local time
+                datetime_init_observation =  datetime.datetime(year=year, month=month_number,day=day, 
+                                                    hour=hour, minute=minute, second=sec,
+                                                    tzinfo=site_dict[site].get_tzinfo(datetime.datetime(year, month_number, day)))
+                time_min = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                metadata['site'] = site
+                metadata['datetime'] = datetime_init_observation
+                metadata['source'] = filename.name if isinstance(filename, Path) else filename
+                metadata["filetype"] = filetype
+                metadata["ndops"] = ndops
+                metadata["nfreqs"] = nfreqs
+                metadata["nheights"] = nheights
+                metadata["minheight"] = minheight
+                metadata["maxheight"] =  maxheight
+                metadata["dheight"] = dheight
+                metadata["pps"] = pps
+                metadata["npulses_avgd"] = npulses_avgd
+                metadata["dtime"] = dtime
+                metadata["extension"] = filename.suffix.replace('.','') if isinstance(filename, Path) else "unknown"
+                metadata["noofreceivers"] = noofreceivers
+                iq_bytes = np.zeros((noofreceivers, 2))
                 # Read complex sensor data from all receivers of all observations till eof.
                 while f.tell() < eof and time_min != 255 and  time_min < 60:
                     #Iterate through each time of observation
@@ -242,79 +308,29 @@ class MDreader(DataReader):
                     time_min = flag
                     if ((f.tell() - 1) != eof):
                         time_min = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # next record
+                    metadata["timepartitions"] = time_partitions
         except EOFError:
-            return file_list, metadata, np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
-
-        #Raw signal values from the four receivers
-        #Use 20 log(value) to get power in dB
-        frequency = np.zeros(shape=(len(dopbin_iq)))
-        for idx in range(len(dopbin_iq)):
-            #Shape of data in dopbin_iq (Re, Im) component array
-            #[[  5., 239.],
-            #   [  8.,  14.],
-            #   [252.,   2.],
-            #   [  5.,   1.]])
-            # transform coordinates
-            for receiver in range(noofreceivers):
-                for component in range(2):
-                    if dopbin_iq[idx][receiver][component] > 127:
-                        dopbin_iq[idx][receiver][component] = dopbin_iq[idx][receiver][component] - 256
-                
-                #Get absolute value of complex signal
-                #absvalue = np.sqrt(dopbin_iq[idx][receiver][0]**2 + dopbin_iq[idx][receiver][1]**2)
-                #receiver_values[receiver][idx] = absvalue
-        #datetime object representing time of first observation in UTC or local time
-        datetime_init_observation =  datetime.datetime(year=year, month=month_number,day=day, 
-                                                    hour=hour, minute=minute, second=sec,
-                                                    tzinfo=site_dict[site].get_tzinfo(datetime.datetime(year, month_number, day)))
-        
-        
-        metadata = dict({
-        "site": site,
-        "datetime": datetime_init_observation,
-        "source": filename.name if isinstance(filename, Path) else filename,
-        "filetype": filetype,
-        "ndops": ndops,
-        "nfreqs": nfreqs,
-        "nheights": nheights,
-        "minheight": minheight,
-        "maxheight": maxheight,
-        "dheight": dheight,
-        "pps": pps,
-        "npulses_avgd": npulses_avgd,
-        "dtime": dtime,
-        "extension": filename.suffix.replace('.','') if isinstance(filename, Path) else "unknown",
-        "noofreceivers": noofreceivers,
-        "timepartitions": time_partitions,
-        })
-
-        if dopbinx > 0:
-            dopbin_iq = np.array(dopbin_iq).reshape((len(frequency), noofreceivers, 2))
-        else:
-            return file_list, metadata, np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
-        frequency = freqs[dopbin_x_freqx]
-        height = np.array(dopbin_x_hflag) * 3
-        #Combine the real and imaginary parts into one complex part
-        complex_signal = np.empty(shape=(len(frequency), 2 * noofreceivers), dtype=np.int8)
-
-        dopbin_x_dop_flag = np.array(dopbin_x_dop_flag)
-        dopsn2 = 1/(ndops * npulses_avgd/pps)
-        dop_shifts = (dopbin_x_dop_flag - ndops/2) * dopsn2
-        
-        
-        for receiver_re_im in range(2 * noofreceivers):
-            #Real component
-            if receiver_re_im % 2 == 0:
-                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 0]
-            #Imaginary component
+            if header_read:
+                metadata['incompletedata'] = True
+                if len(list(time_partitions.keys())) > 0:
+                    final_idx = time_partitions[list(time_partitions.keys())[-1]]
+                    dopbin_x_freqx = np.array(dopbin_x_freqx)[:final_idx]
+                    dopbin_iq = np.array(dopbin_iq[:final_idx])
+                    dopbin_x_hflag = np.array(dopbin_x_hflag)[:final_idx]
+                    dopbin_x_dop_flag = np.array(dopbin_x_dop_flag)[:final_idx]
+                    height, frequency, dop_shifts, complex_signal = MDreader._convert_bins_to_vals(dopbin_x_freqx, dopbin_x_hflag, dopbin_x_dop_flag, dopbin_iq, 
+                                       noofreceivers, dopbinx, freqs, ndops, npulses_avgd, pps)
+                    return file_list, metadata, height, frequency, freqs, dop_shifts, complex_signal
+                else:
+                    return file_list, metadata, np.array([]), np.array([]), freqs, np.array([]), np.array([])
             else:
-                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 1]
-        
-        height = height.astype(np.float32)
-        dop_shifts = dop_shifts.astype(np.float16)
-        complex_signal = complex_signal.astype(np.int8)
+                metadata['incompleteheader'] = True
+                metadata['incompletedata'] = True
+                return file_list, metadata, np.array([]), np.array([]), np.array([]), np.array([]), np.array([])
+        height, frequency, dop_shifts, complex_signal = MDreader._convert_bins_to_vals(dopbin_x_freqx, dopbin_x_hflag, dopbin_x_dop_flag, dopbin_iq, 
+                                       noofreceivers, dopbinx, freqs, ndops, npulses_avgd, pps)
         return file_list, metadata, height, frequency, freqs, dop_shifts, complex_signal
-
+    
     @staticmethod
     def read_raw_data_dir(input_dir: Path, extension: str, 
                           multithread=False, backend='threading') -> tuple[list, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:

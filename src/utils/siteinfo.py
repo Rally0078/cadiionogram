@@ -31,10 +31,11 @@ class SiteInfo():
 ald_site = SiteInfo(FH=1.119, dip=10.2, site='ALD',short_site='al')
 tir_site = SiteInfo(FH=0.951, dip=0.5, site='TIR', short_site='ti')
 hyd_site = SiteInfo(FH=1.007, dip=6.5, site='TFR', short_site='tf')
-
+moc_site = SiteInfo(FH=0, dip=0, site='MOC', short_site='ut')
 site_dict = {
     'TIR': tir_site,
     'KSKGRL-IIGM PRAYAGRAJ': ald_site,
     'ALD': ald_site,
-    'TFR': hyd_site
+    'TFR': hyd_site,
+    'MOC': moc_site
 }
