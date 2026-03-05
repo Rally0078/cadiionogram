@@ -40,10 +40,7 @@ class PlotStateFactory:
         main_widget.table_widget.end_timepartitions_dropdown.setVisible(state)
         main_widget.table_widget.left_button.setVisible(not state)
         main_widget.table_widget.right_button.setVisible(not state)
-        if is_md3:
-            main_widget.freq_selector.setVisible(state)
-        else:
-            main_widget.freq_selector.setVisible(not state)
+        main_widget.freq_selector.setVisible(state and is_md3)
         main_widget.table_widget.end_timepartitions_dropdown.setVisible(state)
     
     @staticmethod
