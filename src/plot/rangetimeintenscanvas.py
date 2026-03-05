@@ -54,14 +54,15 @@ class RangeTimeIntensCanvas(FigureCanvas):
                 self.time_height_plot = self.ax.scatter(time_index[matched_idxs], heights.iloc[matched_idxs], s=25, 
                             c=pow_signal[matched_idxs], cmap=self.main.colormap, vmin=0, vmax=self.main.power_limit, linewidth=0, marker=',')
         else:
-            self.time_height_plot = self.ax.scatter(time_index, heights, s=25, 
-                            c=pow_signal, cmap=self.main.colormap, vmin=0, vmax=self.main.power_limit, linewidth=0, marker=',')
+            time_vals = mdates.date2num(time_index)
+            self.time_height_plot = self.ax.tricontourf(time_vals, heights, 
+                            pow_signal, cmap='turbo', levels=100)
         xaxis_timedelta = timedelta(hours=3) if len(np.unique(time_index)) > 72 else timedelta(hours=2) if len(np.unique(time_index)) > 36 else timedelta(minutes=30) if len(np.unique(time_index)) > 12 else timedelta(minutes=15)
         self.ax.set_xticks(np.arange(datetime(year=time_index[0].year, month=time_index[0].month, day=time_index[0].day, 
                                                 hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
                                                 hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
         self.ax.margins(x=0,y=0)
-        self.ax.set_xlim(time_index[0], time_index[-1])
+        #self.ax.set_xlim(time_index[0], time_index[-1])
         
         self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} UTC")
         self._set_plot_ax()
