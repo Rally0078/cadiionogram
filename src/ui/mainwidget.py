@@ -18,7 +18,9 @@ from src.plotstate.factory import PlotStateFactory
 from src.ionogramparser.mdxreader import MDreader
 from src.ionogramparser.sameerreader import SameerReader
 from src.utils.rawdatadiriterator import RawDataDirIterator
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThreadPool
+from src.workers.data_loader_worker import DataLoaderWorker
+from src.workers.computation_worker import ComputationWorker
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout,
     QPushButton, QFileDialog, QLabel, 
@@ -36,6 +38,7 @@ from math import isnan
 class MainWidget(QWidget):
     md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries']
     md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity']
+    
     def __init__(self):
         super().__init__()
         self.polan_dir = None
@@ -45,9 +48,8 @@ class MainWidget(QWidget):
         self.canvas_layout_rowspan = 8
         self.canvas_layout_colspan = 3
         self.canvas_widget = None
-        self.lpointer = -1
-        self.rpointer = -1
         self.current_plot_state = None
+        self.has_handled_calculation = False
 
         # Folder selector buttons and label
         self.label = QLabel("No folder selected")
@@ -67,22 +69,26 @@ class MainWidget(QWidget):
         self.md3_checkbox.stateChanged.connect(self._on_tickbox_changed)
         self.md4_checkbox.stateChanged.connect(self._on_tickbox_changed)
         self.iono_checkbox.stateChanged.connect(self._on_tickbox_changed)
+        
         # POLAN button
         self.polan_button = QPushButton("POLAN")
         self.polan_button.setVisible(False)  # Hidden initially
         self.polan_button.clicked.connect(self._polan_manual_helper)
+        
         # Add Reset Zoom button
         self.reset_zoom_button = QPushButton("Reset Zoom")
         self.reset_zoom_button.setVisible(False)  # Hidden initially
         self.reset_zoom_button.clicked.connect(self._reset_zoom_helper)
-        #Save Scaling button
+        
+        # Save Scaling button
         self.save_scale_button = QPushButton("Save Scaling")
         self.save_scale_button.setVisible(False)  # Hidden initially
         self.save_scale_button.clicked.connect(self._save_manual_scale)
         self.clear_scale_button = QPushButton("Clear Scaling")
         self.clear_scale_button.setVisible(False)  # Hidden initially
         self.clear_scale_button.clicked.connect(self._clean_scaled_canvas)
-        #Manual scaling modes
+        
+        # Manual scaling modes
         self.scale_mode_group = QButtonGroup()
         self.f_scale_box = QCheckBox('Scale F')
         self.e_scale_box = QCheckBox('Scale E')
@@ -108,8 +114,6 @@ class MainWidget(QWidget):
 
         # Mode selection dropdown
         self.mode_dropdown = QComboBox()
-        
-        # Default mode is md4
         self.mode_dropdown.addItems(MainWidget.md4_options)
         
         # Create container widget + layout for dropdown + Run button
@@ -117,7 +121,6 @@ class MainWidget(QWidget):
         self.mode_dropdown_layout = QHBoxLayout()
         self.mode_dropdown_layout.setContentsMargins(0, 0, 0, 0)
         self.mode_dropdown_layout.setSpacing(5)
-        self.mode_dropdown_container.setContentsMargins(0, 0, 0, 0)
         self.mode_dropdown_container.setLayout(self.mode_dropdown_layout)
 
         # Add mode selection dropdown and Run button to this layout
@@ -126,23 +129,18 @@ class MainWidget(QWidget):
         self.mode_dropdown_layout.addWidget(self.mode_dropdown)
         self.mode_dropdown_layout.addWidget(self.run_button)
         self.run_button.clicked.connect(self._run_button_callback)
+        
         self.freq_selector = CheckableDropdown(text="Select Frequencies")
         self.freq_selector.setVisible(False)
         self.freq_selector.selectionChanged.connect(self._on_freq_selector_updated)
         
         # Grid layout
         layout = QGridLayout()
-
-        # Folder selection and label
         layout.addWidget(self.button, 1, 0)
-        #layout.addWidget(self.label, 4, 0)
-
-        # Checkboxes
         layout.addWidget(self.md3_checkbox, 2, 0)
         layout.addWidget(self.md4_checkbox, 2, 1)
         layout.addWidget(self.iono_checkbox, 2, 2)
         layout.addWidget(self.mode_dropdown_container, 3, 0, 1, 2)
-
         layout.setColumnStretch(4, 1)
 
         # Custom table widget for metadata table and navigation
@@ -151,21 +149,20 @@ class MainWidget(QWidget):
 
         # Add table widget, POLAN, and scaling buttons to the layout        
         layout.addWidget(self.table_widget, 4, 0, 2, 2)
-        layout.addWidget(self.f_scale_box, 6,0)
-        layout.addWidget(self.e_scale_box, 6,1)
-        layout.addWidget(self.ie_scale_box, 6,2)
+        layout.addWidget(self.f_scale_box, 6, 0)
+        layout.addWidget(self.e_scale_box, 6, 1)
+        layout.addWidget(self.ie_scale_box, 6, 2)
         layout.addWidget(self.es_scaling_label, 7, 0)
         layout.addWidget(self.es_scaling_dropdown, 7, 1)
-        layout.addWidget(self.freq_selector, 8,0)
+        layout.addWidget(self.freq_selector, 8, 0)
         layout.addWidget(self.polan_button, 8, 0)
         layout.addWidget(self.reset_zoom_button, 8, 2)
-        layout.addWidget(self.save_scale_button, 8,0)
+        layout.addWidget(self.save_scale_button, 8, 0)
         layout.addWidget(self.clear_scale_button, 8, 1)
-        # Set margins and spacing
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        #Initialize signal handling
+        # Initialize signal handling
         self.table_widget.dropdown_changed.connect(self._on_dropdown_changed)
         self.table_widget.right_dropdown_changed.connect(self._on_right_dropdown_changed)
         self.table_widget.left_clicked.connect(self._prev_option)
@@ -175,29 +172,29 @@ class MainWidget(QWidget):
         
         self._selected_timestamp = ''
         self._right_selected_timestamp = ''
-        self.directory = None
+        self.folder_path = None
+        self.prev_folder_path = None
+        self.prev_checkbox = None
+        self.folder_changed = False
 
-        #Error message dialog box
+        # Error message dialog box
         self.dlg = QDialog(self)
         self.dlg.setWindowTitle("Error!")
         self.layout_dlg = QVBoxLayout()
         self.textbox_errormsg = QLabel("")
-        self.button_dlg_close = QDialogButtonBox.Close
-        self.buttonBox_dlg = QDialogButtonBox(self.button_dlg_close)
+        self.buttonBox_dlg = QDialogButtonBox(QDialogButtonBox.Close)
         self.buttonBox_dlg.clicked.connect(self.dlg.close)
         self.layout_dlg.addWidget(self.textbox_errormsg)
         self.layout_dlg.addWidget(self.buttonBox_dlg)
         self.dlg.setLayout(self.layout_dlg)
-        self.prev_checkbox = None
-        self.folder_path = None
-        self.prev_folder_path = None
-        self.folder_changed = False
+
+        self.threadpool = QThreadPool()
+        print(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
         
     def init_config(self, config: ConfigParser):
         self.polan_dir = Path(config['Locations']['polanoutputdirectory'])
         self.input_dir = Path(config['Locations']['DefaultInputDirectory'])
         self.parquet_cache_dir = Path(config['Locations']['cachedir'])
-        # Read plotting options from config
         self.colormap = config['plotting']['colormap']
         self.scatter_size = config.getint('plotting', 'scattersize')
         self.power_limit = config.getint('plotting', 'powerlimit')
@@ -208,99 +205,100 @@ class MainWidget(QWidget):
         
     def open_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", dir=str(self.input_dir))
-        folder_path = Path(folder_path)
-        self.folder_path = folder_path
-        self._run_button_callback()
+        if folder_path:
+            self.folder_path = Path(folder_path)
+            self._run_button_callback()
         
     def _run_button_callback(self):
         if self.folder_path:
-            try:
-                self.plot_widget_table(self.folder_path)
-                self.label.setText(f"Selected: {self.folder_path.parent.parent.name +  self.folder_path.parent.name + self.folder_path.name}")
-                self.run_button.setEnabled(True)
-            except FolderNotContainingData:
-                self.textbox_errormsg.setText("You must choose a folder containing the data.")
-                self.dlg.exec()
-                self.run_button.setEnabled(False)
-                return
-    #Create table and plot the selected canvas when a valid folder is selected.
-    def plot_widget_table(self, location):
-        self.directory = location
-        print(f"Currently chosen directory: {self.directory}")
-        
-        #TODO: Dropdown list for md1-md4 formats?
+            self.run_button.setEnabled(False)
+            self._load_data_in_thread(self.folder_path)
+
+    def _load_data_in_thread(self, location):
         if self.md3_checkbox.isChecked():
             extension = 'md3'
             raw_reader = MDreader()
-            keys_list = cadi_keys_list
-        if self.md4_checkbox.isChecked():
+        elif self.md4_checkbox.isChecked():
             extension = 'md4'
             raw_reader = MDreader()
-            keys_list = cadi_keys_list
-        if self.iono_checkbox.isChecked():
+        elif self.iono_checkbox.isChecked():
             extension = 'iono'
             raw_reader = SameerReader()
+        self.extension = extension       
+        worker = DataLoaderWorker(location, extension, raw_reader)
+        worker.signals.finished.connect(self._data_loaded)
+        worker.signals.error.connect(self._data_loading_error)
+        self.threadpool.start(worker)
+
+    def _data_loaded(self, files_list, metadata, heights, freqs, freqs_list, dops, signals):
+        self.files_list = files_list
+        self.metadata = metadata
+        self.heights = heights
+        self.freqs = freqs
+        self.freqs_list = freqs_list
+        self.dops = dops
+        self.signals = signals
+        
+        if self.md3_checkbox.isChecked():
+            keys_list = cadi_keys_list
+        elif self.md4_checkbox.isChecked():
+            keys_list = cadi_keys_list
+        elif self.iono_checkbox.isChecked():
             keys_list = sameer_keys_list
-        self.extension = extension
-        #Note: Throws FolderNotContainingData exception if md3/4 is not found in the directory
-        self.files_list, self.metadata, self.heights, self.freqs, self.freqs_list, self.dops, self.signals = raw_reader.read_raw_data_dir(location, extension)
+
         self.freq_selector.setItems(items=[str(freq/1e6) for freq in self.freqs_list])
         self.timepartitions = self.metadata['timepartitions']
-        #Default timestamp to start with is the first timestamp
         self._selected_timestamp = list(self.timepartitions.keys())[0]
         self._right_selected_timestamp = list(self.timepartitions.keys())[-1]
 
-        #Update metadata when new folder is selected
-        #Disconnect signals before updating
         self.table_widget.left_clicked.disconnect(self._prev_option)
         self.table_widget.right_clicked.disconnect(self._next_option)
-
-        # Call the update_metadata function in MetadataTableWidget
         self.table_widget.update_metadata(self.metadata, keys_list)
-
-        # Reconnect the signals after the update to ensure the buttons work again
         self.table_widget.left_clicked.connect(self._prev_option)
         self.table_widget.right_clicked.connect(self._next_option)
 
-        #Do the initial plotting with the given lpointer and rpointer
+        self.has_handled_calculation = False
         self._plot_helper()
+        self.label.setText(f"Selected: {self.folder_path.parent.parent.name}/{self.folder_path.parent.name}/{self.folder_path.name}")
+        self.run_button.setEnabled(True)
+
+    def _data_loading_error(self, message):
+        self.textbox_errormsg.setText(message)
+        self.dlg.exec()
+        self.run_button.setEnabled(False)
+        self.label.setText("No folder selected")
 
     def _on_freq_selector_updated(self, sel):
         if isinstance(self.canvas_widget, (XYPlotCanvas, RangeTimeFreqCanvas, RangeTimeIntensCanvas)):
             self._plot_helper()
 
-    #Callback to handle tickboxes
     def _on_tickbox_changed(self):
         if self.md3_checkbox.isChecked():
             self.mode_dropdown.clear()
             self.mode_dropdown.addItems(MainWidget.md3_options)
-        if self.md4_checkbox.isChecked():
+        elif self.md4_checkbox.isChecked():
             self.mode_dropdown.clear()
             self.mode_dropdown.addItems(MainWidget.md4_options)
-        if self.iono_checkbox.isChecked():
+        elif self.iono_checkbox.isChecked():
             self.mode_dropdown.clear()
             self.mode_dropdown.addItems(MainWidget.md4_options)
 
-    #Callback to handle changes in dropdown value
     def _on_dropdown_changed(self, text):
         self._selected_timestamp = text
         self._plot_helper()
     
-    #Callback to handle changes in right side dropdown value
     def _on_right_dropdown_changed(self, text):
         if isinstance(self.canvas_widget, (XYPlotCanvas, RangeTimeFreqCanvas, RangeTimeIntensCanvas)):
             self._right_selected_timestamp = text
             self._plot_helper()
-        else:
-            pass
-    
-    #Main plotting function. Delegates the choice of canvas to PlotStateFactory based on the mdx file option and the type of plot
+
     def _plot_helper(self):
         new_state = PlotStateFactory.get_state(self)
-        curr_checkbox = "md4" if self.md4_checkbox.isChecked() else "md3"
+        curr_checkbox = "md4" if self.md4_checkbox.isChecked() else ("md3" if self.md3_checkbox.isChecked() else "iono")
+        
         if self.prev_checkbox is None:
             self.prev_checkbox = curr_checkbox
-        # Determine whether the canvas needs to be replaced
+
         need_new_canvas = (
             self.canvas_widget is None or
             not isinstance(self.current_plot_state, type(new_state)) or 
@@ -317,19 +315,19 @@ class MainWidget(QWidget):
             self.folder_changed = True
 
         if self.folder_changed or need_new_canvas:
-            self.has_handled_calculation = False
-            self._handle_computation(new_state)
+            if not self.has_handled_calculation:
+                is_computing = self._handle_computation(new_state)
+                if is_computing:
+                    return
             self.folder_changed = False
-        print(f"is new canvas needed: {need_new_canvas}, prev_checkbox={self.prev_checkbox}, curr_checkbox={curr_checkbox}, equal? {self.prev_checkbox == curr_checkbox}")
+
         if need_new_canvas:
-            # Remove and delete the existing canvas widget if it exists
             if self.canvas_widget is not None:
                 self.layout().removeWidget(self.canvas_widget)
                 self.canvas_widget.setParent(None)
                 self.canvas_widget.deleteLater()
                 self.canvas_widget = None
 
-            # Create and add the new canvas
             self.canvas_widget = new_state.create_canvas()
             self.canvas_widget.setHidden(True)
             self.layout().addWidget(
@@ -341,72 +339,70 @@ class MainWidget(QWidget):
             )
             self.canvas_widget.setHidden(False)
             self.current_plot_state = new_state
-        # If state needs no change, just update the canvas
         else:
             self.current_plot_state.update_canvas(self.canvas_widget)
+        
         self.prev_checkbox = curr_checkbox
         self._polan_auto_helper()
         self._autoscale_helper()
         
     def _handle_computation(self, new_state):
         if not self.has_handled_calculation and isinstance(new_state, MdxXYplotCanvasState):
-            df = PandasUtils.create_pandas_from_arrays(self.metadata, self.freqs, self.heights, self.dops, self.signals)
-            date_of_obs: datetime = self.metadata['datetime']
-            start_time = datetime.strptime(self._selected_timestamp, "%H:%M:%S")
-            
-            end_time = datetime.strptime(self._right_selected_timestamp, "%H:%M:%S")
-            start_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
-                                hour=start_time.hour, minute=start_time.minute, second=start_time.second, tzinfo=date_of_obs.tzinfo)
-            end_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
-                                hour=end_time.hour, minute=end_time.minute, second=end_time.second, tzinfo=date_of_obs.tzinfo)
-            df_selection = df.loc[start_dtime:end_dtime]
-            df_all_outputs = pd.DataFrame()
-            all_output_freqs = np.array([])
-            for dtime in np.unique(df_selection.index):
-                df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow = compute_xy(df_selection.loc[dtime], self.freqs_list, sort_by_freq=False)
-                df_all_outputs = pd.concat([df_all_outputs if not df_all_outputs.empty else None, df_output])
-                all_output_freqs = np.concatenate([all_output_freqs, output_freqs])
-            self.df_all_outputs = df_all_outputs
-            self.all_output_freqs = all_output_freqs
-            self.has_handled_calculation = True
+            self.label.setText("Computing...")
+            worker = ComputationWorker(
+                self.metadata, self.freqs, self.heights, self.dops, self.signals, 
+                self._selected_timestamp, self._right_selected_timestamp, self.freqs_list
+            )
+            worker.signals.finished.connect(self._computation_finished)
+            worker.signals.error.connect(self._computation_error)
+            self.threadpool.start(worker)
+            return True
+        return False
 
-    #TODO
+    def _computation_finished(self, df_all_outputs, all_output_freqs):
+        self.df_all_outputs = df_all_outputs
+        self.all_output_freqs = all_output_freqs
+        self.has_handled_calculation = True
+        self._plot_helper()
+
+    def _computation_error(self, message):
+        self.textbox_errormsg.setText(message)
+        self.dlg.exec()
+        self.label.setText("Computation error")
+
     def _autoscale_helper(self):
         pass
 
     def _save_manual_scale(self):
         if isinstance(self.canvas_widget, ScaleIonogramCanvas):
             datetime_obs: datetime = self.metadata['datetime']
-            new_timestamp = self._selected_timestamp.replace(':', '')[:-2]
             timestamp_hour = int(self._selected_timestamp.replace(':', '')[:2])
             timestamp_minute = int(self._selected_timestamp.replace(':', '')[2:4])
             timestamp_second = int(self._selected_timestamp.replace(':', '')[4:6])
-            output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
             output_filename = f"{datetime_obs.strftime('%y%m%d')}{site_dict[self.metadata['site']].short_site}_F.tfh"
-            output_file_name = f"{self.polan_dir / output_filename}"
+            output_file_name = self.polan_dir / output_filename
+            
             scaled_values_state = self.canvas_widget.scaled_values_lines
             scaled_values_state.set_region('F')
-            fof = scaled_values_state.f
-            hprimef = scaled_values_state.h
+            fof, hprimef = scaled_values_state.f, scaled_values_state.h
             scaled_values_state.set_region('E')
-            foe = scaled_values_state.f
-            hprimee = scaled_values_state.h
+            foe, hprimee = scaled_values_state.f, scaled_values_state.h
             scaled_values_state.set_region('IE')
-            foie = scaled_values_state.f
-            hprimeie = scaled_values_state.h
+            foie, hprimeie = scaled_values_state.f, scaled_values_state.h
+            
             with open(output_file_name, 'a') as f:
-                f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} " \
-                f"{'NaN ' if isnan(fof) else f'{fof:.2f}'} {'NaN ' if isnan(hprimef) else f'{hprimef:.2f}'} " \
-                f"{'NaN ' if isnan(foe) else f'{foe:.2f}'} {'NaN ' if isnan(hprimee) else f'{hprimee:.2f}'} " \
-                f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'} " \
-                f"{self._es_scaling_mode}\n"))
+                f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} "
+                         f"{'NaN ' if isnan(fof) else f'{fof:.2f}'} {'NaN ' if isnan(hprimef) else f'{hprimef:.2f}'} "
+                         f"{'NaN ' if isnan(foe) else f'{foe:.2f}'} {'NaN ' if isnan(hprimee) else f'{hprimee:.2f}'} "
+                         f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'} "
+                         f"{self._es_scaling_mode}\n"))
         else:
-            print(f"Not scaling canvas! Use the appropriate canvas")
+            print("Not scaling canvas! Use the appropriate canvas")
+
     def _clean_scaled_canvas(self):
         if isinstance(self.canvas_widget, ScaleIonogramCanvas):
             self.canvas_widget.clean_canvas()
 
-    # Run POLAN by outputting fit curve into a file and executing the POLAN executable, then read from the POLAN's output text file POLOUT.T
     def _run_polan(self, freqs, heights, ml_freqs, ml_heights):
         real_freqs = []
         real_heights = []
@@ -421,54 +417,46 @@ class MainWidget(QWidget):
                         height = 0.0
                     polan_input.write(f"{freq}, {float(round(height)):.2f}\n")
                 polan_input.write(f"0.0, 0.0")
-            subprocess.run('./polan.exe')
-            stop_reading = False
-            with open("POLOUT.T", 'r') as polan_output:
-                lines = polan_output.readlines()
-                for i, line in enumerate(lines):
-                    if "Real Heights" in line:
-                        data_start_index = i + 1
-                        break
-                else:
-                    raise ValueError('"Real Heights" not found in file')
-                for line in lines[data_start_index:]:
-                    if stop_reading:
-                        break
-                    if line.strip() == '' or '*' in line:
-                        break
-                    try:
-                        floats = list(map(float, line.strip().split()))
-                    except ValueError:
-                        # Raise exception if non numeric value, cant parse as a number.
-                        raise ValueError(f"Non-numeric value found in line: {line}")
-                    line_freqs = floats[::2]
-                    line_heights = floats[1::2]
-                    
-                    for f, h in zip(line_freqs, line_heights):
-                        if h <= 50 or f <= 0.25:
-                            stop_reading = True
-                            break
-                        real_freqs.append(f)
-                        real_heights.append(h)
-            input_file_name = f"POLOUT.T"
-            new_timestamp = self._selected_timestamp.replace(':', '')[:-2]
-            timestamp_hour = int(self._selected_timestamp.replace(':', '')[:2])
-            #Warn: The following line works only for H type (hourly) MDx files 
-            #This might not work as intended with I type(file per observation) MDx files
-            output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
             
-            new_output_file_name = output_file_nominute_name + new_timestamp
-            output_file_name = f"{self.polan_dir / new_output_file_name}.pol"
-            #ml_output_filename = f"{self.polan_dir / new_output_file_name}.txt"
-            shutil.copyfile(input_file_name, output_file_name)
-            #with open(ml_output_filename, 'w') as f:
-            #    for freq, height in zip(ml_freqs, ml_heights):
-            #        f.write(f"{freq}, {float(round(height)):.2f}\n")
-            self.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
+            subprocess.run(['./polan.exe'])
+            
+            if Path("POLOUT.T").exists():
+                with open("POLOUT.T", 'r') as polan_output:
+                    lines = polan_output.readlines()
+                    data_start_index = -1
+                    for i, line in enumerate(lines):
+                        if "Real Heights" in line:
+                            data_start_index = i + 1
+                            break
+                    
+                    if data_start_index != -1:
+                        stop_reading = False
+                        for line in lines[data_start_index:]:
+                            if stop_reading or line.strip() == '' or '*' in line:
+                                break
+                            try:
+                                floats = list(map(float, line.strip().split()))
+                                line_freqs = floats[::2]
+                                line_heights = floats[1::2]
+                                for f, h in zip(line_freqs, line_heights):
+                                    if h <= 50 or f <= 0.25:
+                                        stop_reading = True
+                                        break
+                                    real_freqs.append(f)
+                                    real_heights.append(h)
+                            except ValueError:
+                                break
+                
+                new_timestamp = self._selected_timestamp.replace(':', '')[:-2]
+                timestamp_hour = int(self._selected_timestamp.replace(':', '')[:2])
+                output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
+                new_output_file_name = output_file_nominute_name + new_timestamp
+                output_file_name = self.polan_dir / f"{new_output_file_name}.pol"
+                shutil.copyfile("POLOUT.T", output_file_name)
+                self.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
         else:
             print("No drawn curve or ionogram data to match.")
-    #Run POLAN function that takes interpolated input data.
-    #Could be moved into the real height canvas?
+
     def _polan_manual_helper(self):
         if isinstance(self.canvas_widget, RealHeightAnalysisCanvas):
             freqs, heights, ml_freqs, ml_heights = self.canvas_widget.draw_manual_curve()
@@ -485,34 +473,26 @@ class MainWidget(QWidget):
                 self._run_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
             else:
                 print("Automatic curvefitting for .iono files is not implemented yet")
-        else:
-            print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
 
     def _reset_zoom_helper(self):
         if hasattr(self.canvas_widget, 'reset_zoom') and callable(self.canvas_widget.reset_zoom):
             self.canvas_widget.reset_zoom()
-        else:
-            print("Current canvas does not support zoom reset.")
+
     def _on_es_scaling_changed(self, index):
         self._es_scaling_mode = index
 
-    #Callback to handle clicking left arrow or pressing left arrow key
-    #Setting current index in dropdown calls the _on_dropdown_changed() with the new index as timestamp
     def _prev_option(self):
         dropdown = self.table_widget.timepartitions_dropdown
         current_index = dropdown.currentIndex()
         new_index = current_index - 1 if current_index > 0 else dropdown.count() - 1
         dropdown.setCurrentIndex(new_index)
     
-    #Callback to handle clicking right arrow or pressing right arrow key
-    #Setting current index in dropdown calls the _on_dropdown_changed() with the new index as timestamp
     def _next_option(self):
         dropdown = self.table_widget.timepartitions_dropdown
         current_index = dropdown.currentIndex()
         new_index = current_index + 1 if current_index < dropdown.count() - 1 else 0
         dropdown.setCurrentIndex(new_index)
 
-    #Keypress event handler
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Left:
             self.table_widget.left_button.click()
