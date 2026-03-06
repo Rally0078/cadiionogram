@@ -1,7 +1,6 @@
 from configparser import ConfigParser
 from pathlib import Path
 from datetime import datetime
-from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.plot.rangetimefreqcanvas import RangeTimeFreqCanvas
 from src.plot.rangetimeintenscanvas import RangeTimeIntensCanvas
@@ -9,18 +8,11 @@ from src.plot.autoscaling import ScaleIonogramCanvas
 from src.plot.xyplotcanvas import XYPlotCanvas
 from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
 from src.ui.metadatatable import MetadataTableWidget
-from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.ui.freq_list_dropdown import CheckableDropdown
-from src.utils.cadikvector import compute_xy
-from src.utils.pandasutils import PandasUtils
 from src.utils.siteinfo import site_dict
 from src.plotstate.factory import PlotStateFactory
-from src.ionogramparser.mdxreader import MDreader
-from src.ionogramparser.sameerreader import SameerReader
-from src.utils.rawdatadiriterator import RawDataDirIterator
+from src.ui.mainwidgetservice import MainWidgetService
 from PySide6.QtCore import Qt, QThreadPool
-from src.workers.data_loader_worker import DataLoaderWorker
-from src.workers.computation_worker import ComputationWorker
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout,
     QPushButton, QFileDialog, QLabel, 
@@ -28,11 +20,6 @@ from PySide6.QtWidgets import (
     QGridLayout, QDialog, QDialogButtonBox,
     QComboBox, QHBoxLayout
 )
-import subprocess
-import numpy as np
-import pandas as pd
-import pytz
-import shutil
 from math import isnan
 
 class MainWidget(QWidget):
@@ -42,6 +29,7 @@ class MainWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.polan_dir = None
+        self.service = MainWidgetService(self)
         # Canvas parameters to be used later
         self.canvas_layout_row = 2
         self.canvas_layout_col = 3
@@ -212,61 +200,7 @@ class MainWidget(QWidget):
     def _run_button_callback(self):
         if self.folder_path:
             self.run_button.setEnabled(False)
-            self._load_data_in_thread(self.folder_path)
-
-    def _load_data_in_thread(self, location):
-        if self.md3_checkbox.isChecked():
-            extension = 'md3'
-            raw_reader = MDreader()
-        elif self.md4_checkbox.isChecked():
-            extension = 'md4'
-            raw_reader = MDreader()
-        elif self.iono_checkbox.isChecked():
-            extension = 'iono'
-            raw_reader = SameerReader()
-        self.extension = extension       
-        worker = DataLoaderWorker(location, extension, raw_reader)
-        worker.signals.finished.connect(self._data_loaded)
-        worker.signals.error.connect(self._data_loading_error)
-        self.threadpool.start(worker)
-
-    def _data_loaded(self, files_list, metadata, heights, freqs, freqs_list, dops, signals):
-        self.files_list = files_list
-        self.metadata = metadata
-        self.heights = heights
-        self.freqs = freqs
-        self.freqs_list = freqs_list
-        self.dops = dops
-        self.signals = signals
-        
-        if self.md3_checkbox.isChecked():
-            keys_list = cadi_keys_list
-        elif self.md4_checkbox.isChecked():
-            keys_list = cadi_keys_list
-        elif self.iono_checkbox.isChecked():
-            keys_list = sameer_keys_list
-
-        self.freq_selector.setItems(items=[str(freq/1e6) for freq in self.freqs_list])
-        self.timepartitions = self.metadata['timepartitions']
-        self._selected_timestamp = list(self.timepartitions.keys())[0]
-        self._right_selected_timestamp = list(self.timepartitions.keys())[-1]
-
-        self.table_widget.left_clicked.disconnect(self._prev_option)
-        self.table_widget.right_clicked.disconnect(self._next_option)
-        self.table_widget.update_metadata(self.metadata, keys_list)
-        self.table_widget.left_clicked.connect(self._prev_option)
-        self.table_widget.right_clicked.connect(self._next_option)
-
-        self.has_handled_calculation = False
-        self._plot_helper()
-        self.label.setText(f"Selected: {self.folder_path.parent.parent.name}/{self.folder_path.parent.name}/{self.folder_path.name}")
-        self.run_button.setEnabled(True)
-
-    def _data_loading_error(self, message):
-        self.textbox_errormsg.setText(message)
-        self.dlg.exec()
-        self.run_button.setEnabled(False)
-        self.label.setText("No folder selected")
+            self.service.load_data(self.folder_path)
 
     def _on_freq_selector_updated(self, sel):
         if isinstance(self.canvas_widget, (XYPlotCanvas, RangeTimeFreqCanvas, RangeTimeIntensCanvas)):
@@ -316,7 +250,7 @@ class MainWidget(QWidget):
 
         if self.folder_changed or need_new_canvas:
             if not self.has_handled_calculation:
-                is_computing = self._handle_computation(new_state)
+                is_computing = self.service.handle_computation(new_state)
                 if is_computing:
                     return
             self.folder_changed = False
@@ -343,32 +277,8 @@ class MainWidget(QWidget):
             self.current_plot_state.update_canvas(self.canvas_widget)
         
         self.prev_checkbox = curr_checkbox
-        self._polan_auto_helper()
+        self.service.polan_auto_helper()
         self._autoscale_helper()
-        
-    def _handle_computation(self, new_state):
-        if not self.has_handled_calculation and isinstance(new_state, MdxXYplotCanvasState):
-            self.label.setText("Computing...")
-            worker = ComputationWorker(
-                self.metadata, self.freqs, self.heights, self.dops, self.signals, 
-                self._selected_timestamp, self._right_selected_timestamp, self.freqs_list
-            )
-            worker.signals.finished.connect(self._computation_finished)
-            worker.signals.error.connect(self._computation_error)
-            self.threadpool.start(worker)
-            return True
-        return False
-
-    def _computation_finished(self, df_all_outputs, all_output_freqs):
-        self.df_all_outputs = df_all_outputs
-        self.all_output_freqs = all_output_freqs
-        self.has_handled_calculation = True
-        self._plot_helper()
-
-    def _computation_error(self, message):
-        self.textbox_errormsg.setText(message)
-        self.dlg.exec()
-        self.label.setText("Computation error")
 
     def _autoscale_helper(self):
         pass
@@ -403,76 +313,8 @@ class MainWidget(QWidget):
         if isinstance(self.canvas_widget, ScaleIonogramCanvas):
             self.canvas_widget.clean_canvas()
 
-    def _run_polan(self, freqs, heights, ml_freqs, ml_heights):
-        real_freqs = []
-        real_heights = []
-        if len(freqs) > 0:
-            short_datetime: datetime = self.metadata['datetime']
-            with open("a.a", 'w') as polan_input:
-                polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
-                polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}{site_dict[self.metadata['site']].short_site}           {site_dict[self.metadata['site']].FH:.2f}  {site_dict[self.metadata['site']].dip:.1f}  0.0 0.00    0\n")
-                polan_input.write(f"{self._selected_timestamp}                    0.0\n")
-                for idx, (freq, height) in enumerate(zip(freqs, heights)):
-                    if idx == len(freqs) - 1:
-                        height = 0.0
-                    polan_input.write(f"{freq}, {float(round(height)):.2f}\n")
-                polan_input.write(f"0.0, 0.0")
-            
-            subprocess.run(['./polan.exe'])
-            
-            if Path("POLOUT.T").exists():
-                with open("POLOUT.T", 'r') as polan_output:
-                    lines = polan_output.readlines()
-                    data_start_index = -1
-                    for i, line in enumerate(lines):
-                        if "Real Heights" in line:
-                            data_start_index = i + 1
-                            break
-                    
-                    if data_start_index != -1:
-                        stop_reading = False
-                        for line in lines[data_start_index:]:
-                            if stop_reading or line.strip() == '' or '*' in line:
-                                break
-                            try:
-                                floats = list(map(float, line.strip().split()))
-                                line_freqs = floats[::2]
-                                line_heights = floats[1::2]
-                                for f, h in zip(line_freqs, line_heights):
-                                    if h <= 50 or f <= 0.25:
-                                        stop_reading = True
-                                        break
-                                    real_freqs.append(f)
-                                    real_heights.append(h)
-                            except ValueError:
-                                break
-                
-                new_timestamp = self._selected_timestamp.replace(':', '')[:-2]
-                timestamp_hour = int(self._selected_timestamp.replace(':', '')[:2])
-                output_file_nominute_name = Path(self.files_list[timestamp_hour]).stem[:4]
-                new_output_file_name = output_file_nominute_name + new_timestamp
-                output_file_name = self.polan_dir / f"{new_output_file_name}.pol"
-                shutil.copyfile("POLOUT.T", output_file_name)
-                self.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
-        else:
-            print("No drawn curve or ionogram data to match.")
-
     def _polan_manual_helper(self):
-        if isinstance(self.canvas_widget, RealHeightAnalysisCanvas):
-            freqs, heights, ml_freqs, ml_heights = self.canvas_widget.draw_manual_curve()
-            self._run_polan(freqs, heights, ml_freqs, ml_heights)
-        else:
-            print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
-
-    def _polan_auto_helper(self):
-        if isinstance(self.canvas_widget, RealHeightAnalysisCanvas):
-            it = RawDataDirIterator(self.metadata, self.freqs, self.heights, self.dops, self.signals)
-            freqs, heights, dops, signals = it[self._selected_timestamp]
-            if self.extension == 'md4':
-                freqs_interp, heights_interp, ml_freqs, ml_heights = self.canvas_widget.draw_auto_curve(freqs, heights, dops, signals)
-                self._run_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
-            else:
-                print("Automatic curvefitting for .iono files is not implemented yet")
+        self.service.polan_manual_helper()
 
     def _reset_zoom_helper(self):
         if hasattr(self.canvas_widget, 'reset_zoom') and callable(self.canvas_widget.reset_zoom):
