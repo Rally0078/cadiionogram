@@ -14,7 +14,6 @@ class RangeTimeIntensCanvas(FigureCanvas):
         self.fig = Figure(figsize=(16, 9))
         self.main = parent
         super().__init__(self.fig)
-        self.is_hidden = True
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
         cmap = cm.get_cmap(self.main.colormap)
@@ -24,8 +23,6 @@ class RangeTimeIntensCanvas(FigureCanvas):
         #self.freq_limits = (1e6, 18e6)
 
         self._set_plot_ax()
-        self.is_hidden = False
-        self.setHidden(self.is_hidden)
 
     def _set_plot_ax(self):
         #self.ax.set_yticks(self.freq_ticks)
@@ -47,7 +44,6 @@ class RangeTimeIntensCanvas(FigureCanvas):
             raise ValueError("Must provide a list of selected frequencies")
         self.ax.clear()
         self.fig.tight_layout(pad=3)
-        self.setHidden(self.is_hidden)
         if needs_freq_selection:
             for freq in np.unique(selected_frequencies):
                 matched_idxs = np.argwhere(np.isclose(freqs, freq, atol=1e-12)).flatten()

@@ -14,7 +14,6 @@ class XYPlotCanvas(FigureCanvas):
         self.fig = Figure(figsize=(10, 8))
         self.main = parent
         super().__init__(self.fig)
-        self.is_hidden = True
         self.ax_range = self.fig.add_subplot(311)
         self.ax_ew = self.fig.add_subplot(312)
         self.ax_ns = self.fig.add_subplot(313)
@@ -24,8 +23,6 @@ class XYPlotCanvas(FigureCanvas):
         cmap = cm.get_cmap(self.main.colormap)
         norm = colors.Normalize(vmin=0, vmax=self.main.power_limit)
         self.axs = [self.ax_range, self.ax_ew, self.ax_ns]
-        self.is_hidden = False
-        self.setHidden(self.is_hidden)
         self.cbar = self.fig.colorbar(mappable=cm.ScalarMappable(norm, cmap), ax=self.ax_range)
 
     def _set_plot_ax(self, site, date):
@@ -43,7 +40,6 @@ class XYPlotCanvas(FigureCanvas):
         for ax in self.axs:
             ax.clear()
         self.fig.tight_layout(pad=3)
-        self.setHidden(self.is_hidden)
         legend = self.fig.legend()
         legend.remove()
         self.fig.suptitle(f"NS, EW, Range timeseries plot at site: {site} on {date.day:02d}-{date.month:02d}-{date.year:04d} {site_dict[site].get_tzstr(date)}")

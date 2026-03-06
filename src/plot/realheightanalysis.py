@@ -15,7 +15,6 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.fig = Figure(figsize=(16, 9))
         self.main = parent
         super().__init__(self.fig)
-        self.is_hidden = True
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
         self.colorbar = None
@@ -39,8 +38,6 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.mpl_connect("scroll_event", self.on_mouse_scroll)
         self.zoom_factor = 1.2
         self._set_plot_ax()
-        self.is_hidden = False
-        self.setHidden(self.is_hidden)
 
     def _set_plot_ax(self):
         self.ax.set_xscale('log')
@@ -59,7 +56,6 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.heights = heights
         self.ax.clear()
         self.fig.tight_layout(pad=3)
-        self.setHidden(self.is_hidden)
         
         self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=power, cmap=self.main.colormap, marker='s')
         self.scatter.set_clim(0, self.main.power_limit)

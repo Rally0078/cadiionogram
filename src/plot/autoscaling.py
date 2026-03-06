@@ -12,7 +12,6 @@ class ScaleIonogramCanvas(FigureCanvas):
         self.fig = Figure(figsize=(16, 9))
         self.main = parent # Store main widget reference
         super().__init__(self.fig)
-        self.is_hidden = True
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
         self.colorbar = None
@@ -27,8 +26,6 @@ class ScaleIonogramCanvas(FigureCanvas):
         self.zoom_factor = 1.2
         self.legend = None
         #self.plot_initial()
-        self.is_hidden = False
-        self.setHidden(self.is_hidden)
 
     def _set_plot_ax(self):
         self.ax.set_xscale('log')
@@ -45,7 +42,6 @@ class ScaleIonogramCanvas(FigureCanvas):
     def plot_scatter(self, freqs, heights, dops, signals, timestamp, date: datetime, site):
         self.ax.clear()
         self.fig.tight_layout(pad=3)
-        self.setHidden(self.is_hidden)
         # Use configurable plotting options
         self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=signals, cmap=self.main.colormap, marker='s')
         self.scatter.set_clim(0, self.main.power_limit)

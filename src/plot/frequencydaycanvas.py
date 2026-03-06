@@ -9,7 +9,6 @@ class FrequencyDayCanvas(FigureCanvas):
         self.fig = Figure(figsize=(16, 9))
         
         super().__init__(self.fig)
-        self.is_hidden = True
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
         self.colorbar = None
@@ -17,8 +16,6 @@ class FrequencyDayCanvas(FigureCanvas):
         self.freq_limits = (1e6, 18e6)
 
         self._set_plot_ax()
-        self.is_hidden = False
-        self.setHidden(self.is_hidden)
 
     def _set_plot_ax(self):
         self.ax.set_yticks(self.freq_ticks)
@@ -33,7 +30,6 @@ class FrequencyDayCanvas(FigureCanvas):
     def plot_scatter(self, freqs, time_index, dops, timestamp, site):
         self.ax.clear()
         self.fig.tight_layout(pad=3)
-        self.setHidden(self.is_hidden)
         self.time_height_plot = self.ax.scatter(time_index, freqs, s=34, 
                            c=dops, cmap='turbo_r', vmin=-3, vmax=3, linewidth=0, marker=',')
         if self.colorbar:
