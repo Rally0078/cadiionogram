@@ -1,15 +1,7 @@
 from configparser import ConfigParser
 from pathlib import Path
-from datetime import datetime
-from src.plot.realheightanalysis import RealHeightAnalysisCanvas
-from src.plot.rangetimefreqcanvas import RangeTimeFreqCanvas
-from src.plot.rangetimeintenscanvas import RangeTimeIntensCanvas
-from src.plot.autoscaling import ScaleIonogramCanvas
-from src.plot.xyplotcanvas import XYPlotCanvas
-from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
 from src.ui.metadatatable import MetadataTableWidget
 from src.ui.freq_list_dropdown import CheckableDropdown
-from src.utils.siteinfo import site_dict
 from src.plotstate.factory import PlotStateFactory
 from src.ui.mainwidgetservice import MainWidgetService
 from PySide6.QtCore import Qt, QThreadPool
@@ -20,7 +12,6 @@ from PySide6.QtWidgets import (
     QGridLayout, QDialog, QDialogButtonBox,
     QComboBox, QHBoxLayout
 )
-from math import isnan
 
 class MainWidget(QWidget):
     md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries']
@@ -203,7 +194,7 @@ class MainWidget(QWidget):
             self.service.load_data(self.folder_path)
 
     def _on_freq_selector_updated(self, sel):
-        if isinstance(self.canvas_widget, (XYPlotCanvas, RangeTimeFreqCanvas, RangeTimeIntensCanvas)):
+        if self.canvas_widget and self.canvas_widget.__class__.__name__ in ('XYPlotCanvas', 'RangeTimeFreqCanvas', 'RangeTimeIntensCanvas'):
             self._plot_helper()
 
     def _on_tickbox_changed(self):
@@ -222,7 +213,7 @@ class MainWidget(QWidget):
         self._plot_helper()
     
     def _on_right_dropdown_changed(self, text):
-        if isinstance(self.canvas_widget, (XYPlotCanvas, RangeTimeFreqCanvas, RangeTimeIntensCanvas)):
+        if self.canvas_widget and self.canvas_widget.__class__.__name__ in ('XYPlotCanvas', 'RangeTimeFreqCanvas', 'RangeTimeIntensCanvas'):
             self._right_selected_timestamp = text
             self._plot_helper()
 
@@ -284,33 +275,10 @@ class MainWidget(QWidget):
         pass
 
     def _save_manual_scale(self):
-        if isinstance(self.canvas_widget, ScaleIonogramCanvas):
-            datetime_obs: datetime = self.metadata['datetime']
-            timestamp_hour = int(self._selected_timestamp.replace(':', '')[:2])
-            timestamp_minute = int(self._selected_timestamp.replace(':', '')[2:4])
-            timestamp_second = int(self._selected_timestamp.replace(':', '')[4:6])
-            output_filename = f"{datetime_obs.strftime('%y%m%d')}{site_dict[self.metadata['site']].short_site}_F.tfh"
-            output_file_name = self.polan_dir / output_filename
-            
-            scaled_values_state = self.canvas_widget.scaled_values_lines
-            scaled_values_state.set_region('F')
-            fof, hprimef = scaled_values_state.f, scaled_values_state.h
-            scaled_values_state.set_region('E')
-            foe, hprimee = scaled_values_state.f, scaled_values_state.h
-            scaled_values_state.set_region('IE')
-            foie, hprimeie = scaled_values_state.f, scaled_values_state.h
-            
-            with open(output_file_name, 'a') as f:
-                f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} "
-                         f"{'NaN ' if isnan(fof) else f'{fof:.2f}'} {'NaN ' if isnan(hprimef) else f'{hprimef:.2f}'} "
-                         f"{'NaN ' if isnan(foe) else f'{foe:.2f}'} {'NaN ' if isnan(hprimee) else f'{hprimee:.2f}'} "
-                         f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'} "
-                         f"{self._es_scaling_mode}\n"))
-        else:
-            print("Not scaling canvas! Use the appropriate canvas")
+        self.service.save_manual_scale()
 
     def _clean_scaled_canvas(self):
-        if isinstance(self.canvas_widget, ScaleIonogramCanvas):
+        if self.canvas_widget and self.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
             self.canvas_widget.clean_canvas()
 
     def _polan_manual_helper(self):

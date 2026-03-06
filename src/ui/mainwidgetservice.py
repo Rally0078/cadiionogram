@@ -171,3 +171,28 @@ class MainWidgetService(QObject):
                 self.run_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
             else:
                 print("Automatic curvefitting for .iono files is not implemented yet")
+
+    def save_manual_scale(self):
+        if self.main_widget.canvas_widget and self.main_widget.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
+            timestamp_hour = int(self.main_widget._selected_timestamp.replace(':', '')[:2])
+            timestamp_minute = int(self.main_widget._selected_timestamp.replace(':', '')[2:4])
+            timestamp_second = int(self.main_widget._selected_timestamp.replace(':', '')[4:6])
+            output_filename = f"{self.main_widget.metadata['datetime'].strftime('%y%m%d')}{site_dict[self.main_widget.metadata['site']].short_site}_F.tfh"
+            output_file_name = self.main_widget.polan_dir / output_filename
+            
+            scaled_values_state = self.main_widget.canvas_widget.scaled_values_lines
+            scaled_values_state.set_region('F')
+            fof, hprimef = scaled_values_state.f, scaled_values_state.h
+            scaled_values_state.set_region('E')
+            foe, hprimee = scaled_values_state.f, scaled_values_state.h
+            scaled_values_state.set_region('IE')
+            foie, hprimeie = scaled_values_state.f, scaled_values_state.h
+            
+            with open(output_file_name, 'a') as f:
+                f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} "
+                         f"{'NaN ' if isnan(fof) else f'{fof:.2f}'} {'NaN ' if isnan(hprimef) else f'{hprimef:.2f}'} "
+                         f"{'NaN ' if isnan(foe) else f'{foe:.2f}'} {'NaN ' if isnan(hprimee) else f'{hprimee:.2f}'} "
+                         f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'} "
+                         f"{self.main_widget._es_scaling_mode}\n"))
+        else:
+            print("Not scaling canvas! Use the appropriate canvas")

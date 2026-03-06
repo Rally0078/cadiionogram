@@ -1,26 +1,45 @@
-from src.plotstate.md4_display_iono_state import Md4DisplayIonogramState
-from src.plotstate.md4_realheight_state import Md4RealheightAnalysisState
-from src.plotstate.mdx_rangetimefreq_state import MdxRangeTimeFreqState
-from src.plotstate.md4_autoscaling_state import Md4ScaleIonogramState
-from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
-from src.plotstate.mdx_rangetimeintens_state import MdxRangeTimeIntensState
+def get_md4_display_iono_state():
+    from src.plotstate.md4_display_iono_state import Md4DisplayIonogramState
+    return Md4DisplayIonogramState
+
+def get_md4_realheight_state():
+    from src.plotstate.md4_realheight_state import Md4RealheightAnalysisState
+    return Md4RealheightAnalysisState
+
+def get_mdx_rangetimefreq_state():
+    from src.plotstate.mdx_rangetimefreq_state import MdxRangeTimeFreqState
+    return MdxRangeTimeFreqState
+
+def get_md4_autoscaling_state():
+    from src.plotstate.md4_autoscaling_state import Md4ScaleIonogramState
+    return Md4ScaleIonogramState
+
+def get_mdx_xyplot_state():
+    from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
+    return MdxXYplotCanvasState
+
+def get_mdx_rangetimeintens_state():
+    from src.plotstate.mdx_rangetimeintens_state import MdxRangeTimeIntensState
+    return MdxRangeTimeIntensState
 
 options_states_md4_dict = {
-    'Scale ionogram': Md4ScaleIonogramState,
-    'Display ionogram': Md4DisplayIonogramState,
-    'Real height analysis': Md4RealheightAnalysisState,
-    'Range Time Intensity': MdxRangeTimeIntensState,
+    'Scale ionogram': get_md4_autoscaling_state,
+    'Display ionogram': get_md4_display_iono_state,
+    'Real height analysis': get_md4_realheight_state,
+    'Range Time Intensity': get_mdx_rangetimeintens_state,
     'EW-NS vs Range': NotImplementedError,
 }
+
 options_states_md3_dict = {
-    'Range Time Frequency': MdxRangeTimeFreqState,
-    'Range Time Intensity': MdxRangeTimeIntensState,
-    'EW-NS timeseries': MdxXYplotCanvasState,
+    'Range Time Frequency': get_mdx_rangetimefreq_state,
+    'Range Time Intensity': get_mdx_rangetimeintens_state,
+    'EW-NS timeseries': get_mdx_xyplot_state,
     'Drift velocity timeseries': NotImplementedError
 }
-timeseries_options = {
-    'Range Time Frequency': MdxRangeTimeFreqState,
-    'Range Time Intensity': MdxRangeTimeIntensState,
-    'EW-NS timeseries': MdxXYplotCanvasState,
-    'Drift velocity timeseries': NotImplementedError
-}
+
+timeseries_options = [
+    'Range Time Frequency',
+    'Range Time Intensity',
+    'EW-NS timeseries',
+    'Drift velocity timeseries'
+]
