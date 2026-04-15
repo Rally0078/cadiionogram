@@ -244,7 +244,12 @@ class MDreader(DataReader):
                 # Read complex sensor data from all receivers of all observations till eof.
                 while f.tell() < eof and time_min != 255 and  time_min < 60:
                     #Iterate through each time of observation
-                    time_sec = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                    first_obs = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                    if first_obs > 60:
+                        continue
+                    else:
+                        time_sec = first_obs
+
                     flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # gainflag
                     timex += 1
                     time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec)
@@ -374,7 +379,7 @@ class MDreader(DataReader):
         all_heights_list, all_freqs_list, all_freq_list_parts, all_dopshifts_list, all_sensors_list = [], [], [], [], []
         all_files_list = []
         all_metadata = dict()
-        files_list = list(Path(input_dir).glob(f"*.{extension}"))
+        files_list = sorted(list(Path(input_dir).glob(f"*.{extension}")))
         if len(files_list) == 0:
             raise FolderNotContainingData(input_dir)
         lpointer = 0
