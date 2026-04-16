@@ -55,11 +55,11 @@ class MDreader(DataReader):
         
         # Vectorized signal assembly (reshape to flatten receivers and components)
         # Reshaping (N, noofreceivers, 2) to (N, 2 * noofreceivers) effectively interleaves Re and Im
-        complex_signal = dopbin_iq.reshape(len(frequency), 2 * noofreceivers).astype(np.int8)
+        complex_signal = dopbin_iq.reshape(len(frequency), 2 * noofreceivers).astype(np.int16)
 
         dopbin_x_dop_flag = np.array(dopbin_x_dop_flag)
         dopsn2 = 1/(ndops * npulses_avgd/pps)
-        dop_shifts = ((dopbin_x_dop_flag - ndops/2) * dopsn2).astype(np.float16)
+        dop_shifts = ((dopbin_x_dop_flag - ndops/2) * dopsn2).astype(np.float32)
         
         return height, frequency, dop_shifts, complex_signal
 
