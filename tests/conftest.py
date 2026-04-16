@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from itertools import chain
 from ionogramparser.mdxreader import MDreader
+import ionogramparser.cadiionogram as cadiionogram
 import struct
 import os
 import random
@@ -15,7 +16,7 @@ from utils.siteinfo import site_dict
 
 def pytest_collection_modifyitems(items):
     """Modifies test items in place to ensure test classes run in a given order."""
-    CLASS_ORDER = ["TestCADIRaw", "TestSiteInfo","TestPandasUtils", 
+    CLASS_ORDER = ["TestCADIRaw", "TestCADIRustRaw","TestSiteInfo","TestPandasUtils", 
     "TestParquetRaw", "TestCADIRawIntegration", "TestPandasPolarsEquality"]
     sorted_items = items.copy()
       # read the class names from default items
@@ -37,6 +38,9 @@ def test_raw_dir():
 @pytest.fixture
 def test_raw_reader():
     return MDreader
+@pytest.fixture
+def test_rust_raw_reader():
+    return cadiionogram
 @pytest.fixture
 def mock_raw_file():
     mock_bytes = bytearray()
