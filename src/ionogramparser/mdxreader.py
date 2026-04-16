@@ -15,7 +15,6 @@ import joblib
 multiprocessing.freeze_support()
 
 import os
-import copy
 from pathlib import Path
 import struct
 import datetime
@@ -44,41 +43,24 @@ class MDreader(DataReader):
     
     @staticmethod
     def _convert_bins_to_vals(dopbin_x_freqx, dopbin_x_hflag, dopbin_x_dop_flag, dopbin_iq, noofreceivers, dopbinx, freqs, ndops, npulses_avgd, pps):
-        frequency = np.zeros(shape=(len(dopbin_iq)))
-        for idx in range(len(dopbin_iq)):
-            #Shape of data in dopbin_iq (Re, Im) component array
-            #[[  5., 239.],
-            #   [  8.,  14.],
-            #   [252.,   2.],
-            #   [  5.,   1.]])
-            # transform coordinates
-            for receiver in range(noofreceivers):
-                for component in range(2):
-                    if dopbin_iq[idx][receiver][component] > 127:
-                        dopbin_iq[idx][receiver][component] = dopbin_iq[idx][receiver][component] - 256    
-        if dopbinx > 0:
-            dopbin_iq = np.array(dopbin_iq).reshape((len(frequency), noofreceivers, 2))
-        else:
+        if dopbinx <= 0:
             return np.array([]), np.array([]), np.array([]), np.array([])
+        
+        # Vectorize coordinate transformation
+        dopbin_iq = np.array(dopbin_iq)
+        dopbin_iq[dopbin_iq > 127] -= 256
+        
         frequency = freqs[dopbin_x_freqx]
-        height = np.array(dopbin_x_hflag) * 3
-        #Combine the real and imaginary parts into one complex part
-        complex_signal = np.empty(shape=(len(frequency), 2 * noofreceivers), dtype=np.int8)
+        height = (np.array(dopbin_x_hflag) * 3).astype(np.float32)
+        
+        # Vectorized signal assembly (reshape to flatten receivers and components)
+        # Reshaping (N, noofreceivers, 2) to (N, 2 * noofreceivers) effectively interleaves Re and Im
+        complex_signal = dopbin_iq.reshape(len(frequency), 2 * noofreceivers).astype(np.int8)
 
         dopbin_x_dop_flag = np.array(dopbin_x_dop_flag)
         dopsn2 = 1/(ndops * npulses_avgd/pps)
-        dop_shifts = (dopbin_x_dop_flag - ndops/2) * dopsn2
+        dop_shifts = ((dopbin_x_dop_flag - ndops/2) * dopsn2).astype(np.float16)
         
-        for receiver_re_im in range(2 * noofreceivers):
-            #Real component
-            if receiver_re_im % 2 == 0:
-                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 0]
-            #Imaginary component
-            else:
-                complex_signal[:, receiver_re_im] = dopbin_iq[:, receiver_re_im//2, 1]
-        height = height.astype(np.float32)
-        dop_shifts = dop_shifts.astype(np.float16)
-        complex_signal = complex_signal.astype(np.int8)
         return height, frequency, dop_shifts, complex_signal
 
     @staticmethod
@@ -262,7 +244,12 @@ class MDreader(DataReader):
                 # Read complex sensor data from all receivers of all observations till eof.
                 while f.tell() < eof and time_min != 255 and  time_min < 60:
                     #Iterate through each time of observation
-                    time_sec = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                    first_obs = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
+                    if first_obs > 60:
+                        continue
+                    else:
+                        time_sec = first_obs
+
                     flag = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]  # gainflag
                     timex += 1
                     time_partition = datetime.time(hour=hour, minute=time_min, second=time_sec)
@@ -293,7 +280,7 @@ class MDreader(DataReader):
                                     iq_bytes[rec, 0] = struct.unpack("<B", re_part)[0]
                                     iq_bytes[rec, 1] = struct.unpack("<B", im_part)[0]
                                 dopbinx += 1
-                                dopbin_iq.append(copy.deepcopy(iq_bytes))
+                                dopbin_iq.append(iq_bytes.copy())
                                 dopbin_x_timex.append(timex)
                                 dopbin_x_freqx.append(freqx)
                                 dopbin_x_hflag.append(hflag)
@@ -389,11 +376,10 @@ class MDreader(DataReader):
         >>> files, metadata, heights, frequencies, freq_list, dop_shifts, signals = MDreader.read_raw_data_dir(Path('./datafolder'), extension='md4')
         
         """
-        all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float32), np.array([], dtype=np.float32), \
-                                                                            np.array([], dtype=np.float16), np.empty(shape=(0,8), dtype=np.int8)
+        all_heights_list, all_freqs_list, all_freq_list_parts, all_dopshifts_list, all_sensors_list = [], [], [], [], []
         all_files_list = []
         all_metadata = dict()
-        files_list = list(Path(input_dir).glob(f"*.{extension}"))
+        files_list = sorted(list(Path(input_dir).glob(f"*.{extension}")))
         if len(files_list) == 0:
             raise FolderNotContainingData(input_dir)
         lpointer = 0
@@ -402,16 +388,14 @@ class MDreader(DataReader):
             with joblib.Parallel(n_jobs=cpu_count, backend=backend) as parallel:
                 results = parallel(joblib.delayed(MDreader.read_raw_data)(files) for files in files_list)
             for idy, result in enumerate(results):
-                files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = result  # type: ignore
+                files_list_res, metadata, heights, freqs, freq_list, dop_shifts, sensors = result  # type: ignore
                 if len(heights) > 0:
                     time_partitions = metadata['timepartitions']
                     new_timepartition = dict()
                     for time_partition, idz in time_partitions.items():
-                        #time_partition = datetime.datetime.strptime(time_partition, "%H:%M:%S")
-                        #new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}
                         new_timepartition[time_partition] = idz + lpointer
 
-                    if(idy == 0):
+                    if(lpointer == 0):
                         obs_datetime: datetime.datetime = metadata['datetime']
                         obs_dateonly = datetime.datetime(year=obs_datetime.year, month=obs_datetime.month, 
                                                         day=obs_datetime.day, tzinfo=obs_datetime.tzinfo,
@@ -421,33 +405,29 @@ class MDreader(DataReader):
                         all_metadata['source'] = input_dir.name
                         all_metadata['extension'] = extension
                         all_metadata['timepartitions'] = dict()
-                        all_freq_list = np.append(all_freq_list, freq_list)
-                        all_sensors = all_sensors.reshape((0, 2 * metadata['noofreceivers']))
-                        
+                        all_freq_list_parts.append(freq_list)
 
                     all_metadata['timepartitions'] |= new_timepartition
-                    all_files_list.extend(files_list)
-                    all_heights = np.append(all_heights, heights, axis=0)
-                    all_freqs = np.append(all_freqs, freqs, axis=0)
-                    all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
-                    all_sensors = np.append(all_sensors, sensors, axis=0)
-                    lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
+                    all_files_list.extend(files_list_res)
+                    all_heights_list.append(heights)
+                    all_freqs_list.append(freqs)
+                    all_dopshifts_list.append(dop_shifts)
+                    all_sensors_list.append(sensors)
+                    lpointer += len(heights)
                 else:
                     continue
 
         else:
             for idy, input_file in enumerate(files_list):
                 if input_file.exists():
-                    files_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = MDreader.read_raw_data(input_file)
+                    files_list_res, metadata, heights, freqs, freq_list, dop_shifts, sensors = MDreader.read_raw_data(input_file)
                     if len(heights) > 0:
                         time_partitions = metadata['timepartitions']
                         new_timepartition = dict()
                         for time_partition, idz in time_partitions.items():
-                        #time_partition = datetime.datetime.strptime(time_partition, "%H:%M:%S")
-                        #new_timepartition_key = f"{metadata['datetime'].hour:02d}:{minute:02d}"
                             new_timepartition[time_partition] = idz + lpointer
 
-                        if(idy == 0):
+                        if(lpointer == 0):
                             obs_datetime: datetime.datetime = metadata['datetime']
                             obs_dateonly = datetime.datetime(year=obs_datetime.year, month=obs_datetime.month, 
                                                             day=obs_datetime.day, tzinfo=obs_datetime.tzinfo,
@@ -457,16 +437,26 @@ class MDreader(DataReader):
                             all_metadata['source'] = input_dir.name
                             all_metadata['extension'] = extension
                             all_metadata['timepartitions'] = dict()
-                            all_freq_list = np.append(all_freq_list, freq_list)
+                            all_freq_list_parts.append(freq_list)
 
                         all_metadata['timepartitions'] |= new_timepartition
-                        all_files_list.extend(files_list)
-                        #Avoid appending, run two passes of the iteration
-                        all_heights = np.append(all_heights, heights, axis=0)
-                        all_freqs = np.append(all_freqs, freqs, axis=0)
-                        all_dopshifts = np.append(all_dopshifts, dop_shifts, axis=0)
-                        all_sensors = np.append(all_sensors, sensors, axis=0)
-                        lpointer = all_metadata['timepartitions'][max(all_metadata['timepartitions'])]
+                        all_files_list.extend(files_list_res)
+                        all_heights_list.append(heights)
+                        all_freqs_list.append(freqs)
+                        all_dopshifts_list.append(dop_shifts)
+                        all_sensors_list.append(sensors)
+                        lpointer += len(heights)
                     else:
                         continue
+        
+        if lpointer > 0:
+            all_heights = np.concatenate(all_heights_list, axis=0)
+            all_freqs = np.concatenate(all_freqs_list, axis=0)
+            all_dopshifts = np.concatenate(all_dopshifts_list, axis=0)
+            all_sensors = np.concatenate(all_sensors_list, axis=0)
+            all_freq_list = all_freq_list_parts[0] # Usually constant
+        else:
+            all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors = np.array([], dtype=np.int32), np.array([], dtype=np.float32), np.array([], dtype=np.float32), \
+                                                                            np.array([], dtype=np.float16), np.empty(shape=(0,8), dtype=np.int8)
+
         return all_files_list, all_metadata, all_heights, all_freqs, all_freq_list, all_dopshifts, all_sensors

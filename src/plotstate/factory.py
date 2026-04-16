@@ -14,17 +14,19 @@ class PlotStateFactory:
         try:
             if is_md4 or is_iono:   # Ionogram mode plots
                 PlotStateFactory._set_tablewidget_buttons_visibility(main_widget, is_timeseries)
-                new_plotstate = options_states_md4_dict[option]
-                if new_plotstate == NotImplementedError:
+                new_state_getter = options_states_md4_dict[option]
+                if new_state_getter == NotImplementedError:
                     raise KeyError("Not implemented")
+                new_plotstate_cls = new_state_getter()
             elif is_md3:    # Drift mode plots
                 PlotStateFactory._set_tablewidget_buttons_visibility(main_widget, is_timeseries, is_md3)
-                new_plotstate = options_states_md3_dict[option]
-                if new_plotstate == NotImplementedError:
+                new_state_getter = options_states_md3_dict[option]
+                if new_state_getter == NotImplementedError:
                     raise KeyError("Not implemented")
+                new_plotstate_cls = new_state_getter()
             else:
                 raise KeyError
-            return new_plotstate(main_widget)
+            return new_plotstate_cls(main_widget)
         except KeyError:
             raise ValueError(f"No valid PlotState for combination: md3={is_md3}, md4={is_md4}, option={option}")
         

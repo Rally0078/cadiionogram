@@ -13,7 +13,6 @@ class RangeTimeFreqCanvas(FigureCanvas):
         self.fig = Figure(figsize=(16, 9))
         
         super().__init__(self.fig)
-        self.is_hidden = True
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
         self.colorbar = None
@@ -21,8 +20,6 @@ class RangeTimeFreqCanvas(FigureCanvas):
         self.freq_limits = (1e6, 18e6)
 
         self._set_plot_ax()
-        self.is_hidden = False
-        self.setHidden(self.is_hidden)
 
     def _set_plot_ax(self):
         self.ax.set_yticks(self.freq_ticks)
@@ -40,7 +37,6 @@ class RangeTimeFreqCanvas(FigureCanvas):
     def plot_scatter(self, time_index, heights, dops, freqs, date: datetime, site, selected_frequencies):
         self.ax.clear()
         self.fig.tight_layout(pad=3)
-        self.setHidden(self.is_hidden)
         legend = self.fig.legend()
         legend.remove()
         print(f"Selected frequencies: {selected_frequencies}")            
