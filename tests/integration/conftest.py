@@ -12,3 +12,7 @@ def test_real_md4():
 @pytest.fixture
 def test_raw_othersites():
     return (Path(__file__).parent.parent / Path("rawfiles/othersites")).glob("*.md*")
+
+@pytest.fixture
+def test_raw_badfile():
+    return Path(__file__).parent.parent / Path("rawfiles/badfiles/6C040400.md4")
