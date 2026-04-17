@@ -5,32 +5,48 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from itertools import chain
 from ionogramparser.mdxreader import MDreader
-import ionogramparser.cadiionogram as cadiionogram
 import struct
 import os
 import random
 import tempfile
 from utils.siteinfo import site_dict
 
-#from cadiparser.csvio import CSVtools
+# Make this True to test the Rust binary. Ensure that the binary is actually built and copied to the right place first.
+require_rust = False
+
+if require_rust:
+    import ionogramparser.mdreader_rs as cadiionogram
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "rust_test: mark test as requiring the Rust binary to be built"
+    )
 
 def pytest_collection_modifyitems(items):
     """Modifies test items in place to ensure test classes run in a given order."""
-    CLASS_ORDER = ["TestCADIRaw", "TestCADIRustRaw","TestSiteInfo","TestPandasUtils", 
-    "TestParquetRaw", "TestCADIRawIntegration", "TestPandasPolarsEquality"]
-    sorted_items = items.copy()
-      # read the class names from default items
-    class_mapping = {item: item.cls.__name__ for item in items}
+    CLASS_ORDER = ["TestCADIRaw","TestSiteInfo","TestPandasUtils", 
+    "TestParquetRaw", "TestCADIRawIntegration", "TestPandasPolarsEquality", 
+    "TestCADIRustRaw", "TestCADIRustRawIntegration"]
+    if not require_rust:
+        skip_rust = pytest.mark.skip(reason="require_rust is False")
+        for item in items:
+            if "rust_test" in item.keywords:
+                item.add_marker(skip_rust)
 
-    
-    # Iteratively move tests of each class to the end of the test queue
-    for class_ in CLASS_ORDER:
-        sorted_items = [it for it in sorted_items if class_mapping[it] != class_] + [
-            it for it in sorted_items if class_mapping[it] == class_
-        ]
-        
-   
-    items[:] = sorted_items
+    # 1. Map items to their class names
+    class_mapping = {item: (item.cls.__name__ if item.cls else None) for item in items}
+
+    # 2. Extract items that belong to our ordered list
+    ordered_items = []
+    for class_name in CLASS_ORDER:
+        matching_items = [it for it in items if class_mapping[it] == class_name]
+        ordered_items.extend(matching_items)
+
+    # 3. Identify items that are NOT in our CLASS_ORDER
+    remaining_items = [it for it in items if class_mapping[it] not in CLASS_ORDER]
+
+    # 4. Rebuild the list: Specified order first, then everything else
+    items[:] = ordered_items + remaining_items
 
 @pytest.fixture
 def test_raw_dir():

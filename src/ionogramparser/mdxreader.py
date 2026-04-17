@@ -162,6 +162,8 @@ class MDreader(DataReader):
                     "extension": extension,
                     "noofreceivers": noofreceivers,
                     "timepartitions": time_partitions,
+                    "incompletedata": False,
+                    "incompleteheader": False,
         })
         header_read = False
         try:
@@ -227,7 +229,7 @@ class MDreader(DataReader):
                 time_min = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                 metadata['site'] = site
                 metadata['datetime'] = datetime_init_observation
-                metadata['source'] = filename.name if isinstance(filename, Path) else filename
+                metadata['source'] = Path(filename).name
                 metadata["filetype"] = filetype
                 metadata["ndops"] = ndops
                 metadata["nfreqs"] = nfreqs

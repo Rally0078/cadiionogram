@@ -16,13 +16,13 @@ class SiteInfo():
             if dtime < tir_threshold:
                 return ZoneInfo('Asia/Kolkata')
             else:
-                return timezone.utc
+                return ZoneInfo(key='UTC')
         else:
             return ZoneInfo('Asia/Kolkata')
     
     def get_tzstr(self, dtime: datetime) -> str:
         tz = self.get_tzinfo(dtime)
-        if tz == timezone.utc:
+        if tz == ZoneInfo(key='UTC'):
             return 'UT'
         return 'LT'
 
