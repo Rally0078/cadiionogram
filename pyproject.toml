@@ -16,6 +16,7 @@ dependencies = [
     "scipy",
     "scikit-image",
     "pyinstaller",
+    "nuitka>=4.0.8",
 ]
 
 [tool.uv]
