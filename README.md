@@ -30,7 +30,7 @@ To build the faster, Rust-based CADI reader(requires an installation of Rust), u
     # Windows only
     cp "./rust/target/release/mdreader_rs.dll" "./src/ionogramparser/mdreader_rs.pyd"
     # Linux only
-    cp "./rust/target/release/libmdreader_rs.so" "./src/ionogramparser/mdreader_rs.pyd"
+    cp "./rust/target/release/libmdreader_rs.so" "./src/ionogramparser/mdreader_rs.so"
 ```
 
 For manually building the GUI executable, run the following:
