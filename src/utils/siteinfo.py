@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import timezone, tzinfo, datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 @dataclass
 class SiteInfo():
@@ -8,7 +8,7 @@ class SiteInfo():
     site: str
     short_site: str
 
-    def get_tzinfo(self, dtime: datetime) -> timezone | ZoneInfo:
+    def get_tzinfo(self, dtime: datetime) -> ZoneInfo:
         if self.site == 'TIR':
             tir_threshold = datetime(year=2020, month=1, day=1)
             if dtime.tzinfo is not None:
@@ -16,13 +16,13 @@ class SiteInfo():
             if dtime < tir_threshold:
                 return ZoneInfo('Asia/Kolkata')
             else:
-                return timezone.utc
+                return ZoneInfo(key='UTC')
         else:
             return ZoneInfo('Asia/Kolkata')
     
     def get_tzstr(self, dtime: datetime) -> str:
         tz = self.get_tzinfo(dtime)
-        if tz == timezone.utc:
+        if tz == ZoneInfo(key='UTC'):
             return 'UT'
         return 'LT'
 

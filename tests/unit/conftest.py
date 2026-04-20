@@ -18,7 +18,7 @@ def date_site_dict():
               datetime(year=2024,month=2,day=23, hour=0,minute=0,second=0), 
               datetime(year=2018,month=4,day=21, hour=0,minute=0,second=0), 
               datetime(year=2026,month=7,day=15, hour=0,minute=0,second=0), ]
-    expected_tz = [ZoneInfo('Asia/Kolkata'), timezone.utc, ZoneInfo('Asia/Kolkata'), ZoneInfo('Asia/Kolkata'), ZoneInfo('Asia/Kolkata')]
+    expected_tz = [ZoneInfo('Asia/Kolkata'), ZoneInfo(key='UTC'), ZoneInfo('Asia/Kolkata'), ZoneInfo('Asia/Kolkata'), ZoneInfo('Asia/Kolkata')]
     return sitename, obs_dt, expected_tz
 
 @pytest.fixture

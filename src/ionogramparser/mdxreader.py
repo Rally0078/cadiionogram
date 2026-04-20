@@ -55,11 +55,11 @@ class MDreader(DataReader):
         
         # Vectorized signal assembly (reshape to flatten receivers and components)
         # Reshaping (N, noofreceivers, 2) to (N, 2 * noofreceivers) effectively interleaves Re and Im
-        complex_signal = dopbin_iq.reshape(len(frequency), 2 * noofreceivers).astype(np.int8)
+        complex_signal = dopbin_iq.reshape(len(frequency), 2 * noofreceivers).astype(np.int16)
 
         dopbin_x_dop_flag = np.array(dopbin_x_dop_flag)
         dopsn2 = 1/(ndops * npulses_avgd/pps)
-        dop_shifts = ((dopbin_x_dop_flag - ndops/2) * dopsn2).astype(np.float16)
+        dop_shifts = ((dopbin_x_dop_flag - ndops/2) * dopsn2).astype(np.float32)
         
         return height, frequency, dop_shifts, complex_signal
 
@@ -162,6 +162,8 @@ class MDreader(DataReader):
                     "extension": extension,
                     "noofreceivers": noofreceivers,
                     "timepartitions": time_partitions,
+                    "incompletedata": False,
+                    "incompleteheader": False,
         })
         header_read = False
         try:
@@ -227,7 +229,7 @@ class MDreader(DataReader):
                 time_min = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                 metadata['site'] = site
                 metadata['datetime'] = datetime_init_observation
-                metadata['source'] = filename.name if isinstance(filename, Path) else filename
+                metadata['source'] = Path(filename).name
                 metadata["filetype"] = filetype
                 metadata["ndops"] = ndops
                 metadata["nfreqs"] = nfreqs

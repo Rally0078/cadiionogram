@@ -18,4 +18,4 @@ class TestSiteInfo:
 
         assert type(metadata) == dict
         assert type(metadata['timepartitions']) == dict
-        assert metadata['datetime'].tzinfo == timezone.utc
+        assert metadata['datetime'].tzinfo == ZoneInfo(key='UTC')
