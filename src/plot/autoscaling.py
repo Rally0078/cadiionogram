@@ -16,7 +16,7 @@ class ScaleIonogramCanvas(FigureCanvas):
         self.scatter = None
         self.colorbar = None
         self.freq_ticks = [1, 2, 4, 6, 8, 10, 15, 20]
-        self.freq_limits = (1, 15)
+        self.freq_limits = (1, 18)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
         self.scaled_values_lines = ScaleRegionValues(self.ax, self.main.scaling_line_width)

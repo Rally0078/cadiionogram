@@ -25,7 +25,7 @@ class RangeTimeFreqCanvas(FigureCanvas):
         self.ax.set_yticks(self.freq_ticks)
         self.ax.set_ylim(self.freq_limits)
         self.ax.set_ylabel("Virtual Height(km)")
-        self.ax.set_xlabel("Time (UTC)")
+        #self.ax.set_xlabel("Time (UTC)")
         timeformat = mdates.DateFormatter('%H:%M')
         self.ax.xaxis.set_major_formatter(timeformat)
         self.ax.tick_params(axis='both', direction='in')
@@ -49,7 +49,8 @@ class RangeTimeFreqCanvas(FigureCanvas):
                                             hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
                                             hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
             self.ax.margins(x=0,y=0)
-        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} UTC")
+        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {site_dict[site].get_tzstr(date)}")
+        self.ax.set_xlabel(f"Time ({site_dict[site].get_tzstr(date)})")
         self._set_plot_ax()
         self._update_legend()
         #self.fig.tight_layout()

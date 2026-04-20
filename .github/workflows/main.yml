@@ -58,46 +58,50 @@ jobs:
             cp rust/target/release/libmdreader_rs.so src/ionogramparser/mdreader_rs.so
           fi
 
-      - name: Cached Conda environment
-        id: cache-conda
-        uses: actions/cache@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: |
-            ~/conda_pkgs_dir
-            ~/conda_envs_dir
-          key: ${{runner.os}}-conda-${{hashFiles('environment-build.yml')}}
-          restore-keys: |
-            ${{runner.os}}-conda-
-      
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          activate-environment: cadiionogram-release
-          environment-file: environment-build.yml
-          use-mamba: true
-          miniforge-variant: Miniforge3
-          miniforge-version: latest
-          auto-activate-base: false
-          pkgs-dirs: ~/conda_pkgs_dir
+          python-version: "3.13"
+          enable-cache: true
 
       - name: Run tests
-        shell: bash -l {0}
+        shell: bash
         run: |
-          conda activate cadiionogram-release
-          pytest
+          uv run pytest
 
       - name: Build with pyinstaller
-        shell: bash -l {0}
+        shell: bash
         run: |
-          conda activate cadiionogram-release
-          cd $GITHUB_WORKSPACE
-          python -m PyInstaller main.spec
+          uv run python -m PyInstaller main.spec
+
+      - name: Build AppImage (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-appimage-x86_64.AppImage
+
+          mkdir -p AppDir/usr/bin
+          cp -r dist/main/* AppDir/usr/bin/
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --executable AppDir/usr/bin/egrliono --desktop-file egrliono.desktop --icon-file iigmlogo.png --plugin appimage --output appimage
+
+          # Move the generated AppImage to dist
+          mv egrliono*.AppImage dist/
 
       - name: Prepare artifacts
-        shell: bash -l {0}
+        shell: bash
         run: |
           mkdir dist-upload
-          cp -r dist/* dist-upload/ || true
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            # For Linux, only upload the AppImage
+            cp dist/*.AppImage dist-upload/
+          else
+            # For Windows, upload the folder (it will be zipped in the release step)
+            cp -r dist/* dist-upload/ || true
+          fi
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
