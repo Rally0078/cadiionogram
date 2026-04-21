@@ -22,6 +22,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
       - name: Check if Rust is required
         id: check_rust
         shell: bash
@@ -39,6 +45,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+
       - name: Build Rust extension
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
@@ -60,12 +67,11 @@ jobs:
             cp target/release/libmdreader_rs.so ../src/ionogramparser/mdreader_rs.so
           fi
 
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          python-version: "3.13"
-          enable-cache: true
+      - name: Verify extension placement
+        shell: bash
+        run: |
+          echo "Checking src/ionogramparser content:"
+          ls -R src/ionogramparser
 
       - name: Run tests
         shell: bash
