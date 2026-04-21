@@ -37,26 +37,27 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-
       - name: Build Rust extension
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
+        working-directory: rust
         run: |
-          cd rust
           cargo test
           cargo build --release
 
       - name: Export Rust release folder
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
+        working-directory: rust
         run: |
-          mkdir -p dist/rust
-          cp -r rust/target/release/. dist/rust/
+          mkdir -p ../dist/rust
+          cp -r target/release/. ../dist/rust/
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            cp rust/target/release/mdreader_rs.dll src/ionogramparser/mdreader_rs.pyd
+            cp target/release/mdreader_rs.dll ../src/ionogramparser/mdreader_rs.pyd
           else
-            cp rust/target/release/libmdreader_rs.so src/ionogramparser/mdreader_rs.so
+            cp target/release/libmdreader_rs.so ../src/ionogramparser/mdreader_rs.so
           fi
+
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
