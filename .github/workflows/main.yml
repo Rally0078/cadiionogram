@@ -18,7 +18,9 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
       - name: Check if Rust is required
         id: check_rust
@@ -40,16 +42,16 @@ jobs:
       - name: Build Rust extension
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
-        working-directory: rust
         run: |
+          cd rust || exit 1
           cargo test
           cargo build --release
 
       - name: Export Rust release folder
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
-        working-directory: rust
         run: |
+          cd rust || exit 1
           mkdir -p ../dist/rust
           cp -r target/release/. ../dist/rust/
           if [[ "${{ runner.os }}" == "Windows" ]]; then
@@ -108,7 +110,7 @@ jobs:
             cp -r dist/* dist-upload/ || true
           fi
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-${{runner.os}}
           path: dist-upload/
@@ -120,7 +122,7 @@ jobs:
     needs: build
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -134,7 +136,7 @@ jobs:
           tag_prefix: "v"
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: ./artifacts
       
