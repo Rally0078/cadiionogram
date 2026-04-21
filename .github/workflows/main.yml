@@ -51,6 +51,8 @@ jobs:
         shell: bash
         run: |
           cd rust || exit 1
+          # Link against the same Python version used by uv
+          export PYO3_PYTHON=$(uv python find 3.13)
           cargo test
           cargo build --release
 
