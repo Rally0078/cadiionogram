@@ -23,7 +23,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "joblib" },
     { name = "matplotlib" },
-    { name = "nuitka" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "polars" },
@@ -39,7 +38,6 @@ dependencies = [
 requires-dist = [
     { name = "joblib" },
     { name = "matplotlib" },
-    { name = "nuitka", specifier = ">=4.0.8" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "polars" },
@@ -252,12 +250,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl", hash = "sha256:d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762", size = 2068504, upload-time = "2025-12-08T17:02:38.159Z" },
 ]
-
-[[package]]
-name = "nuitka"
-version = "4.0.8"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1c/48/e54130d57b89fc015d702e98a1a217b5757625d01a01cc07d29fd046d336/nuitka-4.0.8.tar.gz", hash = "sha256:3f87e87e4d3773997944ce401145ef21461337121d39ea0fbe678274005e60ba", size = 4422692, upload-time = "2026-04-10T07:18:15.109Z" }
 
 [[package]]
 name = "numpy"
