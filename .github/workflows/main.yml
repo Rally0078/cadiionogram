@@ -82,11 +82,15 @@ jobs:
         run: |
           wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-appimage-x86_64.AppImage
+          mv linuxdeploy-plugin-appimage-x86_64.AppImage linuxdeploy-plugin-appimage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-appimage
 
           mkdir -p AppDir/usr/bin
           cp -r dist/main/* AppDir/usr/bin/
-          ./linuxdeploy-x86_64.AppImage --appdir AppDir --executable AppDir/usr/bin/egrliono --desktop-file egrliono.desktop --icon-file iigmlogo.png --plugin appimage --output appimage
+          
+          # Ensure icon and desktop file are in the root for linuxdeploy to find
+          # and also provide them explicitly via flags.
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --executable AppDir/usr/bin/egrliono --desktop-file egrliono.desktop --icon-file iigmlogo.png --output appimage
 
           # Move the generated AppImage to dist
           mv egrliono*.AppImage dist/

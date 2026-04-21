@@ -19,7 +19,6 @@ include/
 *.json
 *.csv
 *.jpg
-*.png
 *.bak
 *.db
 *~
