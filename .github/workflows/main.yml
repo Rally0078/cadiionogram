@@ -50,9 +50,11 @@ jobs:
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
         run: |
+          # Capture Python path from root directory
+          PY_EXE=$(uv python find 3.13)
+          echo "Using Python interpreter: $PY_EXE"
           cd rust || exit 1
-          # Link against the same Python version used by uv
-          export PYO3_PYTHON=$(uv python find 3.13)
+          export PYO3_PYTHON="$PY_EXE"
           cargo test
           cargo build --release
 
