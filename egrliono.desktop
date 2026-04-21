@@ -3,6 +3,6 @@ Type=Application
 Name=egrliono
 Exec=egrliono
 Icon=iigmlogo
-Categories=Scientific;Science;Engineering;
+Categories=Science;Engineering;
 Comment=CADI MDx binary file reader and plotter
 Terminal=true
