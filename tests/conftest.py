@@ -12,7 +12,7 @@ import tempfile
 from utils.siteinfo import site_dict
 
 # Make this True to test the Rust binary. Ensure that the binary is actually built and copied to the right place first.
-require_rust = False
+require_rust = True
 
 if require_rust:
     import ionogramparser.mdreader_rs as cadiionogram

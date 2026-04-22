@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=egrliono
+Exec=egrliono
+Icon=iigmlogo
+Categories=Science;Engineering;
+Comment=CADI MDx binary file reader and plotter
+Terminal=true

@@ -8,6 +8,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.dates as mdates
 
+from src.utils.siteinfo import site_dict
+
 
 class RangeTimeIntensCanvas(FigureCanvas):
     def __init__(self, parent=None):
@@ -28,7 +30,7 @@ class RangeTimeIntensCanvas(FigureCanvas):
         #self.ax.set_yticks(self.freq_ticks)
         #self.ax.set_ylim(self.freq_limits)
         self.ax.set_ylabel("Virtual Height(km)")
-        self.ax.set_xlabel("Time (UTC)")
+        #self.ax.set_xlabel("Time (UTC)")
         timeformat = mdates.DateFormatter('%H:%M')
         self.ax.xaxis.set_major_formatter(timeformat)
         self.ax.tick_params(axis='both', direction='in')
@@ -59,7 +61,8 @@ class RangeTimeIntensCanvas(FigureCanvas):
         self.ax.margins(x=0,y=0)
         #self.ax.set_xlim(time_index[0], time_index[-1])
         
-        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} UTC")
+        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {site_dict[site].get_tzstr(date)}")
+        self.ax.set_xlabel(f"Time ({site_dict[site].get_tzstr(date)})")
         self._set_plot_ax()
         #self.fig.tight_layout()
         self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)

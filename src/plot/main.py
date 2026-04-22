@@ -12,37 +12,61 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.config = configparser.ConfigParser()
-        self.cfg_file = Path("./config.ini")
         os_name = platform.system()
-
-        if not self.cfg_file.exists():
-            self.cfg_file.touch()
-            if os_name == "Windows":
-                self.config['Locations'] = {'DefaultInputDirectory': 'C:\\CADIinput',
-                                            'DefaultOutputDirectory': 'C:\\CADIoutput',
-                                            "polanoutputdirectory": "C:\\cdata",
-                                            "cachedir": "C:\\cdata\\parquetcache"}
-            elif os_name == "Linux" or os_name == "Darwin":
-                self.config['Locations'] = {'DefaultInputDirectory': '~/CADIinput',
-                                            'DefaultOutputDirectory': '~/CADIoutput',
-                                            "polanoutputdirectory": "~/cdata",
-                                            "cachedir": "~/cdata/parquetcache"}
+        
+        if os_name == "Windows":
+            # On Windows, keep it in the application directory when frozen, or CWD
+            if getattr(sys, 'frozen', False):
+                self.cfg_file = Path(sys.executable).parent / "config.ini"
             else:
-                print("OS is not supported!")
-                return                
-            self.config['plotting'] = {'colormap': 'jet_r',
-                                       'scattersize': '6',
-                                       'powerlimit': '50'}
-            self.config['realheightanalysis'] = {
+                self.cfg_file = Path("./config.ini")
+        else:
+            # Use ~/.config/egrliono/config.ini for Linux/macOS (AppImage friendly)
+            config_dir = Path.home() / ".config" / "egrliono"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            self.cfg_file = config_dir / "config.ini"
+
+        # Define default configuration
+        defaults = {
+            'Locations': {
+                'DefaultInputDirectory': 'C:\\CADIinput' if os_name == "Windows" else '~/CADIinput',
+                'DefaultOutputDirectory': 'C:\\CADIoutput' if os_name == "Windows" else '~/CADIoutput',
+                'polanoutputdirectory': 'C:\\cdata' if os_name == "Windows" else '~/cdata',
+                'cachedir': 'C:\\cdata\\parquetcache' if os_name == "Windows" else '~/cdata/parquetcache'
+            },
+            'plotting': {
+                'colormap': 'jet_r',
+                'scattersize': '6',
+                'powerlimit': '50'
+            },
+            'realheightanalysis': {
                 'interpmode': 'old'
-            }
-            self.config['scaling'] = {
+            },
+            'scaling': {
                 'linewidth': '2'
             }
+        }
+
+        # Load existing config if it exists
+        if self.cfg_file.exists():
+            self.config.read(self.cfg_file)
+
+        # Ensure all defaults are present
+        updated = False
+        for section, keys in defaults.items():
+            if not self.config.has_section(section):
+                self.config.add_section(section)
+                updated = True
+            for key, value in keys.items():
+                if not self.config.has_option(section, key):
+                    self.config.set(section, key, value)
+                    updated = True
+
+        # Save if it's new or was updated with missing defaults
+        if updated or not self.cfg_file.exists():
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
-        else:
-            self.config.read(self.cfg_file)
+
         self.main_widget = MainWidget()
         self.main_widget.init_config(config=self.config)
         self.setWindowTitle("CADI Ionogram Plotter")

@@ -4,7 +4,6 @@ from src.plotstate.base import PlotState
 from src.utils.pandasutils import PandasUtils
 from datetime import datetime
 from decimal import Decimal
-import pytz
 
 class MdxRangeTimeFreqState(PlotState):
     def create_canvas(self):
@@ -22,8 +21,8 @@ class MdxRangeTimeFreqState(PlotState):
                                hour=start_time.hour, minute=start_time.minute, second=start_time.second)
         end_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
                                hour=end_time.hour, minute=end_time.minute, second=end_time.second)
-        start_dtime = start_dtime.replace(tzinfo=pytz.UTC)
-        end_dtime = end_dtime.replace(tzinfo=pytz.utc)
+        start_dtime = start_dtime.replace(tzinfo=date_of_obs.tzinfo)
+        end_dtime = end_dtime.replace(tzinfo=date_of_obs.tzinfo)
         df_selection = df.loc[start_dtime:end_dtime]
         selected_frequencies = self.main.freq_selector.selectedItems()
         selected_frequencies_decimals = [Decimal(freq) for freq in selected_frequencies]

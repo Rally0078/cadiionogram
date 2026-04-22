@@ -18,7 +18,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          activate-environment: true
 
       - name: Check if Rust is required
         id: check_rust
@@ -42,7 +51,11 @@ jobs:
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
         run: |
-          cd rust
+          # Resolve Python path in root directory context
+          PY_EXE=$(python -c "import sys; print(sys.executable)")
+          export PYO3_PYTHON="$PY_EXE"
+          echo "Using Python interpreter: $PYO3_PYTHON"
+          cd rust || exit 1
           cargo test
           cargo build --release
 
@@ -50,54 +63,63 @@ jobs:
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
         run: |
-          mkdir -p dist/rust
-          cp -r rust/target/release/. dist/rust/
+          cd rust || exit 1
+          mkdir -p ../dist/rust
+          cp -r target/release/. ../dist/rust/
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            cp rust/target/release/mdreader_rs.dll src/ionogramparser/mdreader_rs.pyd
+            cp target/release/mdreader_rs.dll ../src/ionogramparser/mdreader_rs.pyd
           else
-            cp rust/target/release/libmdreader_rs.so src/ionogramparser/mdreader_rs.so
+            cp target/release/libmdreader_rs.so ../src/ionogramparser/mdreader_rs.so
           fi
 
-      - name: Cached Conda environment
-        id: cache-conda
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/conda_pkgs_dir
-            ~/conda_envs_dir
-          key: ${{runner.os}}-conda-${{hashFiles('environment-build.yml')}}
-          restore-keys: |
-            ${{runner.os}}-conda-
-      
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          activate-environment: cadiionogram-release
-          environment-file: environment-build.yml
-          use-mamba: true
-          miniforge-variant: Miniforge3
-          miniforge-version: latest
-          auto-activate-base: false
-          pkgs-dirs: ~/conda_pkgs_dir
+      - name: Verify extension placement
+        shell: bash
+        run: |
+          echo "Checking src/ionogramparser content:"
+          ls -R src/ionogramparser
 
       - name: Run tests
-        shell: bash -l {0}
+        shell: bash
         run: |
-          conda activate cadiionogram-release
-          pytest
+          uv run pytest
 
       - name: Build with pyinstaller
-        shell: bash -l {0}
+        shell: bash
         run: |
-          conda activate cadiionogram-release
-          cd $GITHUB_WORKSPACE
-          python -m PyInstaller main.spec
+          uv run python -m PyInstaller main.spec
+
+      - name: Build AppImage (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
+          mv linuxdeploy-plugin-appimage-x86_64.AppImage linuxdeploy-plugin-appimage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-appimage
+
+          mkdir -p AppDir/usr/bin
+          cp -r dist/main/* AppDir/usr/bin/
+          
+          # Ensure icon and desktop file are in the root for linuxdeploy to find
+          # and also provide them explicitly via flags.
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --executable AppDir/usr/bin/egrliono --desktop-file egrliono.desktop --icon-file iigmlogo.png --output appimage
+
+          # Move the generated AppImage to dist
+          mv egrliono*.AppImage dist/
 
       - name: Prepare artifacts
-        shell: bash -l {0}
+        shell: bash
         run: |
           mkdir dist-upload
-          cp -r dist/* dist-upload/ || true
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            # For Linux, only upload the AppImage
+            cp dist/*.AppImage dist-upload/
+          else
+            # For Windows, upload the folder (it will be zipped in the release step)
+            cp -r dist/* dist-upload/ || true
+          fi
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -157,7 +179,7 @@ jobs:
           mv renamed/* artifacts/
       
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag_version.outputs.new_tag }}
           name: Release ${{ steps.tag_version.outputs.new_tag }}

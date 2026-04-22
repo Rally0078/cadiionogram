@@ -3,12 +3,8 @@ from src.plot.xyplotcanvas import XYPlotCanvas
 from src.plotstate.base import PlotState
 from datetime import datetime
 from src.utils.pandasutils import PandasUtils
-from src.utils.cadikvector import compute_xy
 from src.utils.powerpreprocessing import convert_amplitude_to_power
 from decimal import Decimal
-import numpy as np
-import pandas as pd
-import pytz
 
 class MdxXYplotCanvasState(PlotState):
     def create_canvas(self):
@@ -18,7 +14,7 @@ class MdxXYplotCanvasState(PlotState):
 
     def update_canvas(self, canvas):
         df = PandasUtils.create_pandas_from_arrays(self.main.metadata, self.main.freqs, self.main.heights, self.main.dops, self.main.signals)
-        date_of_obs = self.main.metadata['datetime']
+        date_of_obs: datetime = self.main.metadata['datetime']
         start_time = datetime.strptime(self.main._selected_timestamp, "%H:%M:%S")
         
         end_time = datetime.strptime(self.main._right_selected_timestamp, "%H:%M:%S")
@@ -26,8 +22,8 @@ class MdxXYplotCanvasState(PlotState):
                                hour=start_time.hour, minute=start_time.minute, second=start_time.second)
         end_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
                                hour=end_time.hour, minute=end_time.minute, second=end_time.second)
-        start_dtime = start_dtime.replace(tzinfo=pytz.UTC)
-        end_dtime = end_dtime.replace(tzinfo=pytz.utc)
+        start_dtime = start_dtime.replace(tzinfo=date_of_obs.tzinfo)
+        end_dtime = end_dtime.replace(tzinfo=date_of_obs.tzinfo)
         df_selection = df.loc[start_dtime:end_dtime]
         selected_frequencies = self.main.freq_selector.selectedItems()
         selected_frequencies_decimals = [Decimal(freq) for freq in selected_frequencies]

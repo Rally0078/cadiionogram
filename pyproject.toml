@@ -1,0 +1,22 @@
+[project]
+name = "cadiionogram"
+version = "0.1.0"
+description = "CADI MDx binary file reader and plotter"
+readme = "README.md"
+requires-python = "==3.13.*"
+dependencies = [
+    "joblib",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "polars",
+    "pyarrow",
+    "pyside6",
+    "pytest",
+    "scipy",
+    "scikit-image",
+    "pyinstaller",
+]
+
+[tool.uv]
+managed = true
