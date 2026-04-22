@@ -23,10 +23,11 @@ jobs:
           submodules: recursive
 
       - name: Install uv
-        uses: astral-sh/setup-uv@8
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
         with:
           python-version: "3.13"
           enable-cache: true
+          activate-environment: true
 
       - name: Check if Rust is required
         id: check_rust
