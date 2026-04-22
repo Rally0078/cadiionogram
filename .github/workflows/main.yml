@@ -18,7 +18,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          activate-environment: true
 
       - name: Check if Rust is required
         id: check_rust
@@ -37,19 +46,24 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+
       - name: Build Rust extension
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
-        working-directory: rust
         run: |
+          # Resolve Python path in root directory context
+          PY_EXE=$(python -c "import sys; print(sys.executable)")
+          export PYO3_PYTHON="$PY_EXE"
+          echo "Using Python interpreter: $PYO3_PYTHON"
+          cd rust || exit 1
           cargo test
           cargo build --release
 
       - name: Export Rust release folder
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
-        working-directory: rust
         run: |
+          cd rust || exit 1
           mkdir -p ../dist/rust
           cp -r target/release/. ../dist/rust/
           if [[ "${{ runner.os }}" == "Windows" ]]; then
@@ -58,12 +72,11 @@ jobs:
             cp target/release/libmdreader_rs.so ../src/ionogramparser/mdreader_rs.so
           fi
 
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          python-version: "3.13"
-          enable-cache: true
+      - name: Verify extension placement
+        shell: bash
+        run: |
+          echo "Checking src/ionogramparser content:"
+          ls -R src/ionogramparser
 
       - name: Run tests
         shell: bash
