@@ -23,7 +23,7 @@ jobs:
           submodules: recursive
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@6
         with:
           python-version: "3.13"
           enable-cache: true
@@ -50,11 +50,11 @@ jobs:
         if: steps.check_rust.outputs.rust_required == 'true'
         shell: bash
         run: |
-          # Capture Python path from root directory
-          PY_EXE=$(uv python find 3.13)
-          echo "Using Python interpreter: $PY_EXE"
-          cd rust || exit 1
+          # Resolve Python path in root directory context
+          PY_EXE=$(python -c "import sys; print(sys.executable)")
           export PYO3_PYTHON="$PY_EXE"
+          echo "Using Python interpreter: $PYO3_PYTHON"
+          cd rust || exit 1
           cargo test
           cargo build --release
 
@@ -120,7 +120,7 @@ jobs:
             cp -r dist/* dist-upload/ || true
           fi
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: build-${{runner.os}}
           path: dist-upload/
@@ -132,7 +132,7 @@ jobs:
     needs: build
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -146,7 +146,7 @@ jobs:
           tag_prefix: "v"
 
       - name: Download artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           path: ./artifacts
       
