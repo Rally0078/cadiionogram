@@ -115,10 +115,8 @@ class MainWidgetService(QObject):
             if self.main_widget.multi_folder_checkbox.isChecked():
                 short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
                 short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
-                n_days: timedelta = (short_datetime - self.main_widget.metadata['datetime'])
             else:
                 short_datetime: datetime = self.main_widget.metadata['datetime']
-                n_days = timedelta(days=0)
             current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
             
             with open("a.a", 'w') as polan_input:
@@ -159,10 +157,13 @@ class MainWidgetService(QObject):
                                     real_heights.append(h)
                             except ValueError:
                                 break
-                
+                # Get output filename in the format
+                # year(single last digit)month(letter A-L)day(0 padded)time(HH:MM)
                 new_timestamp = current_timestamp.replace(':', '')[:-2]
-                timestamp_hour = int(current_timestamp.replace(':', '')[:2])
-                output_file_nominute_name = Path(self.main_widget.files_list[timestamp_hour + 24 * n_days.days]).stem[:4]
+                output_file_nominute_name = datetime.strftime(short_datetime, "%Y%m%d")
+                output_file_nominute_name = output_file_nominute_name[3:]
+                output_file_year, output_file_day = output_file_nominute_name[0], output_file_nominute_name[3:]
+                output_file_nominute_name = output_file_year + chr(short_datetime.month + 64) + output_file_day
                 new_output_file_name = output_file_nominute_name + new_timestamp
                 output_file_name = self.main_widget.polan_dir / f"{new_output_file_name}.pol"
                 shutil.copyfile("POLOUT.T", output_file_name)
@@ -204,12 +205,17 @@ class MainWidgetService(QObject):
 
     def save_manual_scale(self):
         if self.main_widget.canvas_widget and self.main_widget.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
-            current_timestamp = self.main_widget._selected_timestamp if not self.main_widget.multi_folder_checkbox.isChecked() else self.main_widget._selected_timestamp.split(' ')[-1]
+            if self.main_widget.multi_folder_checkbox.isChecked():
+                short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
+                short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+            else:
+                short_datetime: datetime = self.main_widget.metadata['datetime']
+            current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
 
             timestamp_hour = int(current_timestamp.replace(':', '')[:2])
             timestamp_minute = int(current_timestamp.replace(':', '')[2:4])
             timestamp_second = int(current_timestamp.replace(':', '')[4:6])
-            output_filename = f"{self.main_widget.metadata['datetime'].strftime('%y%m%d')}{site_dict[self.main_widget.metadata['site']].short_site}_F.tfh"
+            output_filename = f"{short_datetime.strftime('%y%m%d')}{site_dict[self.main_widget.metadata['site']].short_site}_F.tfh"
             output_file_name = self.main_widget.polan_dir / output_filename
             
             scaled_values_state = self.main_widget.canvas_widget.scaled_values_lines
