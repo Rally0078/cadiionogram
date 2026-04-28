@@ -18,11 +18,14 @@ class Md4RealheightAnalysisState(PlotState):
         df = self.main.combined_df
         date_of_obs = self.main.metadata['datetime']
         
-        # We always want to parse the HH:MM:SS part and use date_of_obs for the date components
-        target_time_str = self.main._selected_timestamp.split(' ')[-1]
-        time_obj = datetime.strptime(target_time_str, "%H:%M:%S")
-        target_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
-                                hour=time_obj.hour, minute=time_obj.minute, second=time_obj.second)
+        target_time_str = self.main._selected_timestamp
+        if self.main.multi_folder_checkbox.isChecked():
+            time_obj = datetime.strptime(target_time_str, "%Y-%m-%d %H:%M:%S")
+            target_dtime = time_obj
+        else:
+            time_obj = datetime.strptime(target_time_str.split(' ')[-1], "%H:%M:%S")
+            target_dtime = time_obj.replace(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day)
+        target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
 
         target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
 
@@ -51,8 +54,7 @@ class Md4RealheightAnalysisState(PlotState):
             heights,
             dops, 
             power,
-            self.main._selected_timestamp,
-            self.main.metadata['datetime'],
+            target_dtime,
             self.main.metadata['site']
         )
         canvas.draw()

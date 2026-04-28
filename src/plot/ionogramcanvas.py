@@ -36,7 +36,7 @@ class IonogramCanvas(FigureCanvas):
         self.ax.yaxis.set_minor_locator(MultipleLocator(5))
         self.ax.grid()
 
-    def plot_scatter(self, freqs, heights, dops, signals, timestamp, date: datetime, site):
+    def plot_scatter(self, freqs, heights, dops, signals, timestamp, site):
         self.ax.clear()
         self.fig.tight_layout(pad=3)
         # Use configurable plotting options
@@ -52,7 +52,7 @@ class IonogramCanvas(FigureCanvas):
             self.colorbar.set_label("Power (dB)")
             self.colorbar.set_ticks(np.arange(0, self.main.power_limit + 1, 5))  # Fixed ticks from 0 to power_limit with step of 5
             self.scatter.set_clim(0, self.main.power_limit)  # Set color limits on scatter plot
-        self.ax.set_title(f"Ionogram site: {site} at time {timestamp} {date.day:02d}-{date.month:02d}-{date.year:04d} {site_dict[site].get_tzstr(date)}")
+        self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime("%H:%M:%S %d-%m-%Y")} {site_dict[site].get_tzstr(timestamp)}")
         self._set_plot_ax()
         #self.fig.tight_layout()
         self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)
