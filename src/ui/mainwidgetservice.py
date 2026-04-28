@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from math import isnan
 from PySide6.QtCore import QObject
+from src.utils.pandasutils import PandasUtils
 from src.workers.data_loader_worker import DataLoaderWorker
 from src.workers.computation_worker import ComputationWorker
 from src.ionogramparser.mdxreader import MDreader
@@ -35,36 +36,43 @@ class MainWidgetService(QObject):
         self.main_widget.threadpool.start(worker)
 
     def data_loaded(self, files_list, metadata, heights, freqs, freqs_list, dops, signals):
-        self.main_widget.files_list = files_list
-        self.main_widget.metadata = metadata
-        self.main_widget.heights = heights
-        self.main_widget.freqs = freqs
-        self.main_widget.freqs_list = freqs_list
-        self.main_widget.dops = dops
-        self.main_widget.signals = signals
-        
-        if self.main_widget.md3_checkbox.isChecked():
-            keys_list = cadi_keys_list
-        elif self.main_widget.md4_checkbox.isChecked():
-            keys_list = cadi_keys_list
-        elif self.main_widget.iono_checkbox.isChecked():
-            keys_list = sameer_keys_list
+        new_data = {
+            'files_list': files_list,
+            'metadata': metadata,
+            'heights': heights,
+            'freqs': freqs,
+            'freqs_list': freqs_list,
+            'dops': dops,
+            'signals': signals,
+            'folder_path': self.main_widget._loading_folder_path
+        }
 
-        self.main_widget.freq_selector.setItems(items=[str(freq/1e6) for freq in self.main_widget.freqs_list])
-        self.main_widget.timepartitions = self.main_widget.metadata['timepartitions']
-        self.main_widget._selected_timestamp = list(self.main_widget.timepartitions.keys())[0]
-        self.main_widget._right_selected_timestamp = list(self.main_widget.timepartitions.keys())[-1]
-
-        self.main_widget.table_widget.left_clicked.disconnect(self.main_widget._prev_option)
-        self.main_widget.table_widget.right_clicked.disconnect(self.main_widget._next_option)
-        self.main_widget.table_widget.update_metadata(self.main_widget.metadata, keys_list)
-        self.main_widget.table_widget.left_clicked.connect(self.main_widget._prev_option)
-        self.main_widget.table_widget.right_clicked.connect(self.main_widget._next_option)
-
-        self.main_widget.has_handled_calculation = False
-        self.main_widget._plot_helper()
-        self.main_widget.label.setText(f"Selected: {self.main_widget.folder_path.parent.parent.name}/{self.main_widget.folder_path.parent.name}/{self.main_widget.folder_path.name}")
-        self.main_widget.run_button.setEnabled(True)
+        if self.main_widget.multi_folder_checkbox.isChecked():
+            # Check if this folder is already in the list to avoid duplicates
+            already_exists = False
+            for data in self.main_widget.multi_folder_data:
+                if data['folder_path'] == new_data['folder_path']:
+                    already_exists = True
+                    break
+            
+            if not already_exists:
+                self.main_widget.multi_folder_data.append(new_data)
+                self.main_widget.multi_folder_data.sort(key=lambda x: x['metadata']['datetime'])
+            
+            # Combine all data into unified structures
+            combined_df, combined_metadata = PandasUtils.combine_folder_data(self.main_widget.multi_folder_data)
+            self.main_widget.combined_df = combined_df
+            self.main_widget.combined_metadata = combined_metadata
+            
+            self.main_widget.update_multi_folder_dropdown()
+            self.main_widget.switch_to_combined_data()
+        else:
+            self.main_widget.multi_folder_data = [new_data]
+            self.main_widget.combined_df = PandasUtils.create_pandas_from_arrays(metadata, freqs, heights, dops, signals)
+            self.main_widget.combined_metadata = metadata
+            
+            self.main_widget.update_multi_folder_dropdown()
+            self.main_widget.switch_to_combined_data()
 
     def data_loading_error(self, message):
         self.main_widget.textbox_errormsg.setText(message)

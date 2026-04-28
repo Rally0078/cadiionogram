@@ -49,11 +49,22 @@ class MetadataTableWidget(QWidget):
             except TypeError:
                 pass    
             self.timepartitions_dropdown.clear()
-            self.timepartitions_dropdown.addItems(list(metadata['timepartitions'].keys()))
-            self.timepartitions_dropdown.setCurrentIndex(0)
             self.end_timepartitions_dropdown.clear()
-            self.end_timepartitions_dropdown.addItems(list(metadata['timepartitions'].keys()))
-            self.end_timepartitions_dropdown.setCurrentIndex(len(list(metadata['timepartitions'].keys()))-1)
+            
+            # Ensure items always have date prepended for consistency in selection signals
+            items = []
+            date_of_obs = metadata['datetime']
+            date_str = date_of_obs.strftime("%Y-%m-%d")
+            for key in metadata['timepartitions'].keys():
+                if len(key) == 8: # HH:MM:SS format
+                    items.append(f"{date_str} {key}")
+                else:
+                    items.append(key)
+
+            self.timepartitions_dropdown.addItems(items)
+            self.timepartitions_dropdown.setCurrentIndex(0)
+            self.end_timepartitions_dropdown.addItems(items)
+            self.end_timepartitions_dropdown.setCurrentIndex(len(items)-1)
             self.timepartitions_dropdown.currentTextChanged.connect(self._on_dropdown_changed)
             self.end_timepartitions_dropdown.currentTextChanged.connect(self._on_right_dropdown_changed)
         
