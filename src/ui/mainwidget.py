@@ -42,6 +42,7 @@ class MainWidget(QWidget):
         self.multi_folder_dropdown.setVisible(False)
         self.multi_folder_dropdown.currentIndexChanged.connect(self._on_multi_folder_index_changed)
         self.multi_folder_data = []
+        self.files_list = []
 
         # Filetype selection
         self.button.clicked.connect(self.open_folder)
@@ -239,7 +240,7 @@ class MainWidget(QWidget):
         # Update metadata display and internal state using combined data
         self.metadata = self.combined_metadata
         self.timepartitions = self.metadata['timepartitions']
-        
+        self.files_list = list(dict.fromkeys([filename for data in self.multi_folder_data for filename in data['files_list']]))
         # Use first and last keys from combined timepartitions for selection
         self._selected_timestamp = list(self.timepartitions.keys())[0]
         self._right_selected_timestamp = list(self.timepartitions.keys())[-1]
