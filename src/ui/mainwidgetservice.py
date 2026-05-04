@@ -60,6 +60,9 @@ class MainWidgetService(QObject):
                         break
             
             if not already_exists:
+                if len(self.main_widget.multi_folder_data) >= 1:
+                    if self.main_widget.multi_folder_data[0]['metadata']['extension'] != new_data['metadata']['extension']:
+                        self.main_widget.multi_folder_data = []
                 self.main_widget.multi_folder_data.append(new_data)
                 self.main_widget.multi_folder_data.sort(key=lambda x: x['metadata']['datetime'])
             
