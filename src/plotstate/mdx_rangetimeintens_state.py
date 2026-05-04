@@ -60,7 +60,7 @@ class MdxRangeTimeIntensState(PlotState):
                            df_selection['dopplershift'],
                            df_selection[signal_col_names].to_numpy())
             canvas.plot_scatter(
-                df_selection.index[0:len(freq_selection)], # Simplified index matching if possible or use freq_selection.index
+                freq_selection.index,
                 height_selection,
                 convert_amplitude_to_power(signals_selection),
                 freq_selection, 

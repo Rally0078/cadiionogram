@@ -44,16 +44,20 @@ class MainWidgetService(QObject):
             'freqs_list': freqs_list,
             'dops': dops,
             'signals': signals,
-            'folder_path': self.main_widget._loading_folder_path
+            'folder_path': self.main_widget._loading_folder_path,
+            'file_paths': [self.main_widget._loading_folder_path / filename for filename in files_list]
         }
 
         if self.main_widget.multi_folder_checkbox.isChecked():
             # Check if this folder is already in the list to avoid duplicates
             already_exists = False
             for data in self.main_widget.multi_folder_data:
-                if data['folder_path'] == new_data['folder_path']:
-                    already_exists = True
+                if len(data['file_paths']) != len(new_data['file_paths']):
                     break
+                for old_file, new_file in zip(data['file_paths'], new_data['file_paths']):
+                    if old_file == new_file:
+                        already_exists = True
+                        break
             
             if not already_exists:
                 self.main_widget.multi_folder_data.append(new_data)
@@ -85,10 +89,10 @@ class MainWidgetService(QObject):
         if not self.main_widget.has_handled_calculation and isinstance(new_state, MdxXYplotCanvasState):
             self.main_widget.label.setText("Computing...")
             worker = ComputationWorker(
-                self.main_widget.metadata, self.main_widget.freqs, self.main_widget.heights, 
-                self.main_widget.dops, self.main_widget.signals, 
+                self.main_widget.multi_folder_data[0]['metadata']['datetime'],
+                self.main_widget.combined_df,
                 self.main_widget._selected_timestamp, self.main_widget._right_selected_timestamp, 
-                self.main_widget.freqs_list
+                self.main_widget.multi_folder_data[0]['freqs_list']
             )
             worker.signals.finished.connect(self.computation_finished)
             worker.signals.error.connect(self.computation_error)
@@ -112,11 +116,8 @@ class MainWidgetService(QObject):
         real_heights = []
         
         if len(freqs) > 0:
-            if self.main_widget.multi_folder_checkbox.isChecked():
-                short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
-                short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
-            else:
-                short_datetime: datetime = self.main_widget.metadata['datetime']
+            short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
+            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
             current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
             
             with open("a.a", 'w') as polan_input:
@@ -205,11 +206,8 @@ class MainWidgetService(QObject):
 
     def save_manual_scale(self):
         if self.main_widget.canvas_widget and self.main_widget.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
-            if self.main_widget.multi_folder_checkbox.isChecked():
-                short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
-                short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
-            else:
-                short_datetime: datetime = self.main_widget.metadata['datetime']
+            short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
+            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
             current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
 
             timestamp_hour = int(current_timestamp.replace(':', '')[:2])

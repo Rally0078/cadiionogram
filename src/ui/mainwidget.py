@@ -243,7 +243,16 @@ class MainWidget(QWidget):
         self.files_list = list(dict.fromkeys([filename for data in self.multi_folder_data for filename in data['files_list']]))
         # Use first and last keys from combined timepartitions for selection
         self._selected_timestamp = list(self.timepartitions.keys())[0]
+        if len(self._selected_timestamp) == 8:
+            date_of_obs = self.metadata['datetime']
+            date_str = date_of_obs.strftime("%Y-%m-%d")
+            self._selected_timestamp = f"{date_str} {self._selected_timestamp}"
+
         self._right_selected_timestamp = list(self.timepartitions.keys())[-1]
+        if len(self._right_selected_timestamp) == 8:
+            date_of_obs = self.metadata['datetime']
+            date_str = date_of_obs.strftime("%Y-%m-%d")
+            self._right_selected_timestamp = f"{date_str} {self._right_selected_timestamp}"
 
         if self.md3_checkbox.isChecked():
             keys_list = cadi_keys_list

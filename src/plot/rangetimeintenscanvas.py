@@ -65,7 +65,7 @@ class RangeTimeIntensCanvas(FigureCanvas):
                                                 hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
                                                 hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
         self.ax.margins(x=0,y=0)
-        #self.ax.set_xlim(time_index[0], time_index[-1])
+        self.ax.set_xlim(time_index[0], time_index[-1])
         
         self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {site_dict[site].get_tzstr(date)}")
         self.ax.set_xlabel(f"Time ({site_dict[site].get_tzstr(date)})")
