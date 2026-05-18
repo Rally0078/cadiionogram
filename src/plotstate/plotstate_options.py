@@ -22,11 +22,16 @@ def get_mdx_rangetimeintens_state():
     from src.plotstate.mdx_rangetimeintens_state import MdxRangeTimeIntensState
     return MdxRangeTimeIntensState
 
+def get_mdx_skymap_state():
+    from src.plotstate.mdx_skymap_state import MdxSkymapState
+    return MdxSkymapState
+
 options_states_md4_dict = {
     'Scale ionogram': get_md4_autoscaling_state,
     'Display ionogram': get_md4_display_iono_state,
     'Real height analysis': get_md4_realheight_state,
     'Range Time Intensity': get_mdx_rangetimeintens_state,
+    'Skymap': get_mdx_skymap_state,
     'EW-NS vs Range': NotImplementedError,
 }
 
@@ -34,6 +39,7 @@ options_states_md3_dict = {
     'Range Time Frequency': get_mdx_rangetimefreq_state,
     'Range Time Intensity': get_mdx_rangetimeintens_state,
     'EW-NS timeseries': get_mdx_xyplot_state,
+    'Skymap': get_mdx_skymap_state,
     'Drift velocity timeseries': NotImplementedError
 }
 

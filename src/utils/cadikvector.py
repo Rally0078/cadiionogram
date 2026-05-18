@@ -45,8 +45,8 @@ def compute_xpha_full(df: pd.DataFrame, freq_list):
                         index=df.index)
     PH2_corr=0#np.pi+0*np.pi/180, site dependent
     PH4_corr=0#np.pi-0*np.pi/180, site dependent
-    PH2_corr=np.pi+45*np.pi/180
-    PH4_corr=np.pi-20*np.pi/180
+    PH2_corr=8.8906*np.pi/180
+    PH4_corr=-29.5086*np.pi/180
     ph_corrections = [PH2_corr, PH4_corr]
     pairwise_antenna13 = [('sensor1 real', 'sensor1 imag'), ('sensor3 real', 'sensor3 imag')]
     pairwise_antenna24 = [('sensor2 real', 'sensor2 imag'), ('sensor4 real', 'sensor4 imag')]
@@ -59,7 +59,7 @@ def compute_xpha_full(df: pd.DataFrame, freq_list):
         s = (ant0_re + 1j * ant0_im) * np.conjugate((ant1_re + 1j * ant1_im))
         s = -s  #Site dependent, use polarity to determine according to the IDL code
         xpow[cross_name] = np.abs(s)**2
-        xpha[cross_name] = np.angle(s)
+        xpha[cross_name] = np.angle(s) + ph_corr
     xpha.loc[xpha['x2'] > np.pi, 'x2'] -= 2*np.pi
     xpha.loc[xpha['x2'] < -np.pi, 'x2'] += 2*np.pi
 
