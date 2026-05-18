@@ -3,7 +3,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 from src.utils.cadikvector import compute_xy
-from src.utils.pandasutils import PandasUtils
+from src.utils.powerpreprocessing import convert_amplitude_to_power
 
 class ComputationSignals(QObject):
     """
@@ -46,6 +46,10 @@ class ComputationWorker(QRunnable):
             
             for dtime in np.unique(df_selection.index):
                 df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow = compute_xy(df_selection.loc[dtime], self.freqs_list, sort_by_freq=False)
+                df_output['freq (Hz)'] = output_freqs
+                df_output['dopplershift'] = output_dops
+                df_output[['xpower1 (dB)', 'xpower2 (dB)']] = 10*np.log10(output_xpow)
+
                 df_all_outputs = pd.concat([df_all_outputs if not df_all_outputs.empty else None, df_output])
                 all_output_freqs = np.concatenate([all_output_freqs, output_freqs])
             

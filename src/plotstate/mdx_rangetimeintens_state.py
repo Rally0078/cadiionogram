@@ -33,10 +33,10 @@ class MdxRangeTimeIntensState(PlotState):
             selected_frequencies_rounded = [float(item.quantize(Decimal(f"1e-3"))) * 1e6 for item in selected_frequencies_decimals]
             power = convert_amplitude_to_power(df_selection[signal_col_names].to_numpy())
             canvas.plot_scatter(
-            df_selection.index,
-            df_selection['height (km)'],
-            power,
-            df_selection['freq (Hz)'], 
+            df_selection.index[power > 5],
+            df_selection['height (km)'][power > 5],
+            power[power > 5],
+            df_selection['freq (Hz)'][power > 5], 
             self.main.metadata['datetime'],
             self.main.metadata['site'],
             True,
