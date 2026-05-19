@@ -45,9 +45,9 @@ class MainWindow(QMainWindow):
             },
             'scaling': {
                 'linewidth': '2',
-                'scalingoption1': 'Scale F',
-                'scalingoption2': 'Scale E',
-                'scalingoption3': 'Scale IE',
+                'scalingoption1': 'F',
+                'scalingoption2': 'E',
+                'scalingoption3': 'IE',
                 'enableESscaling': 'true'
             }
         }
