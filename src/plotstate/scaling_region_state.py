@@ -1,16 +1,17 @@
 #State class to determine the correct lines and scaled values for each region
 
 class ScaleRegionValues:
-    def __init__(self, ax, line_width):
+    def __init__(self, ax, line_width, labels=['F', 'E', 'IE']):
+        self.regions = labels
         self._state = {
-            'F': {'h': float('nan'), 'f': float('nan'), 'hline': None, 'fline': None}, 
-            'E': {'h': float('nan'), 'f': float('nan'), 'hline': None, 'fline': None}, 
-            'IE': {'h': float('nan'), 'f': float('nan'), 'hline': None, 'fline': None}
+            self.regions[0]: {'h': float('nan'), 'f': float('nan'), 'hline': None, 'fline': None}, 
+            self.regions[1]: {'h': float('nan'), 'f': float('nan'), 'hline': None, 'fline': None}, 
+            self.regions[2]: {'h': float('nan'), 'f': float('nan'), 'hline': None, 'fline': None}
         }
         self._colors = {
-            'F': {'h': 'red', 'f': 'blue'},
-            'E': {'h': 'green', 'f': 'yellow'},
-            'IE': {'h': 'black', 'f': 'pink'}
+            self.regions[0]: {'h': 'red', 'f': 'blue'},
+            self.regions[1]: {'h': 'green', 'f': 'yellow'},
+            self.regions[2]: {'h': 'black', 'f': 'pink'}
         }
         self._current_region = None
         self._ax = ax
@@ -51,7 +52,7 @@ class ScaleRegionValues:
         if self._current_region is None:
             raise Exception("Scale region not set!")
     def set_region(self, region):
-        if region not in ['E', 'F', 'IE']:
+        if region not in self.regions:
             raise KeyError("Not a valid region!")
         self._current_region = region
 

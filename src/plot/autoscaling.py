@@ -19,7 +19,11 @@ class ScaleIonogramCanvas(FigureCanvas):
         self.freq_limits = (1, 18)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
-        self.scaled_values_lines = ScaleRegionValues(self.ax, self.main.scaling_line_width)
+        self.scaled_values_lines = ScaleRegionValues(self.ax, 
+                                                     self.main.scaling_line_width, labels=
+                                                     [self.main.config.get('scaling', 'scalingoption1'),
+                                                      self.main.config.get('scaling', 'scalingoption2'),
+                                                      self.main.config.get('scaling', 'scalingoption3')])
         self._set_plot_ax()
         self.mpl_connect("button_press_event", self.on_mouse_press)
         self.mpl_connect("scroll_event", self.on_mouse_scroll)
@@ -66,12 +70,12 @@ class ScaleIonogramCanvas(FigureCanvas):
 
     def on_mouse_press(self, event):
         #Get current scale region mode
-        if self.main.f_scale_box.isChecked():
-            text_legend = 'F'
-        elif self.main.e_scale_box.isChecked():
-            text_legend = 'E'
-        elif self.main.ie_scale_box.isChecked():
-            text_legend = 'IE'
+        if self.main.scale_box1.isChecked():
+            text_legend = self.main.config.get('scaling', 'scalingoption1')
+        elif self.main.scale_box2.isChecked():
+            text_legend = self.main.config.get('scaling', 'scalingoption2')
+        elif self.main.scale_box3.isChecked():
+            text_legend = self.main.config.get('scaling', 'scalingoption3')
         else:
             raise KeyError("No valid region selected for manual scaling")
         self.scaled_values_lines.set_region(text_legend)

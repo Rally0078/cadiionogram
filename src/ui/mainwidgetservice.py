@@ -221,18 +221,18 @@ class MainWidgetService(QObject):
             output_file_name = self.main_widget.polan_dir / output_filename
             
             scaled_values_state = self.main_widget.canvas_widget.scaled_values_lines
-            scaled_values_state.set_region('F')
-            fof, hprimef = scaled_values_state.f, scaled_values_state.h
-            scaled_values_state.set_region('E')
-            foe, hprimee = scaled_values_state.f, scaled_values_state.h
-            scaled_values_state.set_region('IE')
-            foie, hprimeie = scaled_values_state.f, scaled_values_state.h
+            scaled_values_state.set_region(self.main_widget.config.get('scaling','scalingoption1'))
+            f1, h1 = scaled_values_state.f, scaled_values_state.h
+            scaled_values_state.set_region(self.main_widget.config.get('scaling','scalingoption2'))
+            f2, h2 = scaled_values_state.f, scaled_values_state.h
+            scaled_values_state.set_region(self.main_widget.config.get('scaling','scalingoption3'))
+            f3, h3 = scaled_values_state.f, scaled_values_state.h
             
             with open(output_file_name, 'a') as f:
                 f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} "
-                         f"{'NaN ' if isnan(fof) else f'{fof:.2f}'} {'NaN ' if isnan(hprimef) else f'{hprimef:.2f}'} "
-                         f"{'NaN ' if isnan(foe) else f'{foe:.2f}'} {'NaN ' if isnan(hprimee) else f'{hprimee:.2f}'} "
-                         f"{'NaN ' if isnan(foie) else f'{foie:.2f}'} {'NaN ' if isnan(hprimeie) else f'{hprimeie:.2f}'} "
+                         f"{'NaN ' if isnan(f1) else f'{f1:.2f}'} {'NaN ' if isnan(h1) else f'{h1:.2f}'} "
+                         f"{'NaN ' if isnan(f2) else f'{f2:.2f}'} {'NaN ' if isnan(h2) else f'{h2:.2f}'} "
+                         f"{'NaN ' if isnan(f3) else f'{f3:.2f}'} {'NaN ' if isnan(h3) else f'{h3:.2f}'} "
                          f"{self.main_widget._es_scaling_mode}\n"))
         else:
             print("Not scaling canvas! Use the appropriate canvas")

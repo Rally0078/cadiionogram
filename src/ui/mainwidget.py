@@ -18,9 +18,9 @@ class MainWidget(QWidget):
     md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries','Skymap']
     md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity', 'Skymap']
     
-    def __init__(self):
+    def __init__(self, config: ConfigParser):
         super().__init__()
-        self.polan_dir = None
+        self.init_config(config)
         self.service = MainWidgetService(self)
         # Canvas parameters to be used later
         self.canvas_layout_row = 2
@@ -79,16 +79,16 @@ class MainWidget(QWidget):
         
         # Manual scaling modes
         self.scale_mode_group = QButtonGroup()
-        self.f_scale_box = QCheckBox('Scale F')
-        self.e_scale_box = QCheckBox('Scale E')
-        self.ie_scale_box = QCheckBox('Scale IE')
-        self.scale_mode_group.addButton(self.f_scale_box)
-        self.scale_mode_group.addButton(self.e_scale_box)
-        self.scale_mode_group.addButton(self.ie_scale_box)
+        self.scale_box1 = QCheckBox(f"Scale " + self.config.get('scaling', 'scalingoption1'))
+        self.scale_box2 = QCheckBox(f"Scale " + self.config.get('scaling', 'scalingoption2'))
+        self.scale_box3 = QCheckBox(f"Scale " + self.config.get('scaling', 'scalingoption3'))
+        self.scale_mode_group.addButton(self.scale_box1)
+        self.scale_mode_group.addButton(self.scale_box2)
+        self.scale_mode_group.addButton(self.scale_box3)
         self.scale_mode_group.setExclusive(True)
-        self.f_scale_box.setVisible(False)
-        self.e_scale_box.setVisible(False)
-        self.ie_scale_box.setVisible(False)
+        self.scale_box1.setVisible(False)
+        self.scale_box2.setVisible(False)
+        self.scale_box3.setVisible(False)
         
         # ES Scaling controls
         self.es_scaling_label = QLabel("ES scaling")
@@ -140,9 +140,9 @@ class MainWidget(QWidget):
 
         # Add table widget, POLAN, and scaling buttons to the layout        
         layout.addWidget(self.table_widget, 4, 0, 2, 2)
-        layout.addWidget(self.f_scale_box, 6, 0)
-        layout.addWidget(self.e_scale_box, 6, 1)
-        layout.addWidget(self.ie_scale_box, 6, 2)
+        layout.addWidget(self.scale_box1, 6, 0)
+        layout.addWidget(self.scale_box2, 6, 1)
+        layout.addWidget(self.scale_box3, 6, 2)
         layout.addWidget(self.es_scaling_label, 7, 0)
         layout.addWidget(self.es_scaling_dropdown, 7, 1)
         layout.addWidget(self.freq_selector, 8, 0)
@@ -183,14 +183,17 @@ class MainWidget(QWidget):
         print(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
         
     def init_config(self, config: ConfigParser):
+        self.config = config
         self.polan_dir = Path(config['Locations']['polanoutputdirectory'])
         self.input_dir = Path(config['Locations']['DefaultInputDirectory'])
         self.parquet_cache_dir = Path(config['Locations']['cachedir'])
-        self.colormap = config['plotting']['colormap']
+        self.colormap = config['plotting']['powercolormap']
+        self.dopcolormap = config['plotting']['dopcolormap']
         self.scatter_size = config.getint('plotting', 'scattersize')
         self.power_limit = config.getint('plotting', 'powerlimit')
         self.polan_interp_mode = config.get('realheightanalysis', 'interpmode')
         self.scaling_line_width = config.getfloat('scaling', 'linewidth')
+        self.enable_es_scaling = config.getboolean('scaling', 'enableesscaling')
         if self.polan_interp_mode not in ['old', 'new', 'OLD', 'NEW']:
             raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
         
