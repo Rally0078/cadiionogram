@@ -14,13 +14,15 @@ class Md4ScaleIonogramState(PlotState):
 
     def update_canvas(self, canvas):
         self.main.save_scale_button.setVisible(True)
-        self.main.f_scale_box.setVisible(True)
-        self.main.e_scale_box.setVisible(True)
-        self.main.ie_scale_box.setVisible(True)
+        self.main.scale_box1.setVisible(True)
+        self.main.scale_box2.setVisible(True)
         self.main.clear_scale_button.setVisible(True)
         self.main.reset_zoom_button.setVisible(True)
-        self.main.es_scaling_label.setVisible(True)
-        self.main.es_scaling_dropdown.setVisible(True)
+        if(self.main.enable_es_scaling):
+            self.main.es_scaling_label.setVisible(True)
+            self.main.es_scaling_dropdown.setVisible(True)
+        if(self.main.config.get('scaling', 'scalingoption3') != ''):
+            self.main.scale_box3.setVisible(True)
         df = self.main.combined_df
         date_of_obs = self.main.metadata['datetime']
         

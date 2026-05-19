@@ -35,7 +35,8 @@ class MainWindow(QMainWindow):
                 'cachedir': 'C:\\cdata\\parquetcache' if os_name == "Windows" else '~/cdata/parquetcache'
             },
             'plotting': {
-                'colormap': 'jet_r',
+                'powercolormap': 'jet_r',
+                'dopcolormap': 'viridis',
                 'scattersize': '6',
                 'powerlimit': '50'
             },
@@ -43,7 +44,11 @@ class MainWindow(QMainWindow):
                 'interpmode': 'old'
             },
             'scaling': {
-                'linewidth': '2'
+                'linewidth': '2',
+                'scalingoption1': 'Scale F',
+                'scalingoption2': 'Scale E',
+                'scalingoption3': 'Scale IE',
+                'enableESscaling': 'true'
             }
         }
 
@@ -67,8 +72,7 @@ class MainWindow(QMainWindow):
             with open(self.cfg_file, 'w') as f:
                 self.config.write(f)
 
-        self.main_widget = MainWidget()
-        self.main_widget.init_config(config=self.config)
+        self.main_widget = MainWidget(config=self.config)
         self.setWindowTitle("CADI Ionogram Plotter")
         self.setCentralWidget(self.main_widget)
         self.resize(1366, 768)
