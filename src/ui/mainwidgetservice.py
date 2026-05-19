@@ -1,9 +1,10 @@
 import subprocess
 import shutil
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from math import isnan
 from PySide6.QtCore import QObject
+from src.utils.pandasutils import PandasUtils
 from src.workers.data_loader_worker import DataLoaderWorker
 from src.workers.computation_worker import ComputationWorker
 from src.ionogramparser.mdxreader import MDreader
@@ -35,36 +36,50 @@ class MainWidgetService(QObject):
         self.main_widget.threadpool.start(worker)
 
     def data_loaded(self, files_list, metadata, heights, freqs, freqs_list, dops, signals):
-        self.main_widget.files_list = files_list
-        self.main_widget.metadata = metadata
-        self.main_widget.heights = heights
-        self.main_widget.freqs = freqs
-        self.main_widget.freqs_list = freqs_list
-        self.main_widget.dops = dops
-        self.main_widget.signals = signals
-        
-        if self.main_widget.md3_checkbox.isChecked():
-            keys_list = cadi_keys_list
-        elif self.main_widget.md4_checkbox.isChecked():
-            keys_list = cadi_keys_list
-        elif self.main_widget.iono_checkbox.isChecked():
-            keys_list = sameer_keys_list
+        new_data = {
+            'files_list': files_list,
+            'metadata': metadata,
+            'heights': heights,
+            'freqs': freqs,
+            'freqs_list': freqs_list,
+            'dops': dops,
+            'signals': signals,
+            'folder_path': self.main_widget._loading_folder_path,
+            'file_paths': [self.main_widget._loading_folder_path / filename for filename in files_list]
+        }
 
-        self.main_widget.freq_selector.setItems(items=[str(freq/1e6) for freq in self.main_widget.freqs_list])
-        self.main_widget.timepartitions = self.main_widget.metadata['timepartitions']
-        self.main_widget._selected_timestamp = list(self.main_widget.timepartitions.keys())[0]
-        self.main_widget._right_selected_timestamp = list(self.main_widget.timepartitions.keys())[-1]
-
-        self.main_widget.table_widget.left_clicked.disconnect(self.main_widget._prev_option)
-        self.main_widget.table_widget.right_clicked.disconnect(self.main_widget._next_option)
-        self.main_widget.table_widget.update_metadata(self.main_widget.metadata, keys_list)
-        self.main_widget.table_widget.left_clicked.connect(self.main_widget._prev_option)
-        self.main_widget.table_widget.right_clicked.connect(self.main_widget._next_option)
-
-        self.main_widget.has_handled_calculation = False
-        self.main_widget._plot_helper()
-        self.main_widget.label.setText(f"Selected: {self.main_widget.folder_path.parent.parent.name}/{self.main_widget.folder_path.parent.name}/{self.main_widget.folder_path.name}")
-        self.main_widget.run_button.setEnabled(True)
+        if self.main_widget.multi_folder_checkbox.isChecked():
+            # Check if this folder is already in the list to avoid duplicates
+            already_exists = False
+            for data in self.main_widget.multi_folder_data:
+                if len(data['file_paths']) != len(new_data['file_paths']):
+                    break
+                for old_file, new_file in zip(data['file_paths'], new_data['file_paths']):
+                    if old_file == new_file:
+                        already_exists = True
+                        break
+            
+            if not already_exists:
+                if len(self.main_widget.multi_folder_data) >= 1:
+                    if self.main_widget.multi_folder_data[0]['metadata']['extension'] != new_data['metadata']['extension']:
+                        self.main_widget.multi_folder_data = []
+                self.main_widget.multi_folder_data.append(new_data)
+                self.main_widget.multi_folder_data.sort(key=lambda x: x['metadata']['datetime'])
+            
+            # Combine all data into unified structures
+            combined_df, combined_metadata = PandasUtils.combine_folder_data(self.main_widget.multi_folder_data)
+            self.main_widget.combined_df = combined_df
+            self.main_widget.combined_metadata = combined_metadata
+            
+            self.main_widget.update_multi_folder_dropdown()
+            self.main_widget.switch_to_combined_data()
+        else:
+            self.main_widget.multi_folder_data = [new_data]
+            self.main_widget.combined_df = PandasUtils.create_pandas_from_arrays(metadata, freqs, heights, dops, signals)
+            self.main_widget.combined_metadata = metadata
+            
+            self.main_widget.update_multi_folder_dropdown()
+            self.main_widget.switch_to_combined_data()
 
     def data_loading_error(self, message):
         self.main_widget.textbox_errormsg.setText(message)
@@ -77,10 +92,10 @@ class MainWidgetService(QObject):
         if not self.main_widget.has_handled_calculation and isinstance(new_state, MdxXYplotCanvasState):
             self.main_widget.label.setText("Computing...")
             worker = ComputationWorker(
-                self.main_widget.metadata, self.main_widget.freqs, self.main_widget.heights, 
-                self.main_widget.dops, self.main_widget.signals, 
+                self.main_widget.multi_folder_data[0]['metadata']['datetime'],
+                self.main_widget.combined_df,
                 self.main_widget._selected_timestamp, self.main_widget._right_selected_timestamp, 
-                self.main_widget.freqs_list
+                self.main_widget.multi_folder_data[0]['freqs_list']
             )
             worker.signals.finished.connect(self.computation_finished)
             worker.signals.error.connect(self.computation_error)
@@ -102,12 +117,16 @@ class MainWidgetService(QObject):
     def run_polan(self, freqs, heights, ml_freqs, ml_heights):
         real_freqs = []
         real_heights = []
+        
         if len(freqs) > 0:
-            short_datetime: datetime = self.main_widget.metadata['datetime']
+            short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
+            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+            current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
+            
             with open("a.a", 'w') as polan_input:
                 polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
                 polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}{site_dict[self.main_widget.metadata['site']].short_site}           {site_dict[self.main_widget.metadata['site']].FH:.2f}  {site_dict[self.main_widget.metadata['site']].dip:.1f}  0.0 0.00    0\n")
-                polan_input.write(f"{self.main_widget._selected_timestamp}                    0.0\n")
+                polan_input.write(f"{current_timestamp}                    0.0\n")
                 for idx, (freq, height) in enumerate(zip(freqs, heights)):
                     if idx == len(freqs) - 1:
                         height = 0.0
@@ -142,10 +161,13 @@ class MainWidgetService(QObject):
                                     real_heights.append(h)
                             except ValueError:
                                 break
-                
-                new_timestamp = self.main_widget._selected_timestamp.replace(':', '')[:-2]
-                timestamp_hour = int(self.main_widget._selected_timestamp.replace(':', '')[:2])
-                output_file_nominute_name = Path(self.main_widget.files_list[timestamp_hour]).stem[:4]
+                # Get output filename in the format
+                # year(single last digit)month(letter A-L)day(0 padded)time(HH:MM)
+                new_timestamp = current_timestamp.replace(':', '')[:-2]
+                output_file_nominute_name = datetime.strftime(short_datetime, "%Y%m%d")
+                output_file_nominute_name = output_file_nominute_name[3:]
+                output_file_year, output_file_day = output_file_nominute_name[0], output_file_nominute_name[3:]
+                output_file_nominute_name = output_file_year + chr(short_datetime.month + 64) + output_file_day
                 new_output_file_name = output_file_nominute_name + new_timestamp
                 output_file_name = self.main_widget.polan_dir / f"{new_output_file_name}.pol"
                 shutil.copyfile("POLOUT.T", output_file_name)
@@ -164,8 +186,21 @@ class MainWidgetService(QObject):
     def polan_auto_helper(self):
         from src.plot.realheightanalysis import RealHeightAnalysisCanvas
         if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
-            it = RawDataDirIterator(self.main_widget.metadata, self.main_widget.freqs, self.main_widget.heights, self.main_widget.dops, self.main_widget.signals)
-            freqs, heights, dops, signals = it[self.main_widget._selected_timestamp]
+            target_time_str = self.main_widget._selected_timestamp
+            date_of_obs = self.main_widget.combined_metadata['datetime']
+            if self.main_widget.multi_folder_checkbox.isChecked():
+                time_obj = datetime.strptime(target_time_str, "%Y-%m-%d %H:%M:%S")
+                target_dtime = time_obj
+            else:
+                time_obj = datetime.strptime(target_time_str.split(' ')[-1], "%H:%M:%S")
+                target_dtime = time_obj.replace(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day)
+            target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
+
+            df_at_time = self.main_widget.combined_df.loc[target_dtime]
+            signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
+            
+            freqs, heights, dops = df_at_time['freq (Hz)'].to_numpy(), df_at_time['height (km)'].to_numpy(), df_at_time['dopplershift'].to_numpy()
+            signals = df_at_time[signal_col_names].to_numpy()
             if self.main_widget.extension == 'md4':
                 freqs_interp, heights_interp, ml_freqs, ml_heights = self.main_widget.canvas_widget.draw_auto_curve(freqs, heights, dops, signals)
                 self.run_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
@@ -174,10 +209,14 @@ class MainWidgetService(QObject):
 
     def save_manual_scale(self):
         if self.main_widget.canvas_widget and self.main_widget.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
-            timestamp_hour = int(self.main_widget._selected_timestamp.replace(':', '')[:2])
-            timestamp_minute = int(self.main_widget._selected_timestamp.replace(':', '')[2:4])
-            timestamp_second = int(self.main_widget._selected_timestamp.replace(':', '')[4:6])
-            output_filename = f"{self.main_widget.metadata['datetime'].strftime('%y%m%d')}{site_dict[self.main_widget.metadata['site']].short_site}_F.tfh"
+            short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
+            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+            current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
+
+            timestamp_hour = int(current_timestamp.replace(':', '')[:2])
+            timestamp_minute = int(current_timestamp.replace(':', '')[2:4])
+            timestamp_second = int(current_timestamp.replace(':', '')[4:6])
+            output_filename = f"{short_datetime.strftime('%y%m%d')}{site_dict[self.main_widget.metadata['site']].short_site}_F.tfh"
             output_file_name = self.main_widget.polan_dir / output_filename
             
             scaled_values_state = self.main_widget.canvas_widget.scaled_values_lines

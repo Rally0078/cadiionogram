@@ -69,7 +69,7 @@ class PandasUtils:
                 Metadata containing information about the data. This is required to shape the arrays correctly.
             df_sensors : `pandas.DataFrame`
                 Contains all the IQ, frequency, height, and doppler data.
-            
+
             Returns
             -------
             frequency : `numpy.ndarray`
@@ -91,3 +91,42 @@ class PandasUtils:
         complex_signal = sensors_all.astype(np.int8)
 
         return frequency, height, dop_shifts, complex_signal
+
+    @staticmethod
+    def combine_folder_data(multi_folder_data):
+        """
+            Combines multiple folder data into a single DataFrame and unified metadata.
+        """
+        dfs = []
+        combined_timepartitions = {}
+        total_len = 0
+
+        # Sort data by datetime if not already sorted
+        multi_folder_data.sort(key=lambda x: x['metadata']['datetime'])
+
+        for data in multi_folder_data:
+            df = PandasUtils.create_pandas_from_arrays(
+                data['metadata'], 
+                data['freqs'], 
+                data['heights'], 
+                data['dops'], 
+                data['signals']
+            )
+            dfs.append(df)
+
+            # Create combined timepartitions with full datetime strings
+            date_str = data['metadata']['datetime'].strftime('%Y-%m-%d')
+            for timestamp, count in data['metadata']['timepartitions'].items():
+                combined_key = f"{date_str} {timestamp}"
+                combined_timepartitions[combined_key] = count + total_len
+
+            total_len += len(df)
+
+        combined_df = pd.concat(dfs)
+
+        # Use metadata from the first folder as base
+        combined_metadata = multi_folder_data[0]['metadata'].copy()
+        combined_metadata['timepartitions'] = combined_timepartitions
+        # Set datetime to the very first observation's date (already sorted)
+
+        return combined_df, combined_metadata

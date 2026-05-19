@@ -17,13 +17,10 @@ class ComputationWorker(QRunnable):
     Worker for performing intensive data computations in a separate thread.
     Emits a signal upon completion with the computed data or an error message.
     """
-    def __init__(self, metadata, freqs, heights, dops, signals, selected_timestamp, right_selected_timestamp, freqs_list):
+    def __init__(self, date_of_obs, df, selected_timestamp, right_selected_timestamp, freqs_list):
         super().__init__()
-        self.metadata = metadata
-        self.freqs = freqs
-        self.heights = heights
-        self.dops = dops
-        self.raw_signals = signals
+        self.df = df
+        self.date_of_obs = date_of_obs
         self.selected_timestamp = selected_timestamp
         self.right_selected_timestamp = right_selected_timestamp
         self.freqs_list = freqs_list
@@ -31,16 +28,12 @@ class ComputationWorker(QRunnable):
 
     def run(self):
         try:
-            df = PandasUtils.create_pandas_from_arrays(self.metadata, self.freqs, self.heights, self.dops, self.raw_signals)
-            date_of_obs: datetime = self.metadata['datetime']
-            start_time = datetime.strptime(self.selected_timestamp, "%H:%M:%S")
-            end_time = datetime.strptime(self.right_selected_timestamp, "%H:%M:%S")
-            start_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
-                                hour=start_time.hour, minute=start_time.minute, second=start_time.second, tzinfo=date_of_obs.tzinfo)
-            end_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
-                                hour=end_time.hour, minute=end_time.minute, second=end_time.second, tzinfo=date_of_obs.tzinfo)
+            start_dtime = datetime.strptime(self.selected_timestamp, "%Y-%m-%d %H:%M:%S")
+            end_dtime = datetime.strptime(self.right_selected_timestamp, "%Y-%m-%d %H:%M:%S")
+            start_dtime = start_dtime.replace(tzinfo=self.date_of_obs.tzinfo)
+            end_dtime = end_dtime.replace(tzinfo=self.date_of_obs.tzinfo)
             
-            df_selection = df.loc[start_dtime:end_dtime]
+            df_selection = self.df.loc[start_dtime:end_dtime]
             df_all_outputs = pd.DataFrame()
             all_output_freqs = np.array([])
             

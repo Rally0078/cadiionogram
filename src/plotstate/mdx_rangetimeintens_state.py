@@ -6,6 +6,7 @@ from src.ionogramfiltering.noisereduction import o_x_separation
 from src.utils.pandasutils import PandasUtils
 from datetime import datetime
 from decimal import Decimal
+import pandas as pd
 
 class MdxRangeTimeIntensState(PlotState):
     def create_canvas(self):
@@ -14,17 +15,26 @@ class MdxRangeTimeIntensState(PlotState):
         return canvas
 
     def update_canvas(self, canvas):
-        df = PandasUtils.create_pandas_from_arrays(self.main.metadata, self.main.freqs, self.main.heights, self.main.dops, self.main.signals)
+        df = self.main.combined_df
         date_of_obs = self.main.metadata['datetime']
-        start_time = datetime.strptime(self.main._selected_timestamp, "%H:%M:%S")
         
-        end_time = datetime.strptime(self.main._right_selected_timestamp, "%H:%M:%S")
-        start_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
-                               hour=start_time.hour, minute=start_time.minute, second=start_time.second)
-        end_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
-                               hour=end_time.hour, minute=end_time.minute, second=end_time.second)
+        # Combined timestamps are "YYYY-MM-DD HH:MM:SS"
+        # We always want to parse the full string if it contains the date
+        if ' ' in self.main._selected_timestamp:
+            start_dtime = datetime.strptime(self.main._selected_timestamp, "%Y-%m-%d %H:%M:%S")
+            end_dtime = datetime.strptime(self.main._right_selected_timestamp, "%Y-%m-%d %H:%M:%S")
+        else:
+            # Fallback
+            start_time = datetime.strptime(self.main._selected_timestamp, "%H:%M:%S")
+            end_time = datetime.strptime(self.main._right_selected_timestamp, "%H:%M:%S")
+            start_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
+                                   hour=start_time.hour, minute=start_time.minute, second=start_time.second)
+            end_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
+                                   hour=end_time.hour, minute=end_time.minute, second=end_time.second)
+            
         start_dtime = start_dtime.replace(tzinfo=date_of_obs.tzinfo)
         end_dtime = end_dtime.replace(tzinfo=date_of_obs.tzinfo)
+
         df_selection = df.loc[start_dtime:end_dtime]
         signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
         if self.main.md3_checkbox.isChecked():
