@@ -32,20 +32,20 @@ class SkymapCanvas(FigureCanvas):
         self.ax.set_theta_direction('clockwise')
         self.ax.grid(visible=True)
 
-    def plot_scatter(self, zenith, azimuth, dops, timestamp, site):
+    def plot_scatter(self, zenith, azimuth, dops, timestamp, site, ndops=16, mindopfreq=-5, maxdopfreq=5):
         self.ax.clear()
         self.fig.tight_layout(pad=1)
         # Use configurable plotting options
         self.scatter = self.ax.scatter(np.radians(azimuth[zenith <= 60]), zenith[zenith <=60], 
                             marker='s',s=self.main.scatter_size, 
-                            c=dops[zenith <= 60], cmap=self.main.colormap, vmin=-5, vmax=5)
+                            c=dops[zenith <= 60], cmap=self.main.colormap, vmin=mindopfreq, vmax=maxdopfreq)
         #self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=signals, cmap=self.main.colormap, marker='s')
 
         if not self.colorbar:
             # Create the colorbar if it doesn't exist
             self.colorbar = self.figure.colorbar(self.scatter, ax=self.ax)
             self.colorbar.set_label("Doppler")
-            self.colorbar.ax.set_yticks(np.arange(-5,5,16))
+            self.colorbar.ax.set_yticks(np.linspace(mindopfreq, maxdopfreq, ndops+1))
         self.ax.set_title(f"Skymap site: {site} at {timestamp.strftime("%H:%M:%S %d-%m-%Y")} {site_dict[site].get_tzstr(timestamp)}")
         self._set_plot_ax()
         #self.fig.tight_layout()

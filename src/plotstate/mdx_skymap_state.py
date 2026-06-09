@@ -45,11 +45,19 @@ class MdxSkymapState(PlotState):
             power = convert_amplitude_to_power(signals)
         else:
             raise TypeError("Input data is not the correct type for this canvas")
-
+        ndops = self.main.metadata['ndops']
+        npulses_avgd = self.main.metadata['npulses_avgd']
+        pps = self.main.metadata['pps']
+        dopsn2 = 1/(self.main.metadata['ndops'] * npulses_avgd/pps)
+        mindopfreq = (0 - ndops/2) * dopsn2
+        maxdopfreq = (ndops - ndops/2) * dopsn2
         canvas.plot_scatter(
             self.main.df_all_outputs.loc[target_dtime, 'zenith'],
             self.main.df_all_outputs.loc[target_dtime, 'azimuth'], 
             self.main.df_all_outputs.loc[target_dtime,'dopplershift'],
             target_dtime,
-            self.main.metadata['site']
+            self.main.metadata['site'],
+            ndops=self.main.metadata['ndops'],
+            mindopfreq=mindopfreq,
+            maxdopfreq=maxdopfreq
         )
