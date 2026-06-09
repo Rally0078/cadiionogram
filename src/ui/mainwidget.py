@@ -101,6 +101,16 @@ class MainWidget(QWidget):
         self.es_scaling_dropdown.currentIndexChanged.connect(self._on_es_scaling_changed)
         self._es_scaling_mode = 0
 
+        #Spread-F Scaling controls
+        self.spread_f_label = QLabel("Spread F")
+        self.spread_f_label.setVisible(False)
+        self.spread_f_dropdown = QComboBox()
+        self.spread_f_options = ['No',' Yes']
+        self.spread_f_dropdown.addItems(self.spread_f_options)
+        self.spread_f_dropdown.setVisible(False)
+        self.spread_f_dropdown.currentIndexChanged.connect(self._on_spread_f_scaling_changed)
+        self._spread_f_scaling_mode = 0
+
         # Mode selection dropdown
         self.mode_dropdown = QComboBox()
         self.mode_dropdown.addItems(MainWidget.md4_options)
@@ -143,13 +153,23 @@ class MainWidget(QWidget):
         layout.addWidget(self.scale_box1, 6, 0)
         layout.addWidget(self.scale_box2, 6, 1)
         layout.addWidget(self.scale_box3, 6, 2)
-        layout.addWidget(self.es_scaling_label, 7, 0)
-        layout.addWidget(self.es_scaling_dropdown, 7, 1)
-        layout.addWidget(self.freq_selector, 8, 0)
-        layout.addWidget(self.polan_button, 8, 0)
-        layout.addWidget(self.reset_zoom_button, 8, 2)
-        layout.addWidget(self.save_scale_button, 8, 0)
-        layout.addWidget(self.clear_scale_button, 8, 1)
+        if(self.enable_es_scaling and not self.enable_spreadf_scaling):
+            layout.addWidget(self.es_scaling_label, 7, 0)
+            layout.addWidget(self.es_scaling_dropdown, 7, 1)
+        elif(self.enable_spreadf_scaling and not self.enable_es_scaling):
+            layout.addWidget(self.spread_f_label, 7, 0)
+            layout.addWidget(self.spread_f_dropdown, 7, 1)
+        else:
+            layout.addWidget(self.es_scaling_label, 7, 0)
+            layout.addWidget(self.es_scaling_dropdown, 7, 1)
+            layout.addWidget(self.spread_f_label, 8, 0)
+            layout.addWidget(self.spread_f_dropdown, 8, 1)
+
+        layout.addWidget(self.freq_selector, 9, 0)
+        layout.addWidget(self.polan_button, 9, 0)
+        layout.addWidget(self.reset_zoom_button, 9, 2)
+        layout.addWidget(self.save_scale_button, 9, 0)
+        layout.addWidget(self.clear_scale_button, 9, 1)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
@@ -194,6 +214,7 @@ class MainWidget(QWidget):
         self.polan_interp_mode = config.get('realheightanalysis', 'interpmode')
         self.scaling_line_width = config.getfloat('scaling', 'linewidth')
         self.enable_es_scaling = config.getboolean('scaling', 'enableesscaling')
+        self.enable_spreadf_scaling = config.getboolean('scaling', 'enablespreadFscaling')
         if self.polan_interp_mode not in ['old', 'new', 'OLD', 'NEW']:
             raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
         
@@ -392,6 +413,9 @@ class MainWidget(QWidget):
 
     def _on_es_scaling_changed(self, index):
         self._es_scaling_mode = index
+
+    def _on_spread_f_scaling_changed(self, index):
+        self._spread_f_scaling_mode = index
 
     def _prev_option(self):
         dropdown = self.table_widget.timepartitions_dropdown

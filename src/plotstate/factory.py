@@ -57,6 +57,8 @@ class PlotStateFactory:
         main_widget.clear_scale_button.setVisible(False)
         main_widget.es_scaling_label.setVisible(False)
         main_widget.es_scaling_dropdown.setVisible(False)
+        main_widget.spread_f_label.setVisible(False)
+        main_widget.spread_f_dropdown.setVisible(False)
         main_widget.table_widget.end_timepartitions_dropdown.setVisible(False)
         main_widget.table_widget.left_button.setVisible(True)
         main_widget.table_widget.right_button.setVisible(True)

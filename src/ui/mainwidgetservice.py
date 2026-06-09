@@ -233,6 +233,7 @@ class MainWidgetService(QObject):
                          f"{'NaN ' if isnan(f1) else f'{f1:.2f}'} {'NaN ' if isnan(h1) else f'{h1:.2f}'} "
                          f"{'NaN ' if isnan(f2) else f'{f2:.2f}'} {'NaN ' if isnan(h2) else f'{h2:.2f}'} "
                          f"{'NaN ' if isnan(f3) else f'{f3:.2f}'} {'NaN ' if isnan(h3) else f'{h3:.2f}'} "
-                         f"{self.main_widget._es_scaling_mode}\n"))
+                         f"{self.main_widget._es_scaling_mode} "
+                         f"{self.main_widget._spread_f_scaling_mode}\n"))
         else:
             print("Not scaling canvas! Use the appropriate canvas")

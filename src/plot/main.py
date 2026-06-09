@@ -48,7 +48,8 @@ class MainWindow(QMainWindow):
                 'scalingoption1': 'F',
                 'scalingoption2': 'E',
                 'scalingoption3': 'IE',
-                'enableESscaling': 'true'
+                'enableESscaling': 'true',
+                'enablespreadFscaling': 'true'
             }
         }
 

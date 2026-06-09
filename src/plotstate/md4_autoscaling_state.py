@@ -21,6 +21,10 @@ class Md4ScaleIonogramState(PlotState):
         if(self.main.enable_es_scaling):
             self.main.es_scaling_label.setVisible(True)
             self.main.es_scaling_dropdown.setVisible(True)
+        if(self.main.enable_spreadf_scaling):
+            self.main.spread_f_label.setVisible(True)
+            self.main.spread_f_dropdown.setVisible(True)
+            
         if(self.main.config.get('scaling', 'scalingoption3') != ''):
             self.main.scale_box3.setVisible(True)
         df = self.main.combined_df
