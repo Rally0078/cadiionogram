@@ -70,7 +70,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.secax.xaxis.get_major_formatter().set_scientific(True)
         self.secax.xaxis.get_major_formatter().set_powerlimits((0, 0))
         
-        self.ax.grid(True, which='both', linestyle='--', alpha=0.5)
+        self.ax.grid(True, which='major')
     
     def plot_scatter(self, freqs, heights, dops, power, timestamp, site):
         self.freqs = freqs
@@ -104,7 +104,8 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.line_polan = Line2D([], [], color='green', linewidth=2, linestyle='--')
         self.ax.add_line(self.line_polan)
 
-        self.fig.tight_layout()
+        self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)
+
         self.draw()
 
     
