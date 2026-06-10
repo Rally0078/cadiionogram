@@ -252,7 +252,7 @@ class MainWidget(QWidget):
         elif dt1.day != dt2.day:
             suffix_format = "-%d_%H%M%S"
         else:
-            suffix_format = "-_%H%M%S"
+            suffix_format = "-%H%M%S"
         return f"{dt1.strftime(base_format)}{dt2.strftime(suffix_format)}" 
     
     def _run_save_fig_callback(self):
