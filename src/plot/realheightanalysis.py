@@ -14,7 +14,7 @@ from src.utils.siteinfo import site_dict
 def _convert_f_to_n(f):
     return (f*1e6/8.982)**2
 def _convert_n_to_f(n):
-    return 8.982*np.sqrt(n)
+    return 8.982*np.sqrt(n) / 1e6
 
 class RealHeightAnalysisCanvas(FigureCanvas):
     def __init__(self, parent=None):
@@ -23,7 +23,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         super().__init__(self.fig)
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
-        self.ax_density = None
+        self.secax = None
         self.colorbar = None
         self.freq_ticks = [1, 2, 4, 6, 8, 10, 15, 20]
         self.freq_limits = (1, 18)
@@ -56,45 +56,57 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax.set_ylabel("Virtual height (km)")
         self.ax.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:g}'))
         self.ax.yaxis.set_minor_locator(MultipleLocator(5))
-        if self.ax_density is None:
-            self.ax_density = self.ax.twiny()
-            self.ax_density.set_xlabel(r'Electron density ($m^{-3}$)')
-            self.ax_density.set_zorder(1)
-            self.ax.set_zorder(2)
-        """self.ax_density.set_xticks((np.arange(1e6,15e6,1e6) / 8.982)**2)
-        self.ax_density.set_xlim((self.freq_limits[0]*1e6 / 8.982)**2, (self.freq_limits[1]*1e6 / 8.982)**2)
-        self.ax_density.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:e}'))"""
-        self.ax.grid()
+        
+        # Add secondary X axis for electron density
+        if self.secax is not None:
+            try:
+                self.secax.remove()
+            except:
+                pass
+        
+        self.secax = self.ax.secondary_xaxis('top', functions=(_convert_f_to_n, _convert_n_to_f))
+        self.secax.set_xlabel(r'Electron density ($m^{-3}$)')
+        self.secax.xaxis.set_major_formatter(ScalarFormatter())
+        self.secax.xaxis.get_major_formatter().set_scientific(True)
+        self.secax.xaxis.get_major_formatter().set_powerlimits((0, 0))
+        
+        self.ax.grid(True, which='both', linestyle='--', alpha=0.5)
     
     def plot_scatter(self, freqs, heights, dops, power, timestamp, site):
         self.freqs = freqs
         self.heights = heights
         self.ax.clear()
-        #self.fig.tight_layout(pad=3)
         
         self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=power, cmap=self.main.colormap, marker='s')
         self.scatter.set_clim(0, self.main.power_limit)
 
         if self.colorbar:
-            self.colorbar.update_ticks()
-        else:
+            # When clearing ax, the colorbar might need to be re-associated or cleared
+            try:
+                self.colorbar.remove()
+                self.colorbar = None
+            except:
+                pass
+        
+        if self.colorbar is None:
             self.colorbar = self.figure.colorbar(self.scatter, ax=self.ax)
             self.colorbar.set_label("Power (dB)")
             self.colorbar.set_ticks(np.arange(0, self.main.power_limit + 1, 5))  # Fixed ticks from 0 to power_limit with step of 5
             self.scatter.set_clim(0, self.main.power_limit)  # Set color limits on scatter plot
-        self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime("%H:%M:%S %d-%m-%Y")} {site_dict[site].get_tzstr(timestamp)}")
+        
+        self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime('%H:%M:%S %d-%m-%Y')} {site_dict[site].get_tzstr(timestamp)}")
         self._set_plot_ax()
-        self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)
-        self.drawing = False
-        self.drawn_points = []
-
+        
         # Re-create the interactive drawing line
         self.line = Line2D([], [], color='red', linewidth=2)
         self.ax.add_line(self.line)
 
         self.line_polan = Line2D([], [], color='green', linewidth=2, linestyle='--')
         self.ax.add_line(self.line_polan)
+
+        self.fig.tight_layout()
         self.draw()
+
     
     def plot_interp(self, interp_freqs, interp_heights):
         interp_freqs = np.array(interp_freqs) # Removed Hz conversion as interp_freqs should already be in MHz
