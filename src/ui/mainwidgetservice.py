@@ -185,9 +185,9 @@ class MainWidgetService(QObject):
                         for freq, f_real, height, h_real in zip(freqs[:last_idx], real_freqs[first_idx:], heights[:last_idx], real_heights[first_idx:]):
                             f.write((f"{short_datetime.strftime("%Y %m %d")} "
                             f"{current_timestamp[0:2]} {current_timestamp[3:5]} {current_timestamp[7:9]} "
-                            f"{freq:.3f} "
+                            f"{freq:.2f} "
                             f"{height:.2f} "
-                            f"{f_real:.3f} "
+                            f"{f_real:.2f} "
                             f"{h_real:.2f}\n"))
                 shutil.copyfile("POLOUT.T", output_file_name)
                 self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
