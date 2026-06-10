@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 class MainWidget(QWidget):
     md3_options = ['Range Time Frequency', 'Range Time Intensity']
-    md4_options = ['Display ionogram', 'All Receiver Ionogram', 'Real height analysis', 'Scale ionogram']
+    md4_options = ['Display ionogram', 'All Receiver Ionogram', 'Real height analysis', 'Scale ionogram', 'Range Time Intensity']
     
     def __init__(self, config: ConfigParser):
         super().__init__()
