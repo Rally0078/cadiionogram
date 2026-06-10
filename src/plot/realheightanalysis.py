@@ -1,7 +1,7 @@
 #PySide6 FigureCanvas to plot MD4 Ionogram as scatterplot
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.ticker import ScalarFormatter, MultipleLocator, FuncFormatter
+from matplotlib.ticker import ScalarFormatter, MultipleLocator, FuncFormatter, AutoMinorLocator, FixedLocator
 from matplotlib.lines import Line2D
 import numpy as np
 from datetime import datetime
@@ -56,47 +56,64 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax.set_ylabel("Virtual height (km)")
         self.ax.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:g}'))
         self.ax.yaxis.set_minor_locator(MultipleLocator(5))
-        
+
         # Add secondary X axis for electron density
         if self.secax is not None:
             try:
                 self.secax.remove()
             except:
                 pass
-        
+
         self.secax = self.ax.secondary_xaxis('top', functions=(_convert_f_to_n, _convert_n_to_f))
         self.secax.set_xlabel(r'Electron density ($m^{-3}$)')
-        self.secax.xaxis.set_major_formatter(ScalarFormatter())
-        self.secax.xaxis.get_major_formatter().set_scientific(True)
-        self.secax.xaxis.get_major_formatter().set_powerlimits((0, 0))
-        
+
+        # Use x10^n notation and label existing minor ticks
+        formatter = ScalarFormatter(useMathText=True)
+        formatter.set_scientific(True)
+        formatter.set_powerlimits((0, 0))
+        self.secax.xaxis.set_major_formatter(formatter)
+
+        # Define manual major and minor ticks
+        major_ticks = [1e11, 1e12]
+        minor_ticks = [2e10, 3e10, 4e10, 6e10, 8e10, 2e11, 3e11, 4e11, 5e11, 6e11, 8e11, 1.5e12, 2e12, 3e12, 4e12]
+
+        self.secax.xaxis.set_major_locator(FixedLocator(major_ticks))
+        self.secax.xaxis.set_minor_locator(FixedLocator(minor_ticks))
+
+        # Custom formatter for minor ticks to show more precision (coefficient only)
+        def minor_tick_formatter(x, pos):
+            if x <= 0: return ""
+            exponent = 12
+            coeff = x / 10**exponent
+            return f"${coeff:g}$"
+
+        self.secax.xaxis.set_minor_formatter(FuncFormatter(minor_tick_formatter))
+
+        # Make minor labels smaller
+        self.secax.tick_params(axis='x', which='minor', labelsize=8)
+        self.secax.tick_params(axis='x', which='major', labelsize=10)
+
         self.ax.grid(True, which='major')
-    
+
     def plot_scatter(self, freqs, heights, dops, power, timestamp, site):
         self.freqs = freqs
         self.heights = heights
         self.ax.clear()
-        
+
         self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=power, cmap=self.main.colormap, marker='s')
         self.scatter.set_clim(0, self.main.power_limit)
 
         if self.colorbar:
-            # When clearing ax, the colorbar might need to be re-associated or cleared
-            try:
-                self.colorbar.remove()
-                self.colorbar = None
-            except:
-                pass
-        
-        if self.colorbar is None:
+            self.colorbar.update_ticks()
+        else:
             self.colorbar = self.figure.colorbar(self.scatter, ax=self.ax)
             self.colorbar.set_label("Power (dB)")
             self.colorbar.set_ticks(np.arange(0, self.main.power_limit + 1, 5))  # Fixed ticks from 0 to power_limit with step of 5
             self.scatter.set_clim(0, self.main.power_limit)  # Set color limits on scatter plot
-        
+
         self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime('%H:%M:%S %d-%m-%Y')} {site_dict[site].get_tzstr(timestamp)}")
         self._set_plot_ax()
-        
+
         # Re-create the interactive drawing line
         self.line = Line2D([], [], color='red', linewidth=2)
         self.ax.add_line(self.line)
@@ -104,11 +121,11 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.line_polan = Line2D([], [], color='green', linewidth=2, linestyle='--')
         self.ax.add_line(self.line_polan)
 
-        self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)
+        self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.90)
 
         self.draw()
 
-    
+
     def plot_interp(self, interp_freqs, interp_heights):
         interp_freqs = np.array(interp_freqs) # Removed Hz conversion as interp_freqs should already be in MHz
         if self.interp_line is not None and self.interp_line in self.ax.lines:
@@ -216,7 +233,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         if len(heights_interp) >= 1:
             self.plot_interp(freqs_interp, heights_interp)
         return freqs_interp, heights_interp, unique_freqs, avg_heights
-    
+
     def get_polan_curve(self, points, spacing=0.2, max_points=54):
         if self.main.polan_interp_mode.upper() == 'OLD':
             return self.compute_matched_curve(points, spacing=spacing, max_points=max_points)
@@ -265,7 +282,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         heights_interp = heights_interp[mask]
 
         return freqs_interp, heights_interp, unique_freqs, avg_heights
-    
+
     def new_compute_matched_curve(self, points, spacing=0.1, max_points=54):
         """
             Interpolate a curve based on some sample inputs(automatic or hand drawn), and return an output curve at variable frequency steps, experimental. 
