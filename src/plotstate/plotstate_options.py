@@ -26,8 +26,13 @@ def get_mdx_skymap_state():
     from src.plotstate.mdx_skymap_state import MdxSkymapState
     return MdxSkymapState
 
+def get_md4_display_alliono_state():
+    from src.plotstate.md4_display_alliono_state import Md4DisplayAllIonogramState
+    return Md4DisplayAllIonogramState
+
 options_states_md4_dict = {
     'Scale ionogram': get_md4_autoscaling_state,
+    'All Receiver Ionogram': get_md4_display_alliono_state,
     'Display ionogram': get_md4_display_iono_state,
     'Real height analysis': get_md4_realheight_state,
     'Range Time Intensity': get_mdx_rangetimeintens_state,
@@ -49,3 +54,16 @@ timeseries_options = [
     'EW-NS timeseries',
     'Drift velocity timeseries'
 ]
+
+plot_fig_save_names = {
+    'Range Time Frequency': 'RTI',
+    'Range Time Intensity': 'RTI',
+    'EW-NS timeseries':'EWNSPosTimeSeries',
+    'Drift velocity timeseries':'DriftVelTimeSeries',
+    'Scale ionogram': 'ScaledIono',
+    'Display ionogram': 'Iono',
+    'All Receiver Ionogram': "AllIono",
+    'Real height analysis': 'RealHeight',
+    'Skymap': 'Skymap',
+    'EW-NS vs Range': 'EWNSPosRange',
+}

@@ -10,6 +10,12 @@ from scipy.integrate import cumulative_trapezoid
 from src.ionogramfiltering.noisereduction import *
 from src.utils.siteinfo import site_dict
 
+
+def _convert_f_to_n(f):
+    return (f*1e6/8.982)**2
+def _convert_n_to_f(n):
+    return 8.982*np.sqrt(n)
+
 class RealHeightAnalysisCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure(figsize=(16, 9))
@@ -17,6 +23,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         super().__init__(self.fig)
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
+        self.ax_density = None
         self.colorbar = None
         self.freq_ticks = [1, 2, 4, 6, 8, 10, 15, 20]
         self.freq_limits = (1, 18)
@@ -49,13 +56,21 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax.set_ylabel("Virtual height (km)")
         self.ax.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:g}'))
         self.ax.yaxis.set_minor_locator(MultipleLocator(5))
+        if self.ax_density is None:
+            self.ax_density = self.ax.twiny()
+            self.ax_density.set_xlabel(r'Electron density ($m^{-3}$)')
+            self.ax_density.set_zorder(1)
+            self.ax.set_zorder(2)
+        """self.ax_density.set_xticks((np.arange(1e6,15e6,1e6) / 8.982)**2)
+        self.ax_density.set_xlim((self.freq_limits[0]*1e6 / 8.982)**2, (self.freq_limits[1]*1e6 / 8.982)**2)
+        self.ax_density.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:e}'))"""
         self.ax.grid()
-
+    
     def plot_scatter(self, freqs, heights, dops, power, timestamp, site):
         self.freqs = freqs
         self.heights = heights
         self.ax.clear()
-        self.fig.tight_layout(pad=3)
+        #self.fig.tight_layout(pad=3)
         
         self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=power, cmap=self.main.colormap, marker='s')
         self.scatter.set_clim(0, self.main.power_limit)

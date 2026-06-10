@@ -6,6 +6,7 @@ from src.plotstate.factory import PlotStateFactory
 from src.ui.mainwidgetservice import MainWidgetService
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from PySide6.QtCore import Qt, QThreadPool
+from datetime import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout,
     QPushButton, QFileDialog, QLabel, 
@@ -15,18 +16,18 @@ from PySide6.QtWidgets import (
 )
 
 class MainWidget(QWidget):
-    md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries','Skymap']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity', 'Skymap']
+    md3_options = ['Range Time Frequency', 'Range Time Intensity']
+    md4_options = ['Display ionogram', 'All Receiver Ionogram', 'Real height analysis', 'Scale ionogram']
     
     def __init__(self, config: ConfigParser):
         super().__init__()
         self.init_config(config)
         self.service = MainWidgetService(self)
         # Canvas parameters to be used later
-        self.canvas_layout_row = 2
-        self.canvas_layout_col = 3
-        self.canvas_layout_rowspan = 8
-        self.canvas_layout_colspan = 3
+        self.canvas_layout_row = 1
+        self.canvas_layout_col = 4
+        self.canvas_layout_rowspan = 9
+        self.canvas_layout_colspan = 9
         self.canvas_widget = None
         self.current_plot_state = None
         self.has_handled_calculation = False
@@ -105,8 +106,9 @@ class MainWidget(QWidget):
         self.spread_f_label = QLabel("Spread F")
         self.spread_f_label.setVisible(False)
         self.spread_f_dropdown = QComboBox()
-        self.spread_f_options = ['No',' Yes']
+        self.spread_f_options = ['No','Satellite Trace','Range','Mixed','Freq']
         self.spread_f_dropdown.addItems(self.spread_f_options)
+        self.spread_f_dropdown.setCurrentIndex(0)
         self.spread_f_dropdown.setVisible(False)
         self.spread_f_dropdown.currentIndexChanged.connect(self._on_spread_f_scaling_changed)
         self._spread_f_scaling_mode = 0
@@ -125,9 +127,15 @@ class MainWidget(QWidget):
         # Add mode selection dropdown and Run button to this layout
         self.run_button = QPushButton("Run")
         self.run_button.setEnabled(False)
+        self.save_plot_button = QPushButton("Save Plot")
+        self.save_plot_button.setVisible(False)
+        self.save_plot_button.setEnabled(False)
         self.mode_dropdown_layout.addWidget(self.mode_dropdown)
         self.mode_dropdown_layout.addWidget(self.run_button)
+        self.mode_dropdown_layout.addWidget(self.save_plot_button)
+        self.save_plot_button.clicked.connect(self._run_save_fig_callback)
         self.run_button.clicked.connect(self._run_button_callback)
+
         
         self.freq_selector = CheckableDropdown(text="Select Frequencies")
         self.freq_selector.setVisible(False)
@@ -141,7 +149,7 @@ class MainWidget(QWidget):
         layout.addWidget(self.md3_checkbox, 2, 0)
         layout.addWidget(self.md4_checkbox, 2, 1)
         layout.addWidget(self.iono_checkbox, 2, 2)
-        layout.addWidget(self.mode_dropdown_container, 3, 0, 1, 2)
+        layout.addWidget(self.mode_dropdown_container, 3, 0, 1, 3)
         layout.setColumnStretch(4, 1)
 
         # Custom table widget for metadata table and navigation
@@ -206,16 +214,19 @@ class MainWidget(QWidget):
         self.config = config
         self.polan_dir = Path(config['Locations']['polanoutputdirectory'])
         self.input_dir = Path(config['Locations']['DefaultInputDirectory'])
+        self.output_dir = Path(config['Locations']['DefaultOutputDirectory'])
         self.parquet_cache_dir = Path(config['Locations']['cachedir'])
         self.colormap = config['plotting']['powercolormap']
         self.dopcolormap = config['plotting']['dopcolormap']
         self.scatter_size = config.getint('plotting', 'scattersize')
         self.power_limit = config.getint('plotting', 'powerlimit')
         self.polan_interp_mode = config.get('realheightanalysis', 'interpmode')
+        self.save_clean_polan_format = config.getboolean('realheightanalysis', 'savecleanformat')
         self.scaling_line_width = config.getfloat('scaling', 'linewidth')
         self.enable_es_scaling = config.getboolean('scaling', 'enableesscaling')
         self.enable_spreadf_scaling = config.getboolean('scaling', 'enablespreadFscaling')
-        if self.polan_interp_mode not in ['old', 'new', 'OLD', 'NEW']:
+        
+        if self.polan_interp_mode.lower() not in ['old', 'new']:
             raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
         
     def open_folder(self):
@@ -229,6 +240,37 @@ class MainWidget(QWidget):
             self.run_button.setEnabled(False)
             self._loading_folder_path = self.folder_path
             self.service.load_data(self.folder_path)
+
+    def _generate_filename(self, dt1, dt2):
+        if dt1 > dt2:
+            dt1, dt2 = dt2, dt1
+        base_format = "%y%m%d_%H%M%S"
+        if dt1.year != dt2.year:
+            suffix_format = "-%y%m%d_%H%M%S"
+        elif dt1.month != dt2.month:
+            suffix_format = "-%m%d_%H%M%S"
+        elif dt1.day != dt2.day:
+            suffix_format = "-%d_%H%M%S"
+        else:
+            suffix_format = "-_%H%M%S"
+        return f"{dt1.strftime(base_format)}{dt2.strftime(suffix_format)}" 
+    
+    def _run_save_fig_callback(self):
+        if self.canvas_widget is not None:
+            from src.plotstate.plotstate_options import timeseries_options, plot_fig_save_names
+            option = self.mode_dropdown.currentText()
+            start_datetime = datetime.strptime(self._selected_timestamp,"%Y-%m-%d %H:%M:%S")
+            filename = f"{plot_fig_save_names[option]}"
+            if option in timeseries_options:     
+                end_datetime = datetime.strptime(self._right_selected_timestamp,"%Y-%m-%d %H:%M:%S")
+                filename += self._generate_filename(start_datetime, end_datetime)
+            else:
+                filename += start_datetime.strftime("%y%m%d_%H%M%S")
+            filename = self.output_dir / Path(filename)
+            file_path, selected_filter = QFileDialog.getSaveFileName(self, "Save plot to file", dir=str(filename),
+                                                                    filter="PNG Image (*.png);;JPEG Image (*.jpg);;PDF Document (*.pdf);;SVG Vector (*.svg)")
+            if file_path:
+                self.canvas_widget.figure.savefig(file_path, dpi=250, bbox_inches='tight')
 
     def _on_multi_folder_toggled(self, state):
         is_checked = self.multi_folder_checkbox.isChecked()
@@ -341,6 +383,9 @@ class MainWidget(QWidget):
             self._plot_helper()
 
     def _plot_helper(self):
+        self.save_plot_button.setEnabled(False)
+        self.save_plot_button.setVisible(False)
+        
         new_state = PlotStateFactory.get_state(self)
         curr_checkbox = "md4" if self.md4_checkbox.isChecked() else ("md3" if self.md3_checkbox.isChecked() else "iono")
         
@@ -393,6 +438,8 @@ class MainWidget(QWidget):
         self.prev_checkbox = curr_checkbox
         self.service.polan_auto_helper()
         self._autoscale_helper()
+        self.save_plot_button.setEnabled(True)
+        self.save_plot_button.setVisible(True)
 
     def _autoscale_helper(self):
         pass
@@ -415,6 +462,10 @@ class MainWidget(QWidget):
         self._es_scaling_mode = index
 
     def _on_spread_f_scaling_changed(self, index):
+        if index > 1:
+            index = index - 1   #Spread F types
+        elif index == 1:
+            index = -1  #Satellite Trace index
         self._spread_f_scaling_mode = index
 
     def _prev_option(self):

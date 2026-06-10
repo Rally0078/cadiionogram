@@ -171,6 +171,16 @@ class MainWidgetService(QObject):
                 output_file_nominute_name = output_file_year + chr(short_datetime.month + 64) + output_file_day
                 new_output_file_name = output_file_nominute_name + new_timestamp
                 output_file_name = self.main_widget.polan_dir / f"{new_output_file_name}.pol"
+                
+                if self.main_widget.save_clean_polan_format:
+                    new_format_output_name = self.main_widget.polan_dir / f"{new_output_file_name}.dat"
+                    with open(new_format_output_name, 'w+') as f:
+                        for freq, height, h_real in zip(freqs, heights, real_heights):
+                            f.write((f"{short_datetime.strftime("%Y %m %d")} "
+                            f"{current_timestamp[0:2]} {current_timestamp[3:5]} {current_timestamp[7:9]} "
+                            f"{freq:.3f} "
+                            f"{height:.2f} "
+                            f"{h_real:.2f}\n"))
                 shutil.copyfile("POLOUT.T", output_file_name)
                 self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
         else:
@@ -229,11 +239,12 @@ class MainWidgetService(QObject):
             f3, h3 = scaled_values_state.f, scaled_values_state.h
             
             with open(output_file_name, 'a') as f:
-                f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} "
-                         f"{'NaN ' if isnan(f1) else f'{f1:.2f}'} {'NaN ' if isnan(h1) else f'{h1:.2f}'} "
-                         f"{'NaN ' if isnan(f2) else f'{f2:.2f}'} {'NaN ' if isnan(h2) else f'{h2:.2f}'} "
-                         f"{'NaN ' if isnan(f3) else f'{f3:.2f}'} {'NaN ' if isnan(h3) else f'{h3:.2f}'} "
-                         f"{self.main_widget._es_scaling_mode} "
-                         f"{self.main_widget._spread_f_scaling_mode}\n"))
+                f.write((f"{short_datetime.strftime("%Y %m %d")} "
+                        f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} "
+                        f"{'NaN ' if isnan(f1) else f'{f1:.2f}'} {'NaN ' if isnan(h1) else f'{h1:.2f}'} "
+                        f"{'NaN ' if isnan(f2) else f'{f2:.2f}'} {'NaN ' if isnan(h2) else f'{h2:.2f}'} "
+                        f"{'NaN ' if isnan(f3) else f'{f3:.2f}'} {'NaN ' if isnan(h3) else f'{h3:.2f}'} "
+                        f"{self.main_widget._es_scaling_mode} "
+                        f"{self.main_widget._spread_f_scaling_mode}\n"))
         else:
             print("Not scaling canvas! Use the appropriate canvas")

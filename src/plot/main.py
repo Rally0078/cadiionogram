@@ -41,7 +41,8 @@ class MainWindow(QMainWindow):
                 'powerlimit': '50'
             },
             'realheightanalysis': {
-                'interpmode': 'old'
+                'interpmode': 'old',
+                'savecleanformat': 'true'
             },
             'scaling': {
                 'linewidth': '2',
