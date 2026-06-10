@@ -171,15 +171,23 @@ class MainWidgetService(QObject):
                 output_file_nominute_name = output_file_year + chr(short_datetime.month + 64) + output_file_day
                 new_output_file_name = output_file_nominute_name + new_timestamp
                 output_file_name = self.main_widget.polan_dir / f"{new_output_file_name}.pol"
-                
                 if self.main_widget.save_clean_polan_format:
+                    import numpy as np
+                    first_idx = np.where(np.array(real_freqs) == freqs[0])[0]
+                    first_idx = first_idx[0]
+                    last_idx = np.where(np.array(real_freqs) == freqs[-1])[0]
+                    if len(last_idx) == 0:
+                        last_idx = np.argmax(real_freqs)
+                    else:
+                        last_idx = last_idx[0]
                     new_format_output_name = self.main_widget.polan_dir / f"{new_output_file_name}.dat"
                     with open(new_format_output_name, 'w+') as f:
-                        for freq, height, h_real in zip(freqs, heights, real_heights):
+                        for freq, f_real, height, h_real in zip(freqs[:last_idx], real_freqs[first_idx:], heights[:last_idx], real_heights[first_idx:]):
                             f.write((f"{short_datetime.strftime("%Y %m %d")} "
                             f"{current_timestamp[0:2]} {current_timestamp[3:5]} {current_timestamp[7:9]} "
                             f"{freq:.3f} "
                             f"{height:.2f} "
+                            f"{f_real:.3f} "
                             f"{h_real:.2f}\n"))
                 shutil.copyfile("POLOUT.T", output_file_name)
                 self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
