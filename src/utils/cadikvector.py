@@ -17,11 +17,11 @@ from copy import deepcopy
 from src.utils.pandasutils import PandasUtils
 import pandas as pd
 
-def compute_xpha_only(df, freq_list) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    _, _, _, _, _, xpow, xpha = compute_xpha_full(df, freq_list)
+def compute_xpha_only(df, freq_list, site='TIR') -> Tuple[pd.DataFrame, pd.DataFrame]:
+    _, _, _, _, _, xpow, xpha = compute_xpha_full(df, freq_list, site=site)
     return xpow, xpha
 
-def compute_xpha_full(df: pd.DataFrame, freq_list):
+def compute_xpha_full(df: pd.DataFrame, freq_list, site='TIR'):
     signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
     sig_re_name = [f"sensor{i + 1} real" for i in range(4)]
     sig_im_name = [f"sensor{i + 1} imag" for i in range(4)]
@@ -43,10 +43,20 @@ def compute_xpha_full(df: pd.DataFrame, freq_list):
     xpha = pd.DataFrame({"x1": np.empty(shape=(new_signal_selection.shape[0],)),
                         "x2": np.empty(shape=(new_signal_selection.shape[0],))},
                         index=df.index)
-    PH2_corr=0#np.pi+0*np.pi/180, site dependent
-    PH4_corr=0#np.pi-0*np.pi/180, site dependent
-    PH2_corr=8.8906*np.pi/180
-    PH4_corr=-29.5086*np.pi/180
+    
+    from src.utils.siteinfo import site_dict
+    site_info = site_dict.get(site)
+    if site_info is not None:
+        PH2_corr = site_info.ph_corr[0] * np.pi / 180
+        PH4_corr = site_info.ph_corr[1] * np.pi / 180
+        site_sep_ew = site_info.site_separation[0]
+        site_sep_ns = site_info.site_separation[1]
+    else:
+        PH2_corr = 8.8906 * np.pi / 180
+        PH4_corr = -29.5086 * np.pi / 180
+        site_sep_ew = 30.1
+        site_sep_ns = 30.1
+
     ph_corrections = [PH2_corr, PH4_corr]
     pairwise_antenna13 = [('sensor1 real', 'sensor1 imag'), ('sensor3 real', 'sensor3 imag')]
     pairwise_antenna24 = [('sensor2 real', 'sensor2 imag'), ('sensor4 real', 'sensor4 imag')]
@@ -60,14 +70,14 @@ def compute_xpha_full(df: pd.DataFrame, freq_list):
         s = -s  #Site dependent, use polarity to determine according to the IDL code
         xpow[cross_name] = np.abs(s)**2
         xpha[cross_name] = np.angle(s) + ph_corr
-    xpha.loc[xpha['x2'] > np.pi, 'x2'] -= 2*np.pi
-    xpha.loc[xpha['x2'] < -np.pi, 'x2'] += 2*np.pi
+        xpha.loc[xpha[cross_name] > np.pi, cross_name] -= 2*np.pi
+        xpha.loc[xpha[cross_name] < -np.pi, cross_name] += 2*np.pi
 
     #Reject data with cross phases outside limits
     k_mag = 2*np.pi/(2.998e8) * np.array(freq_list)
     kd = np.empty(shape=(np.array(freq_list).shape[0], 2))
-    kd[:,0] = k_mag * 30.1
-    kd[:,1] = k_mag * 30.1
+    kd[:,0] = k_mag * site_sep_ew
+    kd[:,1] = k_mag * site_sep_ns
     phase_limit = kd
         
     freq_idxs = np.digitize(new_freq, freq_list) - 1
@@ -77,7 +87,7 @@ def compute_xpha_full(df: pd.DataFrame, freq_list):
     output_xpha = xpha.loc[final_good_mask]
     return output_df, output_xpow, output_xpha
 
-def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5):
+def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5, site='TIR'):
     """
         Computes k vector, given the raw data for one time observation.
 
@@ -109,7 +119,7 @@ def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5):
         raise ValueError("Only a single timestamp can be used for the calculation of k vector")
     k_out_with_ts = pd.DataFrame(columns=['kx', 'ky', 'kz'])
     timeindex_series = pd.Series([])
-    df, xpow, xpha = compute_xpha_full(df, freq_list)
+    df, xpow, xpha = compute_xpha_full(df, freq_list, site=site)
     signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
     k_xarr = np.array([])
     k_yarr = np.array([])
@@ -123,6 +133,15 @@ def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5):
     new_dops = df['dopplershift']
     output_freqs = pd.Series([])
     output_dops = pd.Series([])
+
+    from src.utils.siteinfo import site_dict
+    site_info = site_dict.get(site)
+    if site_info is not None:
+        site_sep_ew = site_info.site_separation[0]
+        site_sep_ns = site_info.site_separation[1]
+    else:
+        site_sep_ew = 30.1
+        site_sep_ns = 30.1
 
     k_mag = 2*np.pi/(2.998e8) * np.array(freq_list)
     if sort_by_freq:
@@ -139,8 +158,8 @@ def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5):
                 good_powers = xpow.loc[single_freq_idx]
                 
                 new_kd = np.empty(shape=(np.array(freq_list).shape[0], 2))
-                new_kd[:, 0] = k_mag * 30.1 #Site-specific
-                new_kd[:, 1] = k_mag * 30.1 #Site-specific
+                new_kd[:, 0] = k_mag * site_sep_ew
+                new_kd[:, 1] = k_mag * site_sep_ns
                 temp_xy = good_phases/new_kd[idx]
                 new_xy = temp_xy/np.sqrt(1.0 - temp_xy**2)
                 kz = - k_mag[idx] / np.sqrt(1+ np.sum(new_xy*new_xy,axis=1))
@@ -172,8 +191,8 @@ def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5):
         output_xpow = pd.concat([output_xpow if not output_xpow.empty else None, good_powers])
         timeindex_series = new_height.index
         new_kd = np.empty(shape=(np.array(freq_list).shape[0], 2))
-        new_kd[:, 0] = k_mag * 30.1 #Site-specific
-        new_kd[:, 1] = k_mag * 30.1 #Site-specific
+        new_kd[:, 0] = k_mag * site_sep_ew
+        new_kd[:, 1] = k_mag * site_sep_ns
         temp_xy = good_phases/new_kd[new_freq_idxs]
         new_xy = temp_xy/np.sqrt(1.0 - temp_xy**2)
         kz = - k_mag[new_freq_idxs] / np.sqrt(1+ np.sum(new_xy*new_xy,axis=1))
@@ -184,8 +203,8 @@ def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5):
     k_out_with_ts = pd.DataFrame({'kx': karray[:,0], 'ky': karray[:,1], 'kz': karray[:,2]}, index=timeindex_series)
     return k_out_with_ts, output_freqs, output_heights, output_dops, output_signals, output_xpow
 
-def compute_vel(df, freq_list, points_thres=5):
-    k_out_with_ts, output_freqs, _, output_dops, _, _ = compute_kvector(df, freq_list, sort_by_freq=True, points_thres=points_thres)
+def compute_vel(df, freq_list, points_thres=5, site='TIR'):
+    k_out_with_ts, output_freqs, _, output_dops, _, _ = compute_kvector(df, freq_list, sort_by_freq=True, points_thres=points_thres, site=site)
     v_xarr = np.array([])
     v_yarr = np.array([])
     v_zarr = np.array([])
@@ -211,8 +230,8 @@ def compute_vel(df, freq_list, points_thres=5):
             }, index=np.unique(df.index))])
     return df_output
 
-def compute_xy(df, freq_list, sort_by_freq=False, points_thres=5):
-    karray, output_freqs, output_heights, output_dops, output_signals, output_xpow = compute_kvector(df, freq_list, sort_by_freq=sort_by_freq, points_thres=points_thres)
+def compute_xy(df, freq_list, sort_by_freq=False, points_thres=5, site='TIR'):
+    karray, output_freqs, output_heights, output_dops, output_signals, output_xpow = compute_kvector(df, freq_list, sort_by_freq=sort_by_freq, points_thres=points_thres, site=site)
     kx, ky, kz = karray['kx'], karray['ky'], karray['kz']
 
     #These sign inversions are needed to plot the EW vs range and NS vs range plots

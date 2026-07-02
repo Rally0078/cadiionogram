@@ -54,6 +54,7 @@ class PlotStateFactory:
         main_widget.scale_box1.setVisible(False)
         main_widget.scale_box2.setVisible(False)
         main_widget.scale_box3.setVisible(False)
+        main_widget.autoscale_button.setVisible(False)
         main_widget.clear_scale_button.setVisible(False)
         main_widget.es_scaling_label.setVisible(False)
         main_widget.es_scaling_dropdown.setVisible(False)

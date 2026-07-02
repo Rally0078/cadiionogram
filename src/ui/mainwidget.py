@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 class MainWidget(QWidget):
     md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries','Skymap']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity', 'Skymap']
+    md4_options = ['Display ionogram', 'Autoscale Ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity', 'Skymap']
     
     def __init__(self, config: ConfigParser):
         super().__init__()
@@ -69,6 +69,10 @@ class MainWidget(QWidget):
         self.reset_zoom_button = QPushButton("Reset Zoom")
         self.reset_zoom_button.setVisible(False)  # Hidden initially
         self.reset_zoom_button.clicked.connect(self._reset_zoom_helper)
+
+        self.autoscale_button = QPushButton("Autoscale")
+        self.autoscale_button.setVisible(False)
+        self.autoscale_button.clicked.connect(self._save_autoscale)
         
         # Save Scaling button
         self.save_scale_button = QPushButton("Save Scaling")
@@ -225,7 +229,12 @@ class MainWidget(QWidget):
         self.scaling_line_width = config.getfloat('scaling', 'linewidth')
         self.enable_es_scaling = config.getboolean('scaling', 'enableesscaling')
         self.enable_spreadf_scaling = config.getboolean('scaling', 'enablespreadFscaling')
-        
+        self.polan_options = {}
+        self.polan_options['start'] = config.get('realheightanalysis', 'start')
+        self.polan_options['amode'] = config.get('realheightanalysis', 'amode')
+        self.polan_options['valley'] = config.get('realheightanalysis', 'valley')
+        self.polan_options['list'] = config.get('realheightanalysis', 'list')
+
         if self.polan_interp_mode.lower() not in ['old', 'new']:
             raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
         
@@ -437,18 +446,17 @@ class MainWidget(QWidget):
         
         self.prev_checkbox = curr_checkbox
         self.service.polan_auto_helper()
-        self._autoscale_helper()
         self.save_plot_button.setEnabled(True)
         self.save_plot_button.setVisible(True)
 
-    def _autoscale_helper(self):
-        pass
+    def _save_autoscale(self):
+        self.service.save_autoscale()
 
     def _save_manual_scale(self):
         self.service.save_manual_scale()
 
     def _clean_scaled_canvas(self):
-        if self.canvas_widget and self.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
+        if self.canvas_widget and self.canvas_widget.__class__.__name__ in ['ScaleIonogramCanvas', 'AutoScaleIonogramCanvas']:
             self.canvas_widget.clean_canvas()
 
     def _polan_manual_helper(self):

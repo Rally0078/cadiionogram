@@ -1,8 +1,7 @@
 #PySide6 FigureCanvas to plot Ionogram as scatterplot
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.pyplot import cm
-from matplotlib import colors
+from matplotlib import colormaps, colors, cm
 from matplotlib.ticker import ScalarFormatter, MultipleLocator
 import numpy as np
 from datetime import datetime, timedelta
@@ -18,7 +17,7 @@ class RangeTimeIntensCanvas(FigureCanvas):
         super().__init__(self.fig)
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
-        cmap = cm.get_cmap(self.main.colormap)
+        cmap = colormaps[self.main.colormap]
         norm = colors.Normalize(vmin=0, vmax=self.main.power_limit)
         self.colorbar = self.fig.colorbar(mappable=cm.ScalarMappable(norm, cmap), ax=self.ax)
         #self.freq_ticks = np.arange(0, 18e6, 2e6)

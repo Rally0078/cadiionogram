@@ -42,7 +42,11 @@ class MainWindow(QMainWindow):
             },
             'realheightanalysis': {
                 'interpmode': 'old',
-                'savecleanformat': 'true'
+                'savecleanformat': 'true',
+                'start': '0.0',
+                'amode': '0.0',
+                'valley': '0.00',
+                'list': '0'
             },
             'scaling': {
                 'linewidth': '2',

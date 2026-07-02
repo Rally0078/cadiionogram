@@ -10,8 +10,8 @@ def get_mdx_rangetimefreq_state():
     from src.plotstate.mdx_rangetimefreq_state import MdxRangeTimeFreqState
     return MdxRangeTimeFreqState
 
-def get_md4_autoscaling_state():
-    from src.plotstate.md4_autoscaling_state import Md4ScaleIonogramState
+def get_md4_manualscale_state():
+    from src.plotstate.md4_manualscale_state import Md4ScaleIonogramState
     return Md4ScaleIonogramState
 
 def get_mdx_xyplot_state():
@@ -30,8 +30,13 @@ def get_md4_display_alliono_state():
     from src.plotstate.md4_display_alliono_state import Md4DisplayAllIonogramState
     return Md4DisplayAllIonogramState
 
+def get_md4_autoscale_state():
+    from src.plotstate.md4_autoscale_state import Md4AutoScaleIonogramState
+    return Md4AutoScaleIonogramState
+
 options_states_md4_dict = {
-    'Scale ionogram': get_md4_autoscaling_state,
+    'Scale ionogram': get_md4_manualscale_state,
+    'Autoscale Ionogram': get_md4_autoscale_state,
     'All Receiver Ionogram': get_md4_display_alliono_state,
     'Display ionogram': get_md4_display_iono_state,
     'Real height analysis': get_md4_realheight_state,
@@ -61,6 +66,7 @@ plot_fig_save_names = {
     'EW-NS timeseries':'EWNSPosTimeSeries',
     'Drift velocity timeseries':'DriftVelTimeSeries',
     'Scale ionogram': 'ScaledIono',
+    'Autoscale Ionogram': 'Autoscale',
     'Display ionogram': 'Iono',
     'All Receiver Ionogram': "AllIono",
     'Real height analysis': 'RealHeight',

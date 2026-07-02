@@ -98,6 +98,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
     def plot_scatter(self, freqs, heights, dops, power, timestamp, site):
         self.freqs = freqs
         self.heights = heights
+        self.site = site
         self.ax.clear()
 
         self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=power, cmap=self.main.colormap, marker='s')
@@ -127,7 +128,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
 
 
     def plot_interp(self, interp_freqs, interp_heights):
-        interp_freqs = np.array(interp_freqs) # Removed Hz conversion as interp_freqs should already be in MHz
+        interp_freqs = np.array(interp_freqs)
         if self.interp_line is not None and self.interp_line in self.ax.lines:
             self.interp_line.remove()
         self.interp_line = Line2D(interp_freqs, interp_heights, color='magenta', linewidth=1.5, linestyle='--')
@@ -135,8 +136,8 @@ class RealHeightAnalysisCanvas(FigureCanvas):
 
         self.draw_idle()
 
-    def plot_polan(self, freqs, real_heights, interp_freqs, interp_heights):
-        freqs = np.array(freqs) # Removed Hz conversion as freqs should already be in MHz
+    def plot_polan(self, freqs, real_heights, interp_freqs, interp_heights, extra_data=None):
+        freqs = np.array(freqs)
         self.plot_interp(interp_freqs, interp_heights)
         if self.line_polan is None:
             self.line_polan = Line2D(freqs, real_heights, color='green', linewidth=2, linestyle='--')
@@ -217,7 +218,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         heights_filtered = np.delete(heights, noise_idx)
         dops_filtered = np.delete(dops, noise_idx)
         sensors_filtered = np.delete(signals, noise_idx, axis=0)
-        freqs_omode, heights_omode, dops_omode, sensors_omode = o_x_separation(freqs_filtered, heights_filtered, dops_filtered, sensors_filtered)
+        freqs_omode, heights_omode, dops_omode, sensors_omode = o_x_separation(freqs_filtered, heights_filtered, dops_filtered, sensors_filtered, site=getattr(self, 'site', 'TIR'))
         new_pix_counts, medians, freq_flayer = calculate_pixbins(freqs_omode, heights_omode)
         freq_new_x = []
         height_new_y = []

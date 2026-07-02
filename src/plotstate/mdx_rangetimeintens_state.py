@@ -58,7 +58,8 @@ class MdxRangeTimeIntensState(PlotState):
             freq_selection, height_selection, dop_selection, signals_selection = o_x_separation(df_selection['freq (Hz)'], 
                            df_selection['height (km)'], 
                            df_selection['dopplershift'],
-                           df_selection[signal_col_names].to_numpy())
+                           df_selection[signal_col_names].to_numpy(),
+                           site=self.main.metadata['site'])
             canvas.plot_scatter(
                 freq_selection.index,
                 height_selection,

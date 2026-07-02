@@ -2,8 +2,7 @@
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.dates as mdates
-from matplotlib.pyplot import cm
-from matplotlib import colors
+from matplotlib import colormaps, colors, cm
 from matplotlib.ticker import ScalarFormatter, MultipleLocator
 from datetime import datetime, timedelta
 import numpy as np
@@ -20,7 +19,7 @@ class XYPlotCanvas(FigureCanvas):
         self.scatter_range = None
         self.scatter_ew = None
         self.scatter_ns = None
-        cmap = cm.get_cmap(self.main.colormap)
+        cmap = colormaps[self.main.colormap]
         norm = colors.Normalize(vmin=0, vmax=self.main.power_limit)
         self.axs = [self.ax_range, self.ax_ew, self.ax_ns]
         self.cbar = self.fig.colorbar(mappable=cm.ScalarMappable(norm, cmap), ax=self.ax_range)

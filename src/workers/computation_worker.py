@@ -17,13 +17,14 @@ class ComputationWorker(QRunnable):
     Worker for performing intensive data computations in a separate thread.
     Emits a signal upon completion with the computed data or an error message.
     """
-    def __init__(self, date_of_obs, df, selected_timestamp, right_selected_timestamp, freqs_list):
+    def __init__(self, date_of_obs, df, selected_timestamp, right_selected_timestamp, freqs_list, site='TIR'):
         super().__init__()
         self.df = df
         self.date_of_obs = date_of_obs
         self.selected_timestamp = selected_timestamp
         self.right_selected_timestamp = right_selected_timestamp
         self.freqs_list = freqs_list
+        self.site = site
         self.signals = ComputationSignals()
 
     def run(self):
@@ -38,7 +39,9 @@ class ComputationWorker(QRunnable):
             all_output_freqs = np.array([])
             
             for dtime in np.unique(df_selection.index):
-                df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow = compute_xy(df_selection.loc[dtime], self.freqs_list, sort_by_freq=False)
+                df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow = compute_xy(
+                    df_selection.loc[dtime], self.freqs_list, sort_by_freq=False, site=self.site
+                )
                 df_output['freq (Hz)'] = output_freqs
                 df_output['dopplershift'] = output_dops
                 df_output[['xpower1 (dB)', 'xpower2 (dB)']] = 10*np.log10(output_xpow)

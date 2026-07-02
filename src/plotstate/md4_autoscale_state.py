@@ -1,19 +1,19 @@
 #Concrete implementation of MD4 scale ionogram PlotState
 #Handles plotting of raw ionograms with MD4
-from src.plot.autoscaling import ScaleIonogramCanvas
+from src.plot.autoscale import AutoScaleIonogramCanvas
 from src.plotstate.base import PlotState
 from src.utils.powerpreprocessing import convert_amplitude_to_power
 import pandas as pd
 from datetime import datetime
 
-class Md4ScaleIonogramState(PlotState):
+class Md4AutoScaleIonogramState(PlotState):
     def create_canvas(self):
-        canvas = ScaleIonogramCanvas(self.main)
+        canvas = AutoScaleIonogramCanvas(self.main)
         self.update_canvas(canvas)
         return canvas
 
     def update_canvas(self, canvas):
-        self.main.save_scale_button.setVisible(True)
+        self.main.autoscale_button.setVisible(True)
         self.main.scale_box1.setVisible(True)
         self.main.scale_box2.setVisible(True)
         self.main.clear_scale_button.setVisible(True)
@@ -24,9 +24,6 @@ class Md4ScaleIonogramState(PlotState):
         if(self.main.enable_spreadf_scaling):
             self.main.spread_f_label.setVisible(True)
             self.main.spread_f_dropdown.setVisible(True)
-            
-        if(self.main.config.get('scaling', 'scalingoption3') != ''):
-            self.main.scale_box3.setVisible(True)
         df = self.main.combined_df
         date_of_obs = self.main.metadata['datetime']
         
