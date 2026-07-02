@@ -72,7 +72,7 @@ class MainWidget(QWidget):
 
         self.autoscale_button = QPushButton("Autoscale")
         self.autoscale_button.setVisible(False)
-        self.autoscale_button.clicked.connect(self._save_autoscale)
+        self.autoscale_button.clicked.connect(self._polan_manual_helper)
         
         # Save Scaling button
         self.save_scale_button = QPushButton("Save Scaling")
@@ -179,6 +179,7 @@ class MainWidget(QWidget):
 
         layout.addWidget(self.freq_selector, 9, 0)
         layout.addWidget(self.polan_button, 9, 0)
+        layout.addWidget(self.autoscale_button, 9,0)
         layout.addWidget(self.reset_zoom_button, 9, 2)
         layout.addWidget(self.save_scale_button, 9, 0)
         layout.addWidget(self.clear_scale_button, 9, 1)
@@ -445,12 +446,9 @@ class MainWidget(QWidget):
             self.current_plot_state.update_canvas(self.canvas_widget)
         
         self.prev_checkbox = curr_checkbox
-        self.service.polan_auto_helper()
+        self.service.polan_helper(kind='auto')
         self.save_plot_button.setEnabled(True)
         self.save_plot_button.setVisible(True)
-
-    def _save_autoscale(self):
-        self.service.save_autoscale()
 
     def _save_manual_scale(self):
         self.service.save_manual_scale()
@@ -460,7 +458,7 @@ class MainWidget(QWidget):
             self.canvas_widget.clean_canvas()
 
     def _polan_manual_helper(self):
-        self.service.polan_manual_helper()
+        self.service.polan_helper(kind='manual')
 
     def _reset_zoom_helper(self):
         if hasattr(self.canvas_widget, 'reset_zoom') and callable(self.canvas_widget.reset_zoom):

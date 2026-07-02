@@ -144,6 +144,8 @@ class AutoScaleIonogramCanvas(FigureCanvas):
         self.draw_idle()
 
     def plot_polan(self, freqs, real_heights, interp_freqs, interp_heights, extra_data):
+        if len(freqs) == 0:
+            return
         freqs = np.array(freqs)
         self.extra_data = extra_data  # Store so _update_legend_box can access it
         self.plot_interp(interp_freqs, interp_heights)
@@ -161,11 +163,6 @@ class AutoScaleIonogramCanvas(FigureCanvas):
         signals = df[signal_col_names].to_numpy()
 
         freqs = freqs / 1e6 # Convert freqs from Hz to MHz
-        """noise_idx, _, _ = freq_filter(freqs, heights)
-        freqs_filtered = np.delete(freqs, noise_idx)
-        heights_filtered = np.delete(heights, noise_idx)
-        dops_filtered = np.delete(dops, noise_idx)
-        sensors_filtered = np.delete(signals, noise_idx, axis=0)"""
         freqs_omode, heights_omode, _, _ = o_x_separation(freqs, heights, dops, signals, site=self.main.metadata['site'], mode='O')
         autoscale_output = autoscale(freqs_omode, heights_omode, 
                                      freq_list=np.array(self.main.freqs_list)/1e6, 
@@ -193,14 +190,14 @@ class AutoScaleIonogramCanvas(FigureCanvas):
             raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
 
 
-    def draw_manual_curve(self):
+    def draw_manual_curve(self, df):
         if not self.drawn_points:
-            return np.array([]), np.array([])
+            return np.array([]), np.array([]), np.array([]), np.array([])
         points = np.array([(x, y) for x, y in self.drawn_points if x is not None and y is not None])
         if points.size == 0:
-            return np.array([]), np.array([])
+            return np.array([]), np.array([]), np.array([]), np.array([])
         if points.shape[0] < 2:
-            return np.array([]), np.array([])
+            return np.array([]), np.array([]), np.array([]), np.array([])
         freqs_interp, heights_interp, unique_freqs, avg_heights = self.get_polan_curve(points, spacing=0.1)
         return freqs_interp, heights_interp, unique_freqs, avg_heights
 

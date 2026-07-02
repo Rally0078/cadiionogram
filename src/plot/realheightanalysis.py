@@ -137,6 +137,8 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.draw_idle()
 
     def plot_polan(self, freqs, real_heights, interp_freqs, interp_heights, extra_data=None):
+        if len(freqs) == 0:
+            return
         freqs = np.array(freqs)
         self.plot_interp(interp_freqs, interp_heights)
         if self.line_polan is None:
@@ -211,7 +213,11 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax.set_ylim(self.height_limits)
         self.draw_idle()
 
-    def draw_auto_curve(self, freqs, heights, dops, signals):
+    def draw_auto_curve(self, df):
+        freqs, heights, dops = df['freq (Hz)'].to_numpy(), df['height (km)'].to_numpy(), df['dopplershift'].to_numpy()
+        signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
+        signals = df[signal_col_names].to_numpy()
+
         freqs = freqs / 1e6 # Convert freqs from Hz to MHz
         noise_idx, _, _ = freq_filter(freqs, heights)
         freqs_filtered = np.delete(freqs, noise_idx)
@@ -244,14 +250,14 @@ class RealHeightAnalysisCanvas(FigureCanvas):
             raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
 
 
-    def draw_manual_curve(self):
+    def draw_manual_curve(self, df):
         if not self.drawn_points:
-            return np.array([]), np.array([])
+            return np.array([]), np.array([]), np.array([]), np.array([])
         points = np.array([(x, y) for x, y in self.drawn_points if x is not None and y is not None])
         if points.size == 0:
-            return np.array([]), np.array([])
+            return np.array([]), np.array([]), np.array([]), np.array([])
         if points.shape[0] < 2:
-            return np.array([]), np.array([])
+            return np.array([]), np.array([]), np.array([]), np.array([])
         freqs_interp, heights_interp, unique_freqs, avg_heights = self.get_polan_curve(points, spacing=0.1)
         return freqs_interp, heights_interp, unique_freqs, avg_heights
 

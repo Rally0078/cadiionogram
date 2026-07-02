@@ -145,7 +145,7 @@ class MainWidgetService(QObject):
 
     def read_polan(self, freqs, heights, ml_freqs, ml_heights, extra_required=False):
         if len(freqs) == 0:
-            return
+            return [], [], [], [], [], [], {}
 
         real_freqs = []
         real_heights = []
@@ -183,10 +183,29 @@ class MainWidgetService(QObject):
 
             if not real_freqs:
                 print("No real heights data parsed from POLOUT.T")
-                return
+                return [], [], [], [], [], [], {}
+            extra_data = {}
+            if extra_required:
+                numbers = self.extract_numbers(lines[data_start_index - 3])
+                if len(numbers) > 0:
+                    extra_data['hmF2'] = numbers[2]
+                    extra_data['hmF2 error'] = numbers[3]
+                    extra_data['ScaleHt'] = numbers[4]
+                    extra_data['ScaleHt error'] = numbers[5]
+                    extra_data['SlabT'] = numbers[6]
+            return freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data
+        return [], [], [], [], [], [], {}
 
+    def save_polan(self, freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data):
+        if len(real_freqs) == 0:
+            return
+        
+        if Path("POLOUT.T").exists():
             # Get output filename in the format
             # year(single last digit)month(letter A-L)day(0 padded)time(HH:MM)
+            short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
+            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+            current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
             new_timestamp = current_timestamp.replace(':', '')[:-2]
             output_file_nominute_name = datetime.strftime(short_datetime, "%Y%m%d")
             output_file_nominute_name = output_file_nominute_name[3:]
@@ -213,19 +232,15 @@ class MainWidgetService(QObject):
                         f"{height:.2f} "
                         f"{f_real:.2f} "
                         f"{h_real:.2f}\n"))
+                new_format_output_name.touch()
             shutil.copyfile("POLOUT.T", output_file_name)
-            extra_data = {}
-            if extra_required:
-                numbers = self.extract_numbers(lines[data_start_index - 3])
-                if len(numbers) > 0:
-                    extra_data['hmF2'] = numbers[2]
-                    extra_data['hmF2 error'] = numbers[3]
-                    extra_data['ScaleHt'] = numbers[4]
-                    extra_data['ScaleHt error'] = numbers[5]
-                    extra_data['SlabT'] = numbers[6]
-            self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
+            output_file_name.touch()
+            
 
-    def polan_manual_helper(self):
+    def save_autoscale(self, freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data):
+        ...
+
+    def polan_helper(self, kind: str='manual'):
         from src.plot.realheightanalysis import RealHeightAnalysisCanvas
         from src.plot.autoscale import AutoScaleIonogramCanvas
         target_time_str = self.main_widget._selected_timestamp
@@ -239,82 +254,28 @@ class MainWidgetService(QObject):
         target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
 
         df_at_time = self.main_widget.combined_df.loc[target_dtime]
-        signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
-        
-        freqs, heights, dops = df_at_time['freq (Hz)'].to_numpy(), df_at_time['height (km)'].to_numpy(), df_at_time['dopplershift'].to_numpy()
-        signals = df_at_time[signal_col_names].to_numpy()
-        freqs, heights, ml_freqs, ml_heights = self.main_widget.canvas_widget.draw_manual_curve()
-
-        if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
-            if self.run_polan(freqs, heights):
-                self.read_polan(freqs, heights, ml_freqs, ml_heights)
-        elif isinstance(self.main_widget.canvas_widget, AutoScaleIonogramCanvas):
-            if self.run_polan(freqs, heights):
-                self.read_polan(freqs, heights, ml_freqs, ml_heights, extra_required=True)
-        else:
-            print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
-
-    def save_autoscale(self):
-        from src.plot.autoscale import AutoScaleIonogramCanvas
-
-    def polan_helper(self, kind='manual'):
-        from src.plot.realheightanalysis import RealHeightAnalysisCanvas
-        from src.plot.autoscale import AutoScaleIonogramCanvas
-        target_time_str = self.main_widget._selected_timestamp
-        date_of_obs = self.main_widget.combined_metadata['datetime']
-        if self.main_widget.multi_folder_checkbox.isChecked():
-            time_obj = datetime.strptime(target_time_str, "%Y-%m-%d %H:%M:%S")
-            target_dtime = time_obj
-        else:
-            time_obj = datetime.strptime(target_time_str.split(' ')[-1], "%H:%M:%S")
-            target_dtime = time_obj.replace(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day)
-        target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
-
-        df_at_time = self.main_widget.combined_df.loc[target_dtime]
-        signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
-        
-        freqs, heights, dops = df_at_time['freq (Hz)'].to_numpy(), df_at_time['height (km)'].to_numpy(), df_at_time['dopplershift'].to_numpy()
-        signals = df_at_time[signal_col_names].to_numpy()
-        if kind == 'manual':
-            generate_curve = self.main_widget.canvas_widget.draw_manual_curve
-        elif kind == 'autoscale':
-            generate_curve = self.main_widget.canvas_widget.draw_auto_curve
-        elif kind == 'autoscale_new':
-            generate_curve = self.main_widget.canvas_widget.draw_new_auto_curve
-        if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas) and (self.main_widget.extension == 'md4'):
-            freqs_interp, heights_interp, ml_freqs, ml_heights = self.main_widget.canvas_widget.draw_auto_curve(freqs, heights, dops, signals)
+        if isinstance(self.main_widget.canvas_widget, (RealHeightAnalysisCanvas, AutoScaleIonogramCanvas)):
+            if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
+                if 'auto' in kind.lower():
+                    generate_curve = self.main_widget.canvas_widget.draw_auto_curve
+                else:
+                    generate_curve = self.main_widget.canvas_widget.draw_manual_curve
+                file_util = self.save_polan
+                extra_required = False
+            elif isinstance(self.main_widget.canvas_widget, AutoScaleIonogramCanvas):
+                if 'auto' in kind.lower():
+                    generate_curve = self.main_widget.canvas_widget.draw_new_auto_curve
+                else:
+                    generate_curve = self.main_widget.canvas_widget.draw_manual_curve
+                file_util = self.save_autoscale
+                extra_required = True
+            else:
+                return
+            freqs_interp, heights_interp, ml_freqs, ml_heights = generate_curve(df_at_time)
             if self.run_polan(freqs_interp, heights_interp):
-                self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
-        elif isinstance(self.main_widget.canvas_widget, AutoScaleIonogramCanvas):
-            freqs_interp, heights_interp, ml_freqs, ml_heights = self.main_widget.canvas_widget.draw_new_auto_curve(df_at_time)
-            if self.run_polan(freqs_interp, heights_interp):
-                self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights, extra_required=True)
-    def polan_auto_helper(self):
-        from src.plot.realheightanalysis import RealHeightAnalysisCanvas
-        from src.plot.autoscale import AutoScaleIonogramCanvas
-        target_time_str = self.main_widget._selected_timestamp
-        date_of_obs = self.main_widget.combined_metadata['datetime']
-        if self.main_widget.multi_folder_checkbox.isChecked():
-            time_obj = datetime.strptime(target_time_str, "%Y-%m-%d %H:%M:%S")
-            target_dtime = time_obj
-        else:
-            time_obj = datetime.strptime(target_time_str.split(' ')[-1], "%H:%M:%S")
-            target_dtime = time_obj.replace(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day)
-        target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
-
-        df_at_time = self.main_widget.combined_df.loc[target_dtime]
-        signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
-        
-        freqs, heights, dops = df_at_time['freq (Hz)'].to_numpy(), df_at_time['height (km)'].to_numpy(), df_at_time['dopplershift'].to_numpy()
-        signals = df_at_time[signal_col_names].to_numpy()
-        if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas) and (self.main_widget.extension == 'md4'):
-            freqs_interp, heights_interp, ml_freqs, ml_heights = self.main_widget.canvas_widget.draw_auto_curve(freqs, heights, dops, signals)
-            if self.run_polan(freqs_interp, heights_interp):
-                self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
-        elif isinstance(self.main_widget.canvas_widget, AutoScaleIonogramCanvas):
-            freqs_interp, heights_interp, ml_freqs, ml_heights = self.main_widget.canvas_widget.draw_new_auto_curve(df_at_time)
-            if self.run_polan(freqs_interp, heights_interp):
-                self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights, extra_required=True)
+                freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data = self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights, extra_required)
+                self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
+                file_util(freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
 
     def save_manual_scale(self):
         if self.main_widget.canvas_widget and self.main_widget.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
