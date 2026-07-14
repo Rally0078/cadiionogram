@@ -9,7 +9,7 @@ import struct
 import os
 import random
 import tempfile
-from utils.siteinfo import site_dict
+from utils.siteinfo import SiteInfo
 
 # Make this True to test the Rust binary. Ensure that the binary is actually built and copied to the right place first.
 require_rust = True

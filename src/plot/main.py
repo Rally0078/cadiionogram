@@ -11,6 +11,15 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        # Ensure sites.json exists and is populated
+        from src.utils.siteinfo import get_sites_json_path, DEFAULT_SITES
+        import json
+        sites_path = get_sites_json_path()
+        if not sites_path.exists():
+            sites_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(sites_path, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_SITES, f, indent=4)
+
         self.config = configparser.ConfigParser()
         os_name = platform.system()
         

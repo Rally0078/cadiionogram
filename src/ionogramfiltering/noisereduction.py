@@ -88,8 +88,8 @@ def o_x_separation(freq_selection, height_selection, dop_selection, sensors_sele
     if phchoice not in ['14', '23']:
         raise ValueError("Only phase difference 1-4 and 2-3 are available")
         #Site Info, loaded from siteinfo.py
-    from src.utils.siteinfo import site_dict
-    site_info = site_dict.get(site)
+    from src.utils.siteinfo import SiteInfo
+    site_info = SiteInfo.get_from_file(site)
 
     if site_info is not None:
         PH2_corr = site_info.ph_corr[0] * np.pi / 180

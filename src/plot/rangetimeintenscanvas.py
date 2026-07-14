@@ -7,7 +7,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.dates as mdates
 
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 
 
 class RangeTimeIntensCanvas(FigureCanvas):
@@ -66,8 +66,8 @@ class RangeTimeIntensCanvas(FigureCanvas):
         self.ax.margins(x=0,y=0)
         self.ax.set_xlim(time_index[0], time_index[-1])
         
-        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {site_dict[site].get_tzstr(date)}")
-        self.ax.set_xlabel(f"Time ({site_dict[site].get_tzstr(date)})")
+        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {SiteInfo.from_file(site).get_tzstr(date)}")
+        self.ax.set_xlabel(f"Time ({SiteInfo.from_file(site).get_tzstr(date)})")
         self._set_plot_ax()
         #self.fig.tight_layout()
         self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)

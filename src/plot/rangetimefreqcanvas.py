@@ -5,7 +5,7 @@ from matplotlib.ticker import ScalarFormatter, MultipleLocator
 import numpy as np
 from datetime import datetime, timedelta
 import matplotlib.dates as mdates
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 
 
 class RangeTimeFreqCanvas(FigureCanvas):
@@ -55,8 +55,8 @@ class RangeTimeFreqCanvas(FigureCanvas):
                                             hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
                                             hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
             self.ax.margins(x=0,y=0)
-        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {site_dict[site].get_tzstr(date)}")
-        self.ax.set_xlabel(f"Time ({site_dict[site].get_tzstr(date)})")
+        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {SiteInfo.from_file(site).get_tzstr(date)}")
+        self.ax.set_xlabel(f"Time ({SiteInfo.from_file(site).get_tzstr(date)})")
         self._set_plot_ax()
         self._update_legend()
         #self.fig.tight_layout()

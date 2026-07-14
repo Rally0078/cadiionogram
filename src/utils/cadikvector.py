@@ -44,8 +44,8 @@ def compute_xpha_full(df: pd.DataFrame, freq_list, site='TIR'):
                         "x2": np.empty(shape=(new_signal_selection.shape[0],))},
                         index=df.index)
     
-    from src.utils.siteinfo import site_dict
-    site_info = site_dict.get(site)
+    from src.utils.siteinfo import SiteInfo
+    site_info = SiteInfo.get_from_file(site)
     if site_info is not None:
         PH2_corr = site_info.ph_corr[0] * np.pi / 180
         PH4_corr = site_info.ph_corr[1] * np.pi / 180
@@ -134,8 +134,8 @@ def compute_kvector(df, freq_list, sort_by_freq=False, points_thres=5, site='TIR
     output_freqs = pd.Series([])
     output_dops = pd.Series([])
 
-    from src.utils.siteinfo import site_dict
-    site_info = site_dict.get(site)
+    from src.utils.siteinfo import SiteInfo
+    site_info = SiteInfo.get_from_file(site)
     if site_info is not None:
         site_sep_ew = site_info.site_separation[0]
         site_sep_ns = site_info.site_separation[1]

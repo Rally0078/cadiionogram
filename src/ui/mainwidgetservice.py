@@ -11,7 +11,7 @@ from src.workers.computation_worker import ComputationWorker
 from src.ionogramparser.mdxreader import MDreader
 from src.ionogramparser.sameerreader import SameerReader
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 from src.utils.rawdatadiriterator import RawDataDirIterator
 
 class MainWidgetService(QObject):
@@ -127,12 +127,12 @@ class MainWidgetService(QObject):
             return False
 
         short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
-        short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+        short_datetime = short_datetime.replace(tzinfo=SiteInfo.from_file(self.main_widget.metadata['site']).get_tzinfo(short_datetime))
         current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
         
         with open("a.a", 'w') as polan_input:
             polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
-            polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}{site_dict[self.main_widget.metadata['site']].short_site}           {site_dict[self.main_widget.metadata['site']].FH:.2f}  {site_dict[self.main_widget.metadata['site']].dip:.1f}  {self.main_widget.polan_options['amode']} {self.main_widget.polan_options['valley']}    {self.main_widget.polan_options['list']}\n")
+            polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}{SiteInfo.from_file(self.main_widget.metadata['site']).short_site}           {SiteInfo.from_file(self.main_widget.metadata['site']).FH:.2f}  {SiteInfo.from_file(self.main_widget.metadata['site']).dip:.1f}  {self.main_widget.polan_options['amode']} {self.main_widget.polan_options['valley']}    {self.main_widget.polan_options['list']}\n")
             polan_input.write(f"{current_timestamp}                    {self.main_widget.polan_options['start']}\n")
             for idx, (freq, height) in enumerate(zip(freqs, heights)):
                 if idx == len(freqs) - 1:
@@ -152,7 +152,7 @@ class MainWidgetService(QObject):
         
         if Path("POLOUT.T").exists():
             short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
-            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+            short_datetime = short_datetime.replace(tzinfo=SiteInfo.from_file(self.main_widget.metadata['site']).get_tzinfo(short_datetime))
             current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
 
             with open("POLOUT.T", 'r') as polan_output:
@@ -204,7 +204,7 @@ class MainWidgetService(QObject):
             # Get output filename in the format
             # year(single last digit)month(letter A-L)day(0 padded)time(HH:MM)
             short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
-            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+            short_datetime = short_datetime.replace(tzinfo=SiteInfo.from_file(self.main_widget.metadata['site']).get_tzinfo(short_datetime))
             current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
             new_timestamp = current_timestamp.replace(':', '')[:-2]
             output_file_nominute_name = datetime.strftime(short_datetime, "%Y%m%d")
@@ -280,13 +280,13 @@ class MainWidgetService(QObject):
     def save_manual_scale(self):
         if self.main_widget.canvas_widget and self.main_widget.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
             short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
-            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+            short_datetime = short_datetime.replace(tzinfo=SiteInfo.from_file(self.main_widget.metadata['site']).get_tzinfo(short_datetime))
             current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
 
             timestamp_hour = int(current_timestamp.replace(':', '')[:2])
             timestamp_minute = int(current_timestamp.replace(':', '')[2:4])
             timestamp_second = int(current_timestamp.replace(':', '')[4:6])
-            output_filename = f"{short_datetime.strftime('%y%m%d')}{site_dict[self.main_widget.metadata['site']].short_site}_F.tfh"
+            output_filename = f"{short_datetime.strftime('%y%m%d')}{SiteInfo.from_file(self.main_widget.metadata['site']).short_site}_F.tfh"
             output_file_name = self.main_widget.polan_dir / output_filename
             
             scaled_values_state = self.main_widget.canvas_widget.scaled_values_lines

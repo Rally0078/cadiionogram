@@ -8,7 +8,7 @@ from datetime import datetime
 from scipy.interpolate import PchipInterpolator
 from scipy.integrate import cumulative_trapezoid
 from src.ionogramfiltering.noisereduction import *
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 
 
 def _convert_f_to_n(f):
@@ -112,7 +112,7 @@ class RealHeightAnalysisCanvas(FigureCanvas):
             self.colorbar.set_ticks(np.arange(0, self.main.power_limit + 1, 5))  # Fixed ticks from 0 to power_limit with step of 5
             self.scatter.set_clim(0, self.main.power_limit)  # Set color limits on scatter plot
 
-        self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime('%H:%M:%S %d-%m-%Y')} {site_dict[site].get_tzstr(timestamp)}")
+        self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime('%H:%M:%S %d-%m-%Y')} {SiteInfo.from_file(site).get_tzstr(timestamp)}")
         self._set_plot_ax()
 
         # Re-create the interactive drawing line

@@ -19,8 +19,8 @@ def compute_xpha_full(df: pl.DataFrame, freq_list, site: str = 'TIR'):
     filtered_df = df.filter(~any_zero)
     
     # 2. Compute cross amplitudes and phases
-    from src.utils.siteinfo import site_dict
-    site_info = site_dict.get(site)
+    from src.utils.siteinfo import SiteInfo
+    site_info = SiteInfo.get_from_file(site)
     if site_info is not None:
         PH2_corr = site_info.ph_corr[0] * np.pi / 180
         PH4_corr = site_info.ph_corr[1] * np.pi / 180
@@ -107,8 +107,8 @@ def compute_kvector(df: pl.DataFrame, freq_list, sort_by_freq=False, points_thre
     signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
     k_mag = 2 * np.pi / (2.998e8) * np.array(freq_list)
     
-    from src.utils.siteinfo import site_dict
-    site_info = site_dict.get(site)
+    from src.utils.siteinfo import SiteInfo
+    site_info = SiteInfo.get_from_file(site)
     if site_info is not None:
         site_sep_ew = site_info.site_separation[0]
         site_sep_ns = site_info.site_separation[1]

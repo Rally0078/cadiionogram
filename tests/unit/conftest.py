@@ -9,7 +9,7 @@ import struct
 import os
 import random
 import tempfile
-from utils.siteinfo import site_dict
+from utils.siteinfo import SiteInfo
 
 @pytest.fixture
 def date_site_dict():
@@ -23,7 +23,7 @@ def date_site_dict():
 
 @pytest.fixture
 def test_site_dict():
-    return site_dict
+    return SiteInfo
 
 @pytest.fixture
 def mock_raw_file_incomplete_header():

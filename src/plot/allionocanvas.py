@@ -4,7 +4,7 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import ScalarFormatter, MultipleLocator, FuncFormatter
 from datetime import datetime
 import numpy as np
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 
 class AllIonogramCanvas(FigureCanvas):
     def __init__(self, parent=None):
@@ -59,7 +59,7 @@ class AllIonogramCanvas(FigureCanvas):
                 self.colorbar.set_ticks(np.arange(0, self.main.power_limit + 1, 5))  # Fixed ticks from 0 to power_limit with step of 5
                 self.scatter.set_clim(0, self.main.power_limit)  # Set color limits on scatter plot"""
             ax.set_title(f"Receiver {idx+1}")
-        self.fig.suptitle(f"Ionogram site: {site} at {timestamp.strftime("%H:%M:%S %d-%m-%Y")} {site_dict[site].get_tzstr(timestamp)}", y=0.99)
+        self.fig.suptitle(f"Ionogram site: {site} at {timestamp.strftime("%H:%M:%S %d-%m-%Y")} {SiteInfo.from_file(site).get_tzstr(timestamp)}", y=0.99)
         self.colorbar = self.figure.colorbar(self.scatter, cax=self.cbar_ax)
         self.colorbar.set_label("Power (dB)")
         self.colorbar.set_ticks(np.arange(0, self.main.power_limit + 1, 5))  # Fixed ticks from 0 to power_limit with step of 5
