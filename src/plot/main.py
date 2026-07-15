@@ -47,7 +47,8 @@ class MainWindow(QMainWindow):
                 'powercolormap': 'jet_r',
                 'dopcolormap': 'viridis',
                 'scattersize': '6',
-                'powerlimit': '50'
+                'powerlimit': '50',
+                'maxfreq': '20'
             },
             'realheightanalysis': {
                 'interpmode': 'old',

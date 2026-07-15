@@ -3,7 +3,7 @@
 from src.plot.ionogramcanvas import IonogramCanvas
 from src.plotstate.base import PlotState
 from src.utils.powerpreprocessing import convert_amplitude_to_power
-import pandas as pd
+import numpy as np
 from datetime import datetime
 
 class Md4DisplayIonogramState(PlotState):
@@ -34,7 +34,7 @@ class Md4DisplayIonogramState(PlotState):
 
         if self.main.extension == 'iono':
             power_prethres = df_at_time['amplitude']
-            power = power_prethres[power_prethres >= 0]
+            power = 20*np.log10(power_prethres[power_prethres >= 0])
             freqs = freqs[power_prethres >= 0] * 1e6
             heights = heights[power_prethres >= 0]
             dops = dops[power_prethres >= 0]

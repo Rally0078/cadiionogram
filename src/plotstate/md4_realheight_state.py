@@ -3,7 +3,7 @@
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.plotstate.base import PlotState
 from src.utils.powerpreprocessing import convert_amplitude_to_power
-import pandas as pd
+import numpy as np
 from datetime import datetime
 
 class Md4RealheightAnalysisState(PlotState):
@@ -32,20 +32,20 @@ class Md4RealheightAnalysisState(PlotState):
         freqs = df_at_time['freq (Hz)'].to_numpy()
         heights = df_at_time['height (km)'].to_numpy()
         dops = df_at_time['dopplershift'].to_numpy()
-        
-        signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
-        signals = df_at_time[signal_col_names].to_numpy()
 
         if self.main.extension == 'iono':
-            power_prethres = signals[:, 1]
-            power = power_prethres[power_prethres >=0 ]
+            power_prethres = df_at_time['amplitude']
+            power = 20*np.log10(power_prethres[power_prethres >= 0])
             freqs = freqs[power_prethres >= 0] * 1e6
             heights = heights[power_prethres >= 0]
-            dops = dops[power_prethres >=0 ]
+            dops = dops[power_prethres >= 0]
         elif self.main.extension in ['md3', 'md4']:
+            signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
+            signals = df_at_time[signal_col_names].to_numpy()
             power = convert_amplitude_to_power(signals)
         else:
             raise TypeError("Input data is not the correct type for this canvas")
+
             
         canvas.plot_scatter(
             freqs,

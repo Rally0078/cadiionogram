@@ -235,7 +235,7 @@ class MainWidget(QWidget):
         self.polan_options['amode'] = config.get('realheightanalysis', 'amode')
         self.polan_options['valley'] = config.get('realheightanalysis', 'valley')
         self.polan_options['list'] = config.get('realheightanalysis', 'list')
-
+        self.iono_maxfreq = config.getfloat('plotting','maxfreq')
         if self.polan_interp_mode.lower() not in ['old', 'new']:
             raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
         
