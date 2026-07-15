@@ -22,21 +22,25 @@ class MainWidgetService(QObject):
     def load_data(self, location):
         if self.main_widget.md3_checkbox.isChecked():
             extension = 'md3'
+            pandas_output_type = 'cadi'
             raw_reader = MDreader()
         elif self.main_widget.md4_checkbox.isChecked():
             extension = 'md4'
+            pandas_output_type = 'cadi'
             raw_reader = MDreader()
         elif self.main_widget.iono_checkbox.isChecked():
             extension = 'iono'
+            pandas_output_type = 'sameer'
             raw_reader = SameerReader()
-        
+        else:
+            raise TypeError("Not the appropriate data type")
         self.main_widget.extension = extension       
-        worker = DataLoaderWorker(location, extension, raw_reader)
+        worker = DataLoaderWorker(location, extension, raw_reader, pandas_output_type)
         worker.signals.finished.connect(self.data_loaded)
         worker.signals.error.connect(self.data_loading_error)
         self.main_widget.threadpool.start(worker)
 
-    def data_loaded(self, files_list, metadata, heights, freqs, freqs_list, dops, signals):
+    def data_loaded(self, files_list, metadata, heights, freqs, freqs_list, dops, signals, pandas_output_type):
         new_data = {
             'files_list': files_list,
             'metadata': metadata,
@@ -68,7 +72,7 @@ class MainWidgetService(QObject):
                 self.main_widget.multi_folder_data.sort(key=lambda x: x['metadata']['datetime'])
             
             # Combine all data into unified structures
-            combined_df, combined_metadata = PandasUtils.combine_folder_data(self.main_widget.multi_folder_data)
+            combined_df, combined_metadata = PandasUtils.combine_folder_data(self.main_widget.multi_folder_data, radar_type=pandas_output_type)
             self.main_widget.combined_df = combined_df
             self.main_widget.combined_metadata = combined_metadata
             
@@ -76,7 +80,7 @@ class MainWidgetService(QObject):
             self.main_widget.switch_to_combined_data()
         else:
             self.main_widget.multi_folder_data = [new_data]
-            self.main_widget.combined_df = PandasUtils.create_pandas_from_arrays(metadata, freqs, heights, dops, signals)
+            self.main_widget.combined_df = PandasUtils.create_pandas_from_arrays(metadata, freqs, heights, dops, signals, radar_type=pandas_output_type)
             self.main_widget.combined_metadata = metadata
             
             self.main_widget.update_multi_folder_dropdown()

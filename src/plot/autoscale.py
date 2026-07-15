@@ -99,11 +99,9 @@ class AutoScaleIonogramCanvas(FigureCanvas):
         if QApplication.keyboardModifiers() & Qt.ControlModifier:
             #Get current scale region mode
             if self.main.scale_box1.isChecked():
-                text_legend = self.main.config.get('scaling', 'scalingoption1')
+                text_legend = self.main.scale_box1.text().split()[-1]
             elif self.main.scale_box2.isChecked():
-                text_legend = self.main.config.get('scaling', 'scalingoption2')
-            elif self.main.scale_box3.isChecked():
-                text_legend = self.main.config.get('scaling', 'scalingoption3')
+                text_legend = self.main.scale_box2.text().split()[-1]
             else:
                 raise KeyError("No valid region selected for manual scaling")
             self.scaled_values_lines.set_region(text_legend)

@@ -16,6 +16,8 @@ class Md4AutoScaleIonogramState(PlotState):
         self.main.autoscale_button.setVisible(True)
         self.main.scale_box1.setVisible(True)
         self.main.scale_box2.setVisible(True)
+        self.main.scale_box1.setText(f"Scale E")
+        self.main.scale_box2.setText(f"Scale F")
         self.main.clear_scale_button.setVisible(True)
         self.main.reset_zoom_button.setVisible(True)
         if(self.main.enable_es_scaling):

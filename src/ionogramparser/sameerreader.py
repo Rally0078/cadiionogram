@@ -27,6 +27,7 @@ from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.ionogramparser.baserawreader import DataReader
 from src.utils.parquetutils import ParquetUtils
 import numpy as np
+from src.utils.siteinfo import SiteInfo
 
 type time_partition_dict = dict[str, int]
 
@@ -127,6 +128,7 @@ class SameerReader(DataReader):
 
             freq_line_idx_original = freq_bin_idx
             freq_bin_idx += 1
+        datetime_obj = datetime_obj.replace(tzinfo=SiteInfo.from_file(site).get_tzinfo(datetime_obj))
         metadata = {'site': site, 'lat': float(lat), 'long': float(long), 
             'filetype': 'iono',
             'extension': 'iono',

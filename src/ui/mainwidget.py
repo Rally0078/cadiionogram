@@ -84,9 +84,9 @@ class MainWidget(QWidget):
         
         # Manual scaling modes
         self.scale_mode_group = QButtonGroup()
-        self.scale_box1 = QCheckBox(f"Scale " + self.config.get('scaling', 'scalingoption1'))
-        self.scale_box2 = QCheckBox(f"Scale " + self.config.get('scaling', 'scalingoption2'))
-        self.scale_box3 = QCheckBox(f"Scale " + self.config.get('scaling', 'scalingoption3'))
+        self.scale_box1 = QCheckBox(f"Scale {self.config.get('scaling', 'scalingoption1')}")
+        self.scale_box2 = QCheckBox(f"Scale {self.config.get('scaling', 'scalingoption2')}")
+        self.scale_box3 = QCheckBox(f"Scale {self.config.get('scaling', 'scalingoption3')}")
         self.scale_mode_group.addButton(self.scale_box1)
         self.scale_mode_group.addButton(self.scale_box2)
         self.scale_mode_group.addButton(self.scale_box3)

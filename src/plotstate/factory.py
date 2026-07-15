@@ -49,6 +49,8 @@ class PlotStateFactory:
     def _reset_visibility(main_widget):
         """Reset back to default MD4 view"""
         main_widget.polan_button.setVisible(False)
+        main_widget.scale_box1.setText(f"Scale {main_widget.config.get('scaling', 'scalingoption1')}")
+        main_widget.scale_box2.setText(f"Scale {main_widget.config.get('scaling', 'scalingoption2')}")
         main_widget.reset_zoom_button.setVisible(False)
         main_widget.save_scale_button.setVisible(False)
         main_widget.scale_box1.setVisible(False)
