@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 class MainWidget(QWidget):
     md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries','Skymap']
     md4_options = ['Display ionogram', 'Autoscale Ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity', 'Skymap']
+    sameer_options = ['Display ionogram', 'Scale ionogram']
     
     def __init__(self, config: ConfigParser):
         super().__init__()
@@ -337,7 +338,7 @@ class MainWidget(QWidget):
         elif self.iono_checkbox.isChecked():
             keys_list = sameer_keys_list
         else:
-            keys_list = cadi_keys_list
+            keys_list = sameer_keys_list
 
         # Note: freqs_list and other details are assumed consistent across folders
         # Use freqs_list from the first folder in the multi-folder data if available
@@ -381,7 +382,7 @@ class MainWidget(QWidget):
             self.mode_dropdown.addItems(MainWidget.md4_options)
         elif self.iono_checkbox.isChecked():
             self.mode_dropdown.clear()
-            self.mode_dropdown.addItems(MainWidget.md4_options)
+            self.mode_dropdown.addItems(MainWidget.sameer_options)
 
     def _on_dropdown_changed(self, text):
         self._selected_timestamp = text
