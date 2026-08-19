@@ -5,6 +5,7 @@ import matplotlib.dates as mdates
 from matplotlib import colormaps, colors, cm
 from matplotlib.ticker import ScalarFormatter, MultipleLocator
 from datetime import datetime, timedelta
+from pandas import date_range
 import numpy as np
 from src.utils.siteinfo import SiteInfo
 
@@ -64,10 +65,12 @@ class XYPlotCanvas(FigureCanvas):
             else:
                 xaxis_timedelta = timedelta(hours=3) if len(np.unique(time_index)) > 72 else timedelta(hours=2) if len(np.unique(time_index)) > 36 else timedelta(minutes=30) if len(np.unique(time_index)) > 12 else timedelta(minutes=15)
             
-            ax.set_xticks(np.arange(datetime(year=time_index[0].year, month=time_index[0].month, day=time_index[0].day, 
-                                                hour=time_index[0].hour, minute=0, second=0, tzinfo=self.tz), 
-                                                datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
-                                                hour=time_index[-1].hour, minute=time_index[-1].minute, second=0, tzinfo=self.tz) + timedelta(minutes=30), xaxis_timedelta))
+            ax.set_xticks(date_range(
+                                    start=time_index[0].replace(minute=0, second=0),
+                                    end=time_index[-1].replace(second=0) + timedelta(minutes=30),
+                                    freq=xaxis_timedelta,
+                                    tz=self.tz,
+            ))
             ax.margins(x=0,y=0)
         self.ax_ew.set_ylim(-1000, 1000)
         self.ax_ns.set_ylim(-1000, 1000)    
