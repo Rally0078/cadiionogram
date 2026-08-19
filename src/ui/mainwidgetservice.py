@@ -12,12 +12,17 @@ from src.ionogramparser.mdxreader import MDreader
 from src.ionogramparser.sameerreader import SameerReader
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.utils.siteinfo import SiteInfo
+from time import perf_counter
 from src.utils.rawdatadiriterator import RawDataDirIterator
 
 class MainWidgetService(QObject):
     def __init__(self, main_widget):
         super().__init__()
         self.main_widget = main_widget
+        self.start_time = 0
+        self.end_time = 0
+        self.computation_start_time = 0
+        self.computation_end_time = 0
 
     def load_data(self, location):
         if self.main_widget.md3_checkbox.isChecked():
@@ -34,10 +39,12 @@ class MainWidgetService(QObject):
             raw_reader = SameerReader()
         else:
             raise TypeError("Not the appropriate data type")
-        self.main_widget.extension = extension       
+        self.main_widget.extension = extension
         worker = DataLoaderWorker(location, extension, raw_reader, pandas_output_type)
         worker.signals.finished.connect(self.data_loaded)
         worker.signals.error.connect(self.data_loading_error)
+        self.start_time = perf_counter()
+        print(f"Reading data from {location}, extension {extension}")
         self.main_widget.threadpool.start(worker)
 
     def data_loaded(self, files_list, metadata, heights, freqs, freqs_list, dops, signals, pandas_output_type):
@@ -52,7 +59,9 @@ class MainWidgetService(QObject):
             'folder_path': self.main_widget._loading_folder_path,
             'file_paths': [self.main_widget._loading_folder_path / filename for filename in files_list]
         }
-
+        self.end_time = perf_counter()
+        print(f"Data successfully loaded in {self.end_time - self.start_time:.3f} seconds")
+        
         if self.main_widget.multi_folder_checkbox.isChecked():
             # Check if this folder is already in the list to avoid duplicates
             already_exists = False
@@ -106,6 +115,7 @@ class MainWidgetService(QObject):
             )
             worker.signals.finished.connect(self.computation_finished)
             worker.signals.error.connect(self.computation_error)
+            self.computation_start_time = perf_counter()
             self.main_widget.threadpool.start(worker)
             return True
         return False
@@ -114,6 +124,8 @@ class MainWidgetService(QObject):
         self.main_widget.df_all_outputs = df_all_outputs
         self.main_widget.all_output_freqs = all_output_freqs
         self.main_widget.has_handled_calculation = True
+        self.computation_end_time = perf_counter()
+        print(f"Computation ended in {self.computation_end_time - self.computation_start_time:.3f} seconds")
         self.main_widget._plot_helper()
 
     def computation_error(self, message):

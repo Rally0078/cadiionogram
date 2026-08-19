@@ -28,7 +28,7 @@ class DataLoaderWorker(QRunnable):
             multithread=False
             backend='loky'
             files_list, metadata, heights, freqs, freqs_list, dops, signals = self.raw_reader.read_raw_data_dir(self.location, self.extension, multithread=multithread, backend=backend)
-            print(f"Data loading completed. Loaded {len(files_list)} timestamps. {"Multithread enabled with " + backend + "." if multithread==True else "Single thread."}")
+            print(f"Data loading completed. Loaded {len(metadata['timepartitions'].keys())} timestamps. {"Multithread enabled with " + backend + "." if multithread==True else "Single thread."}")
             self.signals.finished.emit(files_list, metadata, heights, freqs, freqs_list, dops, signals, self.radar_type)
         except FolderNotContainingData:
             self.signals.error.emit("You must choose a folder containing the data.")

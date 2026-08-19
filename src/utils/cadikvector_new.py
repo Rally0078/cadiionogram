@@ -126,6 +126,7 @@ def compute_kvector(df: pl.DataFrame, freq_list, sort_by_freq=False, points_thre
     # Inject calculations as columns horizontally
     # xpha data is horizontally joined or combined directly for calculations
     working_df = pl.DataFrame({
+        "timestamp": df_filtered["timestamp"],
         "freq": df_filtered["freq (Hz)"],
         "height": df_filtered["height (km)"],
         "dopplershift": df_filtered["dopplershift"],
@@ -174,7 +175,7 @@ def compute_kvector(df: pl.DataFrame, freq_list, sort_by_freq=False, points_thre
         )
 
     # Extract required modular chunks for the multi-output return structure
-    k_out = combined_output.select(["kx", "ky", "kz"])
+    k_out = combined_output.select(["timestamp", "kx", "ky", "kz"])
     output_freqs = combined_output["freq"]
     output_heights = combined_output["height"]
     output_dops = combined_output["dopplershift"]
@@ -270,6 +271,6 @@ def compute_xy(df: pl.DataFrame, freq_list, sort_by_freq=False, points_thres=5, 
         pl.when(pl.col("azimuth") < 0).then(pl.col("azimuth") + 360).otherwise(pl.col("azimuth"))
     ])
     
-    df_output = geo_df.select(["xpos", "ypos", "zpos", "zenith", "azimuth"])
+    df_output = geo_df.select(["timestamp", "xpos", "ypos", "zpos", "zenith", "azimuth"])
     
     return df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow
