@@ -154,13 +154,19 @@ def autoscale(freqs, heights, freq_list, height_list, n_dilations=2, n_erosions=
     interp_input = np.linspace(unique_freqs.min(), unique_freqs.max(), interp_points)
     height_interp = np.interp(interp_input, unique_freqs, unique_height)
     #height_output_unique = np.interp(interp_input, freq_output, height_output)
-    spline = CubicSpline(unique_freqs, unique_height)
-    spline_y = spline(interp_input)
-    spline_x = interp_input
+    if (len(unique_freqs) >= 2) and (len(unique_height) >=2):
+        spline = CubicSpline(unique_freqs, unique_height)
+        spline_y = spline(interp_input)
+        spline_x = interp_input
+        dndh = np.gradient(spline_y, spline_x)
+    else:
+        spline_y = []
+        spline_x = []
+        dndh = []
     #f_smooth = savgol_filter(freq_output, window_length=3, polyorder=2)
     #h_smooth = savgol_filter(height_output, window_length=3, polyorder=2)
 
-    dndh = np.gradient(spline_y, spline_x)
+    
     #dndh = dndh/dndh.max() * 1023
     #max_indices = argrelextrema(dndh, np.greater)[0]
     #min_indices = argrelextrema(dndh, np.less)[0]

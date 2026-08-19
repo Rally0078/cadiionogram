@@ -18,7 +18,7 @@ class RangeTimeFreqCanvas(FigureCanvas):
         self.colorbar = None
         self.freq_ticks = np.arange(0, 18e6, 2e6)
         self.freq_limits = (1e6, 18e6)
-
+        self.tz = None
         self._set_plot_ax()
 
     def _set_plot_ax(self):
@@ -26,7 +26,7 @@ class RangeTimeFreqCanvas(FigureCanvas):
         self.ax.set_ylim(self.freq_limits)
         self.ax.set_ylabel("Virtual Height(km)")
         #self.ax.set_xlabel("Time (UTC)")
-        timeformat = mdates.DateFormatter('%H:%M')
+        timeformat = mdates.DateFormatter('%H:%M', tz=self.tz)
         self.ax.xaxis.set_major_formatter(timeformat)
         self.ax.tick_params(axis='both', direction='in')
         self.ax.set_yticks(np.arange(0, 1200, 100))
@@ -39,6 +39,7 @@ class RangeTimeFreqCanvas(FigureCanvas):
         self.fig.tight_layout(pad=3)
         legend = self.fig.legend()
         legend.remove()
+        self.tz = time_index.tzinfo
         print(f"Selected frequencies: {selected_frequencies}")            
         for freq in np.unique(selected_frequencies):
             matched_idxs = np.argwhere(np.isclose(freqs, freq, atol=1e-12)).flatten()
@@ -52,8 +53,9 @@ class RangeTimeFreqCanvas(FigureCanvas):
                 xaxis_timedelta = timedelta(hours=3) if len(np.unique(time_index)) > 72 else timedelta(hours=2) if len(np.unique(time_index)) > 36 else timedelta(minutes=30) if len(np.unique(time_index)) > 12 else timedelta(minutes=15)
             
             self.ax.set_xticks(np.arange(datetime(year=time_index[0].year, month=time_index[0].month, day=time_index[0].day, 
-                                            hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
-                                            hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
+                                            hour=time_index[0].hour, minute=0, second=0, tzinfo=self.tz), 
+                                            datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
+                                            hour=time_index[-1].hour, minute=time_index[-1].minute, second=0, tzinfo=self.tz) + timedelta(minutes=30), xaxis_timedelta))
             self.ax.margins(x=0,y=0)
         self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {SiteInfo.from_file(site).get_tzstr(date)}")
         self.ax.set_xlabel(f"Time ({SiteInfo.from_file(site).get_tzstr(date)})")

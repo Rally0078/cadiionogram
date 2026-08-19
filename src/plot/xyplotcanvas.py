@@ -19,6 +19,7 @@ class XYPlotCanvas(FigureCanvas):
         self.scatter_range = None
         self.scatter_ew = None
         self.scatter_ns = None
+        self.tz = None
         cmap = colormaps[self.main.colormap]
         norm = colors.Normalize(vmin=0, vmax=self.main.power_limit)
         self.axs = [self.ax_range, self.ax_ew, self.ax_ns]
@@ -31,7 +32,7 @@ class XYPlotCanvas(FigureCanvas):
         self.cbar.set_label('Power (dB)')
         for ax in self.axs:
             ax.set_xlabel(f"Time in {SiteInfo.from_file(site).get_tzstr(date)}")
-            date_format = mdates.DateFormatter("%H:%M")
+            date_format = mdates.DateFormatter("%H:%M", tz=self.tz)
             ax.xaxis.set_major_formatter(date_format)
             #ax.grid()
 
@@ -41,6 +42,7 @@ class XYPlotCanvas(FigureCanvas):
         self.fig.tight_layout(pad=3)
         legend = self.fig.legend()
         legend.remove()
+        self.tz = time_index[0].tzinfo
         self.fig.suptitle(f"NS, EW, Range timeseries plot at site: {site} on {date.day:02d}-{date.month:02d}-{date.year:04d} {SiteInfo.from_file(site).get_tzstr(date)}")
         print(f"Selected frequencies: {selected_frequencies}")
         if len(selected_frequencies) == 1:
@@ -63,8 +65,9 @@ class XYPlotCanvas(FigureCanvas):
                 xaxis_timedelta = timedelta(hours=3) if len(np.unique(time_index)) > 72 else timedelta(hours=2) if len(np.unique(time_index)) > 36 else timedelta(minutes=30) if len(np.unique(time_index)) > 12 else timedelta(minutes=15)
             
             ax.set_xticks(np.arange(datetime(year=time_index[0].year, month=time_index[0].month, day=time_index[0].day, 
-                                                hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
-                                                hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
+                                                hour=time_index[0].hour, minute=0, second=0, tzinfo=self.tz), 
+                                                datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
+                                                hour=time_index[-1].hour, minute=time_index[-1].minute, second=0, tzinfo=self.tz) + timedelta(minutes=30), xaxis_timedelta))
             ax.margins(x=0,y=0)
         self.ax_ew.set_ylim(-1000, 1000)
         self.ax_ns.set_ylim(-1000, 1000)    
