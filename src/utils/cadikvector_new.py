@@ -42,25 +42,26 @@ def compute_xpha_full(df: pl.DataFrame, freq_list, site: str = 'TIR'):
     xpha_exprs = {}
     
     for name, (a0_re, a0_im, a1_re, a1_im, corr) in pairs.items():
-        # s = -(ant0_re + 1j*ant0_im) * conj(ant1_re + 1j*ant1_im)
-        # s_real = -(a0_re * a1_re + a0_im * a1_im)
-        # s_imag = a0_re * a1_im - a0_im * a1_re
-        s_real = -(pl.col(a0_re) * pl.col(a1_re) + pl.col(a0_im) * pl.col(a1_im))
-        s_imag = pl.col(a0_re) * pl.col(a1_im) - pl.col(a0_im) * pl.col(a1_re)
-        
-        # xpow = |s|^2 = s_real^2 + s_imag^2
-        xpow_exprs[name] = (s_real.pow(2) + s_imag.pow(2))
-        
-        # xpha = angle(s) + corr
-        # pl.arctan2 takes (y, x) -> (imag, real)
+    # Cast to float64 first to match np.float64 precision behavior
+        a0_re_f = pl.col(a0_re).cast(pl.Float64)
+        a0_im_f = pl.col(a0_im).cast(pl.Float64)
+        a1_re_f = pl.col(a1_re).cast(pl.Float64)
+        a1_im_f = pl.col(a1_im).cast(pl.Float64)
+
+        s_real = -(a0_re_f * a1_re_f + a0_im_f * a1_im_f)
+        s_imag = a0_re_f * a1_im_f - a0_im_f * a1_re_f
+
+        xpow_exprs[name] = (s_real.pow(2) + s_imag.pow(2)).cast(pl.Float32)
+
         angle_expr = pl.arctan2(s_imag, s_real) + corr
-        
-        if name == "x2":
-            # Wrap phase to [-pi, pi]
-            angle_expr = pl.when(angle_expr > np.pi).then(angle_expr - 2 * np.pi)\
-               .when(angle_expr < -np.pi).then(angle_expr + 2 * np.pi)\
-               .otherwise(angle_expr)
-            
+
+        angle_expr = (
+            pl.when(angle_expr > np.pi)
+            .then(angle_expr - 2 * np.pi)
+            .when(angle_expr < -np.pi)
+            .then(angle_expr + 2 * np.pi)
+            .otherwise(angle_expr)
+        )
         xpha_exprs[name] = angle_expr
 
     # Evaluate the cross power and phase dataframes
@@ -92,8 +93,8 @@ def compute_xpha_full(df: pl.DataFrame, freq_list, site: str = 'TIR'):
 
 def compute_kvector(df: pl.DataFrame, freq_list, sort_by_freq=False, points_thres=5, site: str = 'TIR'):
     # Polars dataframes don't have a traditional index; assuming an explicit timestamp column exists
-    # If your timestamp is a column named "timestamp", we verify uniqueness:
-    if "timestamp" in df.columns and df["timestamp"].n_unique() > 1:
+    # If your timestamp is a column named "datetime", we verify uniqueness:
+    if "datetime" in df.columns and df["datetime"].n_unique() > 1:
         raise ValueError("Only a single timestamp can be used for the calculation of k vector")
         
     # Call the Polars-optimized xpha computation
@@ -126,7 +127,7 @@ def compute_kvector(df: pl.DataFrame, freq_list, sort_by_freq=False, points_thre
     # Inject calculations as columns horizontally
     # xpha data is horizontally joined or combined directly for calculations
     working_df = pl.DataFrame({
-        "timestamp": df_filtered["timestamp"],
+        "datetime": df_filtered["datetime"],
         "freq": df_filtered["freq (Hz)"],
         "height": df_filtered["height (km)"],
         "dopplershift": df_filtered["dopplershift"],
@@ -175,12 +176,12 @@ def compute_kvector(df: pl.DataFrame, freq_list, sort_by_freq=False, points_thre
         )
 
     # Extract required modular chunks for the multi-output return structure
-    k_out = combined_output.select(["timestamp", "kx", "ky", "kz"])
+    k_out = combined_output.select(["datetime", "kx", "ky", "kz"])
     output_freqs = combined_output["freq"]
     output_heights = combined_output["height"]
     output_dops = combined_output["dopplershift"]
     output_signals = combined_output.select(signal_col_names)
-    output_xpow = combined_output.select(["x1", "x2"])
+    output_xpow = combined_output.select(["x1_pow", "x2_pow"])
 
     return k_out, output_freqs, output_heights, output_dops, output_signals, output_xpow
 
@@ -271,6 +272,6 @@ def compute_xy(df: pl.DataFrame, freq_list, sort_by_freq=False, points_thres=5, 
         pl.when(pl.col("azimuth") < 0).then(pl.col("azimuth") + 360).otherwise(pl.col("azimuth"))
     ])
     
-    df_output = geo_df.select(["timestamp", "xpos", "ypos", "zpos", "zenith", "azimuth"])
+    df_output = geo_df.select(["datetime", "xpos", "ypos", "zpos", "zenith", "azimuth"])
     
     return df_output, output_freqs, output_heights, output_dops, output_signals, output_xpow

@@ -62,10 +62,10 @@ def compute_xpha_full(df: pd.DataFrame, freq_list, site='TIR'):
     pairwise_antenna24 = [('sensor2 real', 'sensor2 imag'), ('sensor4 real', 'sensor4 imag')]
     cross_names = ['x1', 'x2']
     for pair1, pair2, cross_name, ph_corr in zip(pairwise_antenna13, pairwise_antenna24, cross_names, ph_corrections):
-        ant0_re = new_signal_selection[pair1[0]]
-        ant0_im = new_signal_selection[pair1[1]]
-        ant1_re = new_signal_selection[pair2[0]]
-        ant1_im = new_signal_selection[pair2[1]]
+        ant0_re = new_signal_selection[pair1[0]].to_numpy().astype(np.int32)
+        ant0_im = new_signal_selection[pair1[1]].to_numpy().astype(np.int32)
+        ant1_re = new_signal_selection[pair2[0]].to_numpy().astype(np.int32)
+        ant1_im = new_signal_selection[pair2[1]].to_numpy().astype(np.int32)
         s = (ant0_re + 1j * ant0_im) * np.conjugate((ant1_re + 1j * ant1_im))
         s = -s  #Site dependent, use polarity to determine according to the IDL code
         xpow[cross_name] = np.abs(s)**2
