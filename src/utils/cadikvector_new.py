@@ -241,6 +241,10 @@ def compute_xy(df: pl.DataFrame, freq_list, sort_by_freq=False, points_thres=5, 
     
     # Process geometry changes natively in Polars via expressions
     # Notice the sign inversion tracking logic based on the sign of kz
+    if (len(karray) == 0) or ("datetime" not in karray.columns):
+        return pl.DataFrame({
+            "datetime": [], "xpos":[], "ypos":[], "zpos":[], "zenith":[], "azimuth":[]
+        }), output_freqs, output_heights, output_dops, output_signals, output_xpow
     geo_df = karray.with_columns([
         pl.when(pl.col("kz") < 0).then(-pl.col("kx")).otherwise(pl.col("kx")).alias("kx_corr"),
         pl.when(pl.col("kz") < 0).then(-pl.col("ky")).otherwise(pl.col("ky")).alias("ky_corr"),

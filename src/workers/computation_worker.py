@@ -45,14 +45,15 @@ class ComputationWorker(QRunnable):
                     pl.from_pandas(df_selection.loc[dtime:dtime].reset_index())
                     ,self.freqs_list, sort_by_freq=False, site=self.site
                 )
-                df_output = df_output.to_pandas()
-                df_output.set_index("datetime", drop=True, inplace=True)
-                df_output['freq (Hz)'] = output_freqs.to_numpy()
-                df_output['dopplershift'] = output_dops.to_numpy()
-                df_output['xpower1 (dB)'] = 10*np.log10(output_xpow['x1_pow'].to_numpy())
-                df_output['xpower2 (dB)'] = 10*np.log10(output_xpow['x2_pow'].to_numpy())
-                all_output_freqs = np.concatenate([all_output_freqs, output_freqs])
-                df_all_outputs.append(df_output)
+                if len(df_output) > 0:
+                    df_output = df_output.to_pandas()
+                    df_output.set_index("datetime", drop=True, inplace=True)
+                    df_output['freq (Hz)'] = output_freqs.to_numpy()
+                    df_output['dopplershift'] = output_dops.to_numpy()
+                    df_output['xpower1 (dB)'] = 10*np.log10(output_xpow['x1_pow'].to_numpy())
+                    df_output['xpower2 (dB)'] = 10*np.log10(output_xpow['x2_pow'].to_numpy())
+                    all_output_freqs = np.concatenate([all_output_freqs, output_freqs])
+                    df_all_outputs.append(df_output)
             df_all_outputs = pd.concat(df_all_outputs)
                 
             

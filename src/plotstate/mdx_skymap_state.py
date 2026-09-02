@@ -26,7 +26,7 @@ class MdxSkymapState(PlotState):
             target_dtime = time_obj.replace(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day)
         target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
 
-        df_at_time = df.loc[target_dtime]
+        df_at_time = df.loc[target_dtime:target_dtime]
         
         freqs = df_at_time['freq (Hz)'].to_numpy()
         heights = df_at_time['height (km)'].to_numpy()

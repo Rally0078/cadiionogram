@@ -208,7 +208,7 @@ def compute_vel(df, freq_list, points_thres=5, site='TIR'):
     v_xarr = np.array([])
     v_yarr = np.array([])
     v_zarr = np.array([])
-    df_output = pd.DataFrame(columns=['freq (Hz)', 'vx', 'vy', 'vz'])
+    df_output = pd.DataFrame(columns=['freq (Hz)', 'vx', 'vy', 'vz', 'n_points'])
     for idx, freq in enumerate(freq_list):
         freq_idxs = output_freqs == freq
         y_df = output_dops.loc[freq_idxs]
