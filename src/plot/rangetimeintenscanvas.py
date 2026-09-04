@@ -1,14 +1,15 @@
 #PySide6 FigureCanvas to plot Ionogram as scatterplot
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.pyplot import cm
-from matplotlib import colors
+from matplotlib import colormaps, colors, cm
 from matplotlib.ticker import ScalarFormatter, MultipleLocator
 import numpy as np
+from pandas import date_range
 from datetime import datetime, timedelta
+
 import matplotlib.dates as mdates
 
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 
 
 class RangeTimeIntensCanvas(FigureCanvas):
@@ -18,12 +19,12 @@ class RangeTimeIntensCanvas(FigureCanvas):
         super().__init__(self.fig)
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
-        cmap = cm.get_cmap(self.main.colormap)
+        cmap = colormaps[self.main.colormap]
         norm = colors.Normalize(vmin=0, vmax=self.main.power_limit)
         self.colorbar = self.fig.colorbar(mappable=cm.ScalarMappable(norm, cmap), ax=self.ax)
         #self.freq_ticks = np.arange(0, 18e6, 2e6)
         #self.freq_limits = (1e6, 18e6)
-
+        self.tz = None
         self._set_plot_ax()
 
     def _set_plot_ax(self):
@@ -31,7 +32,7 @@ class RangeTimeIntensCanvas(FigureCanvas):
         #self.ax.set_ylim(self.freq_limits)
         self.ax.set_ylabel("Virtual Height(km)")
         #self.ax.set_xlabel("Time (UTC)")
-        timeformat = mdates.DateFormatter('%H:%M')
+        timeformat = mdates.DateFormatter('%H:%M', tz=self.tz)
         self.ax.xaxis.set_major_formatter(timeformat)
         self.ax.tick_params(axis='both', direction='in')
         self.ax.set_yticks(np.arange(0, 1200, 100))
@@ -46,6 +47,7 @@ class RangeTimeIntensCanvas(FigureCanvas):
             raise ValueError("Must provide a list of selected frequencies")
         self.ax.clear()
         self.fig.tight_layout(pad=3)
+        self.tz = time_index.tzinfo
         if needs_freq_selection:
             for freq in np.unique(selected_frequencies):
                 matched_idxs = np.argwhere(np.isclose(freqs, freq, atol=1e-12)).flatten()
@@ -60,15 +62,18 @@ class RangeTimeIntensCanvas(FigureCanvas):
             xaxis_timedelta = timedelta(hours=6)
         else:
             xaxis_timedelta = timedelta(hours=3) if len(np.unique(time_index)) > 72 else timedelta(hours=2) if len(np.unique(time_index)) > 36 else timedelta(minutes=30) if len(np.unique(time_index)) > 12 else timedelta(minutes=15)
-        
-        self.ax.set_xticks(np.arange(datetime(year=time_index[0].year, month=time_index[0].month, day=time_index[0].day, 
-                                                hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
-                                                hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
-        self.ax.margins(x=0,y=0)
         self.ax.set_xlim(time_index[0], time_index[-1])
+        self.ax.set_xticks(date_range(
+                start=time_index[0].replace(minute=0, second=0),
+                end=time_index[-1].replace(second=0) + timedelta(minutes=30),
+                freq=xaxis_timedelta,
+                tz=self.tz,
+            ))
+        self.ax.margins(x=0,y=0)
         
-        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {site_dict[site].get_tzstr(date)}")
-        self.ax.set_xlabel(f"Time ({site_dict[site].get_tzstr(date)})")
+        
+        self.ax.set_title(f"Virtual height vs Time: {site} on {date.strftime("%d-%m-%Y")} {SiteInfo.from_file(site).get_tzstr(date)}")
+        self.ax.set_xlabel(f"Time ({SiteInfo.from_file(site).get_tzstr(date)})")
         self._set_plot_ax()
         #self.fig.tight_layout()
         self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)

@@ -11,6 +11,15 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        # Ensure sites.json exists and is populated
+        from src.utils.siteinfo import get_sites_json_path, DEFAULT_SITES
+        import json
+        sites_path = get_sites_json_path()
+        if not sites_path.exists():
+            sites_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(sites_path, "w", encoding="utf-8") as f:
+                json.dump(DEFAULT_SITES, f, indent=4)
+
         self.config = configparser.ConfigParser()
         os_name = platform.system()
         
@@ -38,17 +47,24 @@ class MainWindow(QMainWindow):
                 'powercolormap': 'jet_r',
                 'dopcolormap': 'viridis',
                 'scattersize': '6',
-                'powerlimit': '50'
+                'powerlimit': '50',
+                'maxfreq': '20'
             },
             'realheightanalysis': {
-                'interpmode': 'old'
+                'interpmode': 'old',
+                'savecleanformat': 'true',
+                'start': '0.0',
+                'amode': '0.0',
+                'valley': '0.00',
+                'list': '0'
             },
             'scaling': {
                 'linewidth': '2',
                 'scalingoption1': 'F',
                 'scalingoption2': 'E',
                 'scalingoption3': 'IE',
-                'enableESscaling': 'true'
+                'enableESscaling': 'true',
+                'enablespreadFscaling': 'true'
             }
         }
 

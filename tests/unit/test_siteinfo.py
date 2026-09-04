@@ -4,7 +4,7 @@ class TestSiteInfo:
     def test_siteinfo(self, test_site_dict, date_site_dict):
         sitenames, obs_datetimes, expected_zones = date_site_dict
         for site, obs_dt, expected_zone in zip(sitenames, obs_datetimes, expected_zones):
-            assert expected_zone == test_site_dict[site].get_tzinfo(obs_dt)
+            assert expected_zone == test_site_dict.from_file(site).get_tzinfo(obs_dt)
     
     def test_raw_md4_TIR_LT(self, mock_raw_file_TIR_LT, test_raw_reader):
         file_list, metadata, heights, freqs, freq_list, dop_shifts, sensors = test_raw_reader.read_raw_data(mock_raw_file_TIR_LT)

@@ -2,12 +2,12 @@
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.dates as mdates
-from matplotlib.pyplot import cm
-from matplotlib import colors
+from matplotlib import colormaps, colors, cm
 from matplotlib.ticker import ScalarFormatter, MultipleLocator
 from datetime import datetime, timedelta
+from pandas import date_range
 import numpy as np
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 
 class XYPlotCanvas(FigureCanvas):
     def __init__(self, parent=None):
@@ -20,7 +20,8 @@ class XYPlotCanvas(FigureCanvas):
         self.scatter_range = None
         self.scatter_ew = None
         self.scatter_ns = None
-        cmap = cm.get_cmap(self.main.colormap)
+        self.tz = None
+        cmap = colormaps[self.main.colormap]
         norm = colors.Normalize(vmin=0, vmax=self.main.power_limit)
         self.axs = [self.ax_range, self.ax_ew, self.ax_ns]
         self.cbar = self.fig.colorbar(mappable=cm.ScalarMappable(norm, cmap), ax=self.ax_range)
@@ -31,8 +32,8 @@ class XYPlotCanvas(FigureCanvas):
         self.ax_ew.set_ylabel("EW (km)")
         self.cbar.set_label('Power (dB)')
         for ax in self.axs:
-            ax.set_xlabel(f"Time in {site_dict[site].get_tzstr(date)}")
-            date_format = mdates.DateFormatter("%H:%M")
+            ax.set_xlabel(f"Time in {SiteInfo.from_file(site).get_tzstr(date)}")
+            date_format = mdates.DateFormatter("%H:%M", tz=self.tz)
             ax.xaxis.set_major_formatter(date_format)
             #ax.grid()
 
@@ -42,7 +43,8 @@ class XYPlotCanvas(FigureCanvas):
         self.fig.tight_layout(pad=3)
         legend = self.fig.legend()
         legend.remove()
-        self.fig.suptitle(f"NS, EW, Range timeseries plot at site: {site} on {date.day:02d}-{date.month:02d}-{date.year:04d} {site_dict[site].get_tzstr(date)}")
+        self.tz = time_index[0].tzinfo
+        self.fig.suptitle(f"NS, EW, Range timeseries plot at site: {site} on {date.day:02d}-{date.month:02d}-{date.year:04d} {SiteInfo.from_file(site).get_tzstr(date)}")
         print(f"Selected frequencies: {selected_frequencies}")
         if len(selected_frequencies) == 1:
             selected_heights = heights.iloc[np.argwhere(np.isclose(freqs, selected_frequencies[0], atol=1e-12)).flatten()]
@@ -63,9 +65,12 @@ class XYPlotCanvas(FigureCanvas):
             else:
                 xaxis_timedelta = timedelta(hours=3) if len(np.unique(time_index)) > 72 else timedelta(hours=2) if len(np.unique(time_index)) > 36 else timedelta(minutes=30) if len(np.unique(time_index)) > 12 else timedelta(minutes=15)
             
-            ax.set_xticks(np.arange(datetime(year=time_index[0].year, month=time_index[0].month, day=time_index[0].day, 
-                                                hour=time_index[0].hour, minute=0, second=0), datetime(year=time_index[-1].year, month=time_index[-1].month, day=time_index[-1].day, 
-                                                hour=time_index[-1].hour, minute=time_index[-1].minute, second=0) + timedelta(minutes=30), xaxis_timedelta))
+            ax.set_xticks(date_range(
+                                    start=time_index[0].replace(minute=0, second=0),
+                                    end=time_index[-1].replace(second=0) + timedelta(minutes=30),
+                                    freq=xaxis_timedelta,
+                                    tz=self.tz,
+            ))
             ax.margins(x=0,y=0)
         self.ax_ew.set_ylim(-1000, 1000)
         self.ax_ns.set_ylim(-1000, 1000)    

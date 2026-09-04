@@ -1,50 +1,48 @@
 #PySide6 FigureCanvas to plot MD4 Ionogram as scatterplot
+from scipy.interpolate import PchipInterpolator
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from matplotlib.ticker import ScalarFormatter, MultipleLocator, FuncFormatter, AutoMinorLocator, FixedLocator
 from matplotlib.lines import Line2D
-import numpy as np
+from matplotlib.ticker import ScalarFormatter, MultipleLocator, FuncFormatter
 from datetime import datetime
-from scipy.interpolate import PchipInterpolator
+import numpy as np
 from scipy.integrate import cumulative_trapezoid
-from src.ionogramfiltering.noisereduction import *
 from src.utils.siteinfo import SiteInfo
+from src.ionogramfiltering.noisereduction import *
+from src.plotstate.scaling_region_state import ScaleRegionValues
 
-
-def _convert_f_to_n(f):
-    return (f*1e6/8.982)**2
-def _convert_n_to_f(n):
-    return 8.982*np.sqrt(n) / 1e6
-
-class RealHeightAnalysisCanvas(FigureCanvas):
+class AutoScaleIonogramCanvas(FigureCanvas):
     def __init__(self, parent=None):
         self.fig = Figure(figsize=(16, 9))
-        self.main = parent
+        self.main = parent # Store main widget reference
         super().__init__(self.fig)
         self.ax = self.fig.add_subplot(111)
         self.scatter = None
-        self.secax = None
         self.colorbar = None
         self.freq_ticks = [1, 2, 4, 6, 8, 10, 15, 20]
         self.freq_limits = (1, self.main.iono_maxfreq)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
-        self.user_points = []
-        self.user_point_artists = [] 
-        self.drawing = False
-        self.drawn_points = []  # List of (x, y) tuples for curve
-        self.line = None  # Line2D object for the curve
-        self.line_polan = None #Line2D for POLAN real height curve
-        self.freqs = np.array([])   # Empty by default
-        self.heights = np.array([]) # Empty by default
-        self.interp_line = None
-        # Connect matplotlib mouse events
+        self.scaled_values_lines = ScaleRegionValues(self.ax, 
+                                                     self.main.scaling_line_width, labels=
+                                                     ['E',
+                                                      'F',''])
+        self._set_plot_ax()
         self.mpl_connect("button_press_event", self.on_mouse_press)
         self.mpl_connect("motion_notify_event", self.on_mouse_move)
         self.mpl_connect("button_release_event", self.on_mouse_release)
         self.mpl_connect("scroll_event", self.on_mouse_scroll)
         self.zoom_factor = 1.2
-        self._set_plot_ax()
+        self.legend = None
+        self.extra_data = {}
+        self.drawing = False
+        self.drawn_points = []
+        self.line = None
+        self.line_polan = None
+        self.interp_line = None
+        #self.plot_initial()
 
     def _set_plot_ax(self):
         self.ax.set_xscale('log')
@@ -56,76 +54,83 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         self.ax.set_ylabel("Virtual height (km)")
         self.ax.xaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:g}'))
         self.ax.yaxis.set_minor_locator(MultipleLocator(5))
+        self.ax.grid()
 
-        # Add secondary X axis for electron density
-        if self.secax is not None:
-            try:
-                self.secax.remove()
-            except:
-                pass
-
-        self.secax = self.ax.secondary_xaxis('top', functions=(_convert_f_to_n, _convert_n_to_f))
-        self.secax.set_xlabel(r'Electron density ($m^{-3}$)')
-
-        # Use x10^n notation and label existing minor ticks
-        formatter = ScalarFormatter(useMathText=True)
-        formatter.set_scientific(True)
-        formatter.set_powerlimits((0, 0))
-        self.secax.xaxis.set_major_formatter(formatter)
-
-        # Define manual major and minor ticks
-        major_ticks = [1e11, 1e12]
-        minor_ticks = [2e10, 3e10, 4e10, 6e10, 8e10, 2e11, 3e11, 4e11, 5e11, 6e11, 8e11, 1.5e12, 2e12, 3e12, 4e12]
-
-        self.secax.xaxis.set_major_locator(FixedLocator(major_ticks))
-        self.secax.xaxis.set_minor_locator(FixedLocator(minor_ticks))
-
-        # Custom formatter for minor ticks to show more precision (coefficient only)
-        def minor_tick_formatter(x, pos):
-            if x <= 0: return ""
-            exponent = 12
-            coeff = x / 10**exponent
-            return f"${coeff:g}$"
-
-        self.secax.xaxis.set_minor_formatter(FuncFormatter(minor_tick_formatter))
-
-        # Make minor labels smaller
-        self.secax.tick_params(axis='x', which='minor', labelsize=8)
-        self.secax.tick_params(axis='x', which='major', labelsize=10)
-
-        self.ax.grid(True, which='major')
-
-    def plot_scatter(self, freqs, heights, dops, power, timestamp, site):
-        self.freqs = freqs
-        self.heights = heights
-        self.site = site
+    def plot_scatter(self, freqs, heights, dops, signals, timestamp, site):
         self.ax.clear()
-
-        self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=power, cmap=self.main.colormap, marker='s')
+        self.legend = None  # ax.clear() destroys all artists; reset so _update_legend_box recreates it
+        self.fig.tight_layout(pad=3)
+        # Use configurable plotting options
+        self.scatter = self.ax.scatter(freqs / 1e6, heights, s=self.main.scatter_size, c=signals, cmap=self.main.colormap, marker='s')
         self.scatter.set_clim(0, self.main.power_limit)
 
         if self.colorbar:
             self.colorbar.update_ticks()
+            #self.colorbar.set_clim(signals.min(), signals.max())  # Update color limits
         else:
+            # Create the colorbar if it doesn't exist
             self.colorbar = self.figure.colorbar(self.scatter, ax=self.ax)
             self.colorbar.set_label("Power (dB)")
             self.colorbar.set_ticks(np.arange(0, self.main.power_limit + 1, 5))  # Fixed ticks from 0 to power_limit with step of 5
             self.scatter.set_clim(0, self.main.power_limit)  # Set color limits on scatter plot
-
-        self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime('%H:%M:%S %d-%m-%Y')} {SiteInfo.from_file(site).get_tzstr(timestamp)}")
+        self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime("%H:%M:%S %d-%m-%Y")} {SiteInfo.from_file(site).get_tzstr(timestamp)}")
         self._set_plot_ax()
-
-        # Re-create the interactive drawing line
+        self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)
+        # Re-create/re-add the interactive drawing line and polan line
         self.line = Line2D([], [], color='red', linewidth=2)
         self.ax.add_line(self.line)
 
-        self.line_polan = Line2D([], [], color='green', linewidth=2, linestyle='--')
+        self.line_polan = Line2D([], [], color='darkblue', linewidth=2, linestyle='--')
         self.ax.add_line(self.line_polan)
 
-        self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.90)
+        self.drawing = False
+        self.drawn_points = []
 
+        # Reset lines
+        self.scaled_values_lines.clear_all()
+        self._update_legend_box()
         self.draw()
 
+    def on_mouse_press(self, event):
+        # Only respond to left or right clicks inside axes
+        if event.inaxes != self.ax:
+            return
+
+        if QApplication.keyboardModifiers() & Qt.ControlModifier:
+            #Get current scale region mode
+            if self.main.scale_box1.isChecked():
+                text_legend = self.main.scale_box1.text().split()[-1]
+            elif self.main.scale_box2.isChecked():
+                text_legend = self.main.scale_box2.text().split()[-1]
+            else:
+                raise KeyError("No valid region selected for manual scaling")
+            self.scaled_values_lines.set_region(text_legend)
+            
+            if event.button == 1:  # Left click -> scale height
+                # Create a new line or clear old one
+                self.scaled_values_lines.h = event.ydata
+            elif event.button == 3:  # Right click -> scale frequency
+                self.scaled_values_lines.f = event.xdata
+            self.handle_legend()
+            self.draw()
+        else:
+            if event.button == 1:  # Left click -> start drawing
+                self.drawing = True
+                self.drawn_points = [(event.xdata, event.ydata)]
+                # Create a new line or clear old one
+                if self.line is None:
+                    self.line = Line2D([event.xdata], [event.ydata], color='red', linewidth=2)
+                    self.ax.add_line(self.line)
+                else:
+                    self.line.set_data([event.xdata], [event.ydata])
+                self.draw()
+
+            elif event.button == 3:  # Right click -> clear the curve
+                self.drawing = False
+                self.drawn_points = []
+                if self.line is not None:
+                    self.line.set_data([], [])
+                self.draw()
 
     def plot_interp(self, interp_freqs, interp_heights):
         interp_freqs = np.array(interp_freqs)
@@ -136,109 +141,42 @@ class RealHeightAnalysisCanvas(FigureCanvas):
 
         self.draw_idle()
 
-    def plot_polan(self, freqs, real_heights, interp_freqs, interp_heights, extra_data=None):
+    def plot_polan(self, freqs, real_heights, interp_freqs, interp_heights, extra_data):
         if len(freqs) == 0:
             return
         freqs = np.array(freqs)
+        self.extra_data = extra_data  # Store so _update_legend_box can access it
         self.plot_interp(interp_freqs, interp_heights)
         if self.line_polan is None:
-            self.line_polan = Line2D(freqs, real_heights, color='green', linewidth=2, linestyle='--')
+            self.line_polan = Line2D(freqs, real_heights, color='darkblue', linewidth=2, linestyle='--')
             self.ax.add_line(self.line_polan)
         else:
             self.line_polan.set_data(freqs, real_heights)
+        self.handle_legend()
         self.draw()
 
-    def on_mouse_press(self, event):
-        # Only respond to left or right clicks inside axes
-        if event.inaxes != self.ax:
-            return
-
-        if event.button == 1:  # Left click -> start drawing
-            self.drawing = True
-            self.drawn_points = [(event.xdata, event.ydata)]
-            # Create a new line or clear old one
-            if self.line is None:
-                self.line = Line2D([event.xdata], [event.ydata], color='red', linewidth=2)
-                self.ax.add_line(self.line)
-            else:
-                self.line.set_data([event.xdata], [event.ydata])
-            self.draw()
-
-        elif event.button == 3:  # Right click -> clear the curve
-            self.drawing = False
-            self.drawn_points = []
-            if self.line is not None:
-                self.line.set_data([], [])
-            self.draw()
-
-    def on_mouse_move(self, event):
-        if not self.drawing or event.inaxes != self.ax:
-            return
-        self.drawn_points.append((event.xdata, event.ydata))
-        xs, ys = zip(*self.drawn_points)
-        self.line.set_data(xs, ys)
-        self.draw()
-
-    def on_mouse_release(self, event):
-        if event.button == 1 and self.drawing:
-            self.drawing = False
-
-    def on_mouse_scroll(self, event):
-        if event.inaxes != self.ax:
-            return
-
-        xdata, ydata = event.xdata, event.ydata
-        cur_xlim = self.ax.get_xlim()
-        cur_ylim = self.ax.get_ylim()
-
-        if event.button == 'up':  # Zoom in
-            scale_factor = 1 / self.zoom_factor
-        elif event.button == 'down':  # Zoom out
-            scale_factor = self.zoom_factor
-        else:
-            return
-
-        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
-        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
-
-        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
-        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
-
-        self.ax.set_xlim([xdata - new_width * (1 - relx), xdata + new_width * relx])
-        self.ax.set_ylim([ydata - new_height * (1 - rely), ydata + new_height * rely])
-        self.draw_idle()
-
-    def reset_zoom(self):
-        self.ax.set_xlim(self.freq_limits)
-        self.ax.set_ylim(self.height_limits)
-        self.draw_idle()
-
-    def draw_auto_curve(self, df):
+    def draw_new_auto_curve(self, df):
         freqs, heights, dops = df['freq (Hz)'].to_numpy(), df['height (km)'].to_numpy(), df['dopplershift'].to_numpy()
         signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
         signals = df[signal_col_names].to_numpy()
 
         freqs = freqs / 1e6 # Convert freqs from Hz to MHz
-        noise_idx, _, _ = freq_filter(freqs, heights)
-        freqs_filtered = np.delete(freqs, noise_idx)
-        heights_filtered = np.delete(heights, noise_idx)
-        dops_filtered = np.delete(dops, noise_idx)
-        sensors_filtered = np.delete(signals, noise_idx, axis=0)
-        freqs_omode, heights_omode, dops_omode, sensors_omode = o_x_separation(freqs_filtered, heights_filtered, dops_filtered, sensors_filtered, site=getattr(self, 'site', 'TIR'))
-        new_pix_counts, medians, freq_flayer = calculate_pixbins(freqs_omode, heights_omode)
-        freq_new_x = []
-        height_new_y = []
-        prev_len = 0
-        for freq_bin, median in zip(new_pix_counts, medians):
-            idx, freq, indices, hgts = freq_bin
-            if prev_len >= 1:
-                freq_new_x = np.append(freq_new_x, freq)
-                height_new_y = np.append(height_new_y, np.median(hgts))
-            prev_len = len(hgts)
+        freqs_omode, heights_omode, _, _ = o_x_separation(freqs, heights, dops, signals, site=self.main.metadata['site'], mode='O')
+        autoscale_output = autoscale(freqs_omode, heights_omode, 
+                                     freq_list=np.array(self.main.freqs_list)/1e6, 
+                                     height_list=np.arange(self.main.metadata['minheight'], self.main.metadata['maxheight'], 3.0),
+                                     n_dilations=3,n_erosions=2)
+        freq_new_x, height_new_y = autoscale_output['freq_output'], autoscale_output['height_output']
         points = np.array([(x, y) for x, y in zip(freq_new_x, height_new_y)])
-        freqs_interp, heights_interp, unique_freqs, avg_heights = self.get_polan_curve(points, spacing=0.2)
+        freqs_interp, heights_interp, unique_freqs, avg_heights = self.get_polan_curve(points, spacing=0.1)
         if len(heights_interp) >= 1:
             self.plot_interp(freqs_interp, heights_interp)
+            self.scaled_values_lines.set_region('F')
+
+            self.scaled_values_lines.h = height_new_y[0]
+
+            self.scaled_values_lines.f = freq_new_x[-1]
+            self.handle_legend()
         return freqs_interp, heights_interp, unique_freqs, avg_heights
 
     def get_polan_curve(self, points, spacing=0.2, max_points=54):
@@ -289,8 +227,8 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         heights_interp = heights_interp[mask]
 
         return freqs_interp, heights_interp, unique_freqs, avg_heights
-
-    def new_compute_matched_curve(self, points, spacing=0.1, max_points=54):
+    
+    def new_compute_matched_curve(self, points, spacing=0.05, max_points=54):
         """
             Interpolate a curve based on some sample inputs(automatic or hand drawn), and return an output curve at variable frequency steps, experimental. 
             Required for POLAN.
@@ -369,3 +307,93 @@ class RealHeightAnalysisCanvas(FigureCanvas):
         heights_final = heights_final[mask]
 
         return freqs_final, heights_final, unique_freqs, avg_heights
+
+    def on_mouse_move(self, event):
+        if not self.drawing or event.inaxes != self.ax:
+            return
+        self.drawn_points.append((event.xdata, event.ydata))
+        xs, ys = zip(*self.drawn_points)
+        self.line.set_data(xs, ys)
+        self.draw()
+
+    def on_mouse_release(self, event):
+        if event.button == 1 and self.drawing:
+            self.drawing = False
+
+
+    def on_mouse_scroll(self, event):
+        if event.inaxes != self.ax:
+            return
+
+        xdata, ydata = event.xdata, event.ydata
+        cur_xlim = self.ax.get_xlim()
+        cur_ylim = self.ax.get_ylim()
+
+        if event.button == 'up':  # Zoom in
+            scale_factor = 1 / self.zoom_factor
+        elif event.button == 'down':  # Zoom out
+            scale_factor = self.zoom_factor
+        else:
+            return
+
+        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
+        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
+
+        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
+        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
+
+        self.ax.set_xlim([xdata - new_width * (1 - relx), xdata + new_width * relx])
+        self.ax.set_ylim([ydata - new_height * (1 - rely), ydata + new_height * rely])
+        self.draw_idle()
+
+    def reset_zoom(self):
+        self.ax.set_xlim(self.freq_limits)
+        self.ax.set_ylim(self.height_limits)
+        self.draw_idle()
+
+    def _update_legend_box(self):
+        """Create the custom legend text box once; update its text on subsequent calls."""
+        lines = []
+        for s in self.scaled_values_lines._state.values():
+            for line in [s['hline'], s['fline']]:
+                if line is not None:
+                    lines.append(line)
+
+        if not lines:
+            if self.legend is not None:
+                self.legend.set_visible(False)
+            return
+
+        parts = [line.get_label() for line in lines]
+        if self.extra_data:
+            parts.extend(f"{k}: {v}" for k, v in self.extra_data.items())
+        box_text = "\n".join(parts)
+
+        if self.legend is not None:
+            self.legend.set_text(box_text)
+            self.legend.set_visible(True)
+        else:
+            self.legend = self.ax.text(
+                0.01, 0.99, box_text,
+                transform=self.ax.transAxes,
+                verticalalignment='top',
+                horizontalalignment='left',
+                fontsize=14,
+                family='monospace',
+                bbox=dict(
+                    boxstyle='round,pad=0.4',
+                    facecolor='white',
+                    edgecolor='#444444',
+                    alpha=0.85,
+                    linewidth=1.2,
+                )
+            )
+
+    def handle_legend(self):
+        self._update_legend_box()
+    def clean_canvas(self):
+        self.scaled_values_lines.clear_all()
+        if self.legend is not None:
+            self.legend.remove()
+            self.legend = None
+        self.draw()

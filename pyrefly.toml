@@ -1,0 +1,9 @@
+# set the directory Pyrefly will search for files to type check
+# 1. Tells Pyrefly which files to type-check
+project-includes = ["."]
+
+# 2. Tells Pyrefly where to resolve absolute imports from
+search-path = ["."]
+
+# manually set the `sys.platform` Pyrefly will assume when type checking
+python-platform = "windows"

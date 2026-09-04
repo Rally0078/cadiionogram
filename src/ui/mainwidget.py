@@ -6,6 +6,7 @@ from src.plotstate.factory import PlotStateFactory
 from src.ui.mainwidgetservice import MainWidgetService
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from PySide6.QtCore import Qt, QThreadPool
+from datetime import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout,
     QPushButton, QFileDialog, QLabel, 
@@ -16,17 +17,18 @@ from PySide6.QtWidgets import (
 
 class MainWidget(QWidget):
     md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries','Skymap']
-    md4_options = ['Display ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity', 'Skymap']
+    md4_options = ['Display ionogram', 'Autoscale Ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity', 'Skymap']
+    sameer_options = ['Display ionogram', 'Scale ionogram', 'Real height analysis']
     
     def __init__(self, config: ConfigParser):
         super().__init__()
         self.init_config(config)
         self.service = MainWidgetService(self)
         # Canvas parameters to be used later
-        self.canvas_layout_row = 2
-        self.canvas_layout_col = 3
-        self.canvas_layout_rowspan = 8
-        self.canvas_layout_colspan = 3
+        self.canvas_layout_row = 1
+        self.canvas_layout_col = 4
+        self.canvas_layout_rowspan = 9
+        self.canvas_layout_colspan = 9
         self.canvas_widget = None
         self.current_plot_state = None
         self.has_handled_calculation = False
@@ -68,6 +70,10 @@ class MainWidget(QWidget):
         self.reset_zoom_button = QPushButton("Reset Zoom")
         self.reset_zoom_button.setVisible(False)  # Hidden initially
         self.reset_zoom_button.clicked.connect(self._reset_zoom_helper)
+
+        self.autoscale_button = QPushButton("Autoscale")
+        self.autoscale_button.setVisible(False)
+        self.autoscale_button.clicked.connect(self._polan_manual_helper)
         
         # Save Scaling button
         self.save_scale_button = QPushButton("Save Scaling")
@@ -79,9 +85,9 @@ class MainWidget(QWidget):
         
         # Manual scaling modes
         self.scale_mode_group = QButtonGroup()
-        self.scale_box1 = QCheckBox(f"Scale " + self.config.get('scaling', 'scalingoption1'))
-        self.scale_box2 = QCheckBox(f"Scale " + self.config.get('scaling', 'scalingoption2'))
-        self.scale_box3 = QCheckBox(f"Scale " + self.config.get('scaling', 'scalingoption3'))
+        self.scale_box1 = QCheckBox(f"Scale {self.config.get('scaling', 'scalingoption1')}")
+        self.scale_box2 = QCheckBox(f"Scale {self.config.get('scaling', 'scalingoption2')}")
+        self.scale_box3 = QCheckBox(f"Scale {self.config.get('scaling', 'scalingoption3')}")
         self.scale_mode_group.addButton(self.scale_box1)
         self.scale_mode_group.addButton(self.scale_box2)
         self.scale_mode_group.addButton(self.scale_box3)
@@ -101,6 +107,17 @@ class MainWidget(QWidget):
         self.es_scaling_dropdown.currentIndexChanged.connect(self._on_es_scaling_changed)
         self._es_scaling_mode = 0
 
+        #Spread-F Scaling controls
+        self.spread_f_label = QLabel("Spread F")
+        self.spread_f_label.setVisible(False)
+        self.spread_f_dropdown = QComboBox()
+        self.spread_f_options = ['No','Satellite Trace','Range','Mixed','Freq']
+        self.spread_f_dropdown.addItems(self.spread_f_options)
+        self.spread_f_dropdown.setCurrentIndex(0)
+        self.spread_f_dropdown.setVisible(False)
+        self.spread_f_dropdown.currentIndexChanged.connect(self._on_spread_f_scaling_changed)
+        self._spread_f_scaling_mode = 0
+
         # Mode selection dropdown
         self.mode_dropdown = QComboBox()
         self.mode_dropdown.addItems(MainWidget.md4_options)
@@ -115,9 +132,15 @@ class MainWidget(QWidget):
         # Add mode selection dropdown and Run button to this layout
         self.run_button = QPushButton("Run")
         self.run_button.setEnabled(False)
+        self.save_plot_button = QPushButton("Save Plot")
+        self.save_plot_button.setVisible(False)
+        self.save_plot_button.setEnabled(False)
         self.mode_dropdown_layout.addWidget(self.mode_dropdown)
         self.mode_dropdown_layout.addWidget(self.run_button)
+        self.mode_dropdown_layout.addWidget(self.save_plot_button)
+        self.save_plot_button.clicked.connect(self._run_save_fig_callback)
         self.run_button.clicked.connect(self._run_button_callback)
+
         
         self.freq_selector = CheckableDropdown(text="Select Frequencies")
         self.freq_selector.setVisible(False)
@@ -131,7 +154,7 @@ class MainWidget(QWidget):
         layout.addWidget(self.md3_checkbox, 2, 0)
         layout.addWidget(self.md4_checkbox, 2, 1)
         layout.addWidget(self.iono_checkbox, 2, 2)
-        layout.addWidget(self.mode_dropdown_container, 3, 0, 1, 2)
+        layout.addWidget(self.mode_dropdown_container, 3, 0, 1, 3)
         layout.setColumnStretch(4, 1)
 
         # Custom table widget for metadata table and navigation
@@ -143,13 +166,24 @@ class MainWidget(QWidget):
         layout.addWidget(self.scale_box1, 6, 0)
         layout.addWidget(self.scale_box2, 6, 1)
         layout.addWidget(self.scale_box3, 6, 2)
-        layout.addWidget(self.es_scaling_label, 7, 0)
-        layout.addWidget(self.es_scaling_dropdown, 7, 1)
-        layout.addWidget(self.freq_selector, 8, 0)
-        layout.addWidget(self.polan_button, 8, 0)
-        layout.addWidget(self.reset_zoom_button, 8, 2)
-        layout.addWidget(self.save_scale_button, 8, 0)
-        layout.addWidget(self.clear_scale_button, 8, 1)
+        if(self.enable_es_scaling and not self.enable_spreadf_scaling):
+            layout.addWidget(self.es_scaling_label, 7, 0)
+            layout.addWidget(self.es_scaling_dropdown, 7, 1)
+        elif(self.enable_spreadf_scaling and not self.enable_es_scaling):
+            layout.addWidget(self.spread_f_label, 7, 0)
+            layout.addWidget(self.spread_f_dropdown, 7, 1)
+        else:
+            layout.addWidget(self.es_scaling_label, 7, 0)
+            layout.addWidget(self.es_scaling_dropdown, 7, 1)
+            layout.addWidget(self.spread_f_label, 8, 0)
+            layout.addWidget(self.spread_f_dropdown, 8, 1)
+
+        layout.addWidget(self.freq_selector, 9, 0)
+        layout.addWidget(self.polan_button, 9, 0)
+        layout.addWidget(self.autoscale_button, 9,0)
+        layout.addWidget(self.reset_zoom_button, 9, 2)
+        layout.addWidget(self.save_scale_button, 9, 0)
+        layout.addWidget(self.clear_scale_button, 9, 1)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
@@ -186,15 +220,24 @@ class MainWidget(QWidget):
         self.config = config
         self.polan_dir = Path(config['Locations']['polanoutputdirectory'])
         self.input_dir = Path(config['Locations']['DefaultInputDirectory'])
+        self.output_dir = Path(config['Locations']['DefaultOutputDirectory'])
         self.parquet_cache_dir = Path(config['Locations']['cachedir'])
         self.colormap = config['plotting']['powercolormap']
         self.dopcolormap = config['plotting']['dopcolormap']
         self.scatter_size = config.getint('plotting', 'scattersize')
         self.power_limit = config.getint('plotting', 'powerlimit')
         self.polan_interp_mode = config.get('realheightanalysis', 'interpmode')
+        self.save_clean_polan_format = config.getboolean('realheightanalysis', 'savecleanformat')
         self.scaling_line_width = config.getfloat('scaling', 'linewidth')
         self.enable_es_scaling = config.getboolean('scaling', 'enableesscaling')
-        if self.polan_interp_mode not in ['old', 'new', 'OLD', 'NEW']:
+        self.enable_spreadf_scaling = config.getboolean('scaling', 'enablespreadFscaling')
+        self.polan_options = {}
+        self.polan_options['start'] = config.get('realheightanalysis', 'start')
+        self.polan_options['amode'] = config.get('realheightanalysis', 'amode')
+        self.polan_options['valley'] = config.get('realheightanalysis', 'valley')
+        self.polan_options['list'] = config.get('realheightanalysis', 'list')
+        self.iono_maxfreq = config.getfloat('plotting','maxfreq')
+        if self.polan_interp_mode.lower() not in ['old', 'new']:
             raise ValueError(f"POLAN interpolation mode must be 'old' or 'new', got {self.polan_interp_mode} instead.")
         
     def open_folder(self):
@@ -208,6 +251,37 @@ class MainWidget(QWidget):
             self.run_button.setEnabled(False)
             self._loading_folder_path = self.folder_path
             self.service.load_data(self.folder_path)
+
+    def _generate_filename(self, dt1, dt2):
+        if dt1 > dt2:
+            dt1, dt2 = dt2, dt1
+        base_format = "%y%m%d_%H%M%S"
+        if dt1.year != dt2.year:
+            suffix_format = "-%y%m%d_%H%M%S"
+        elif dt1.month != dt2.month:
+            suffix_format = "-%m%d_%H%M%S"
+        elif dt1.day != dt2.day:
+            suffix_format = "-%d_%H%M%S"
+        else:
+            suffix_format = "-%H%M%S"
+        return f"{dt1.strftime(base_format)}{dt2.strftime(suffix_format)}" 
+    
+    def _run_save_fig_callback(self):
+        if self.canvas_widget is not None:
+            from src.plotstate.plotstate_options import timeseries_options, plot_fig_save_names
+            option = self.mode_dropdown.currentText()
+            start_datetime = datetime.strptime(self._selected_timestamp,"%Y-%m-%d %H:%M:%S")
+            filename = f"{plot_fig_save_names[option]}"
+            if option in timeseries_options:     
+                end_datetime = datetime.strptime(self._right_selected_timestamp,"%Y-%m-%d %H:%M:%S")
+                filename += self._generate_filename(start_datetime, end_datetime)
+            else:
+                filename += start_datetime.strftime("%y%m%d_%H%M%S")
+            filename = self.output_dir / Path(filename)
+            file_path, selected_filter = QFileDialog.getSaveFileName(self, "Save plot to file", dir=str(filename),
+                                                                    filter="PNG Image (*.png);;JPEG Image (*.jpg);;PDF Document (*.pdf);;SVG Vector (*.svg)")
+            if file_path:
+                self.canvas_widget.figure.savefig(file_path, dpi=250, bbox_inches='tight')
 
     def _on_multi_folder_toggled(self, state):
         is_checked = self.multi_folder_checkbox.isChecked()
@@ -264,7 +338,7 @@ class MainWidget(QWidget):
         elif self.iono_checkbox.isChecked():
             keys_list = sameer_keys_list
         else:
-            keys_list = cadi_keys_list
+            keys_list = sameer_keys_list
 
         # Note: freqs_list and other details are assumed consistent across folders
         # Use freqs_list from the first folder in the multi-folder data if available
@@ -308,7 +382,7 @@ class MainWidget(QWidget):
             self.mode_dropdown.addItems(MainWidget.md4_options)
         elif self.iono_checkbox.isChecked():
             self.mode_dropdown.clear()
-            self.mode_dropdown.addItems(MainWidget.md4_options)
+            self.mode_dropdown.addItems(MainWidget.sameer_options)
 
     def _on_dropdown_changed(self, text):
         self._selected_timestamp = text
@@ -320,6 +394,9 @@ class MainWidget(QWidget):
             self._plot_helper()
 
     def _plot_helper(self):
+        self.save_plot_button.setEnabled(False)
+        self.save_plot_button.setVisible(False)
+        
         new_state = PlotStateFactory.get_state(self)
         curr_checkbox = "md4" if self.md4_checkbox.isChecked() else ("md3" if self.md3_checkbox.isChecked() else "iono")
         
@@ -370,21 +447,19 @@ class MainWidget(QWidget):
             self.current_plot_state.update_canvas(self.canvas_widget)
         
         self.prev_checkbox = curr_checkbox
-        self.service.polan_auto_helper()
-        self._autoscale_helper()
-
-    def _autoscale_helper(self):
-        pass
+        self.service.polan_helper(kind='auto', reload=True)
+        self.save_plot_button.setEnabled(True)
+        self.save_plot_button.setVisible(True)
 
     def _save_manual_scale(self):
         self.service.save_manual_scale()
 
     def _clean_scaled_canvas(self):
-        if self.canvas_widget and self.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
+        if self.canvas_widget and self.canvas_widget.__class__.__name__ in ['ScaleIonogramCanvas', 'AutoScaleIonogramCanvas']:
             self.canvas_widget.clean_canvas()
 
     def _polan_manual_helper(self):
-        self.service.polan_manual_helper()
+        self.service.polan_helper(kind='manual')
 
     def _reset_zoom_helper(self):
         if hasattr(self.canvas_widget, 'reset_zoom') and callable(self.canvas_widget.reset_zoom):
@@ -392,6 +467,13 @@ class MainWidget(QWidget):
 
     def _on_es_scaling_changed(self, index):
         self._es_scaling_mode = index
+
+    def _on_spread_f_scaling_changed(self, index):
+        if index > 1:
+            index = index - 1   #Spread F types
+        elif index == 1:
+            index = -1  #Satellite Trace index
+        self._spread_f_scaling_mode = index
 
     def _prev_option(self):
         dropdown = self.table_widget.timepartitions_dropdown

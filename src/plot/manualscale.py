@@ -4,7 +4,7 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import ScalarFormatter, MultipleLocator, FuncFormatter
 from datetime import datetime
 import numpy as np
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 from src.plotstate.scaling_region_state import ScaleRegionValues
 
 class ScaleIonogramCanvas(FigureCanvas):
@@ -16,7 +16,7 @@ class ScaleIonogramCanvas(FigureCanvas):
         self.scatter = None
         self.colorbar = None
         self.freq_ticks = [1, 2, 4, 6, 8, 10, 15, 20]
-        self.freq_limits = (1, 18)
+        self.freq_limits = (1, self.main.iono_maxfreq)
         self.height_ticks = np.arange(0, 1100, 100)
         self.height_limits = (50, 1100)
         self.scaled_values_lines = ScaleRegionValues(self.ax, 
@@ -59,7 +59,7 @@ class ScaleIonogramCanvas(FigureCanvas):
             self.colorbar.set_label("Power (dB)")
             self.colorbar.set_ticks(np.arange(0, self.main.power_limit + 1, 5))  # Fixed ticks from 0 to power_limit with step of 5
             self.scatter.set_clim(0, self.main.power_limit)  # Set color limits on scatter plot
-        self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime("%H:%M:%S %d-%m-%Y")} {site_dict[site].get_tzstr(timestamp)}")
+        self.ax.set_title(f"Ionogram site: {site} at {timestamp.strftime("%H:%M:%S %d-%m-%Y")} {SiteInfo.from_file(site).get_tzstr(timestamp)}")
         self._set_plot_ax()
         #self.fig.tight_layout()
         self.fig.subplots_adjust(left=0.1, right=1.05, bottom=0.075, top=0.95)

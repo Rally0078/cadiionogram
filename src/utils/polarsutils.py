@@ -1,6 +1,6 @@
 import numpy as np
 import polars as pl
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 
 class PolarsUtils:
     def __init__(self):
@@ -63,7 +63,7 @@ class PolarsUtils:
             format='%Y-%m-%d %H:%M:%S%z',
             strict=False
         )
-        datetime_series = datetime_series.dt.replace_time_zone(str(site_dict[metadata['site']].get_tzinfo(date_of_obs)))
+        datetime_series = datetime_series.dt.replace_time_zone(str(SiteInfo.from_file(metadata['site']).get_tzinfo(date_of_obs)))
         
         data_dict["datetime"] = datetime_series
         df_sensors = pl.DataFrame(data_dict)

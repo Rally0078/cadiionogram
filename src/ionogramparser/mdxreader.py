@@ -24,7 +24,7 @@ from io import BufferedReader
 
 from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.ionogramparser.baserawreader import DataReader
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
 import numpy as np
 
 
@@ -225,7 +225,7 @@ class MDreader(DataReader):
                         #datetime object representing time of first observation in UTC or local time
                 datetime_init_observation =  datetime.datetime(year=year, month=month_number,day=day, 
                                                     hour=hour, minute=minute, second=sec,
-                                                    tzinfo=site_dict[site].get_tzinfo(datetime.datetime(year, month_number, day)))
+                                                    tzinfo=SiteInfo.from_file(site).get_tzinfo(datetime.datetime(year, month_number, day)))
                 time_min = struct.unpack("<B", MDreader._safe_reader(f, 1))[0]
                 metadata['site'] = site
                 metadata['datetime'] = datetime_init_observation

@@ -27,6 +27,7 @@ from src.errorhandlers.errorhandling import FolderNotContainingData
 from src.ionogramparser.baserawreader import DataReader
 from src.utils.parquetutils import ParquetUtils
 import numpy as np
+from src.utils.siteinfo import SiteInfo
 
 type time_partition_dict = dict[str, int]
 
@@ -82,7 +83,19 @@ class SameerReader(DataReader):
             lines = f.readlines()
         lines = [line.strip() for line in lines]
         site, lat, long =  lines[3].split(sep='\t')
-        datetime_obj = datetime.strptime(lines[4], "%d-%m-%Y %H:%M")
+        _datetime_formats = [
+            "%d-%m-%Y %H:%M",
+            "%Y-%m-%d %H:%M:%S",
+        ]
+        datetime_obj = None
+        for _fmt in _datetime_formats:
+            try:
+                datetime_obj = datetime.strptime(lines[4], _fmt)
+                break
+            except ValueError:
+                continue
+        if datetime_obj is None:
+            raise ValueError(f"Unable to parse datetime string: {lines[4]!r}")
         nfreqs = int(lines[5])
         start_freq, end_freq, step_freq = lines[6].split(sep='\t')
         ipp, nrgb, nfft, nci, cbl = lines[7].split(sep='\t')
@@ -127,6 +140,7 @@ class SameerReader(DataReader):
 
             freq_line_idx_original = freq_bin_idx
             freq_bin_idx += 1
+        datetime_obj = datetime_obj.replace(tzinfo=SiteInfo.from_file(site).get_tzinfo(datetime_obj))
         metadata = {'site': site, 'lat': float(lat), 'long': float(long), 
             'filetype': 'iono',
             'extension': 'iono',

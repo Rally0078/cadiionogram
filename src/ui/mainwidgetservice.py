@@ -4,38 +4,50 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from math import isnan
 from PySide6.QtCore import QObject
+import re
 from src.utils.pandasutils import PandasUtils
 from src.workers.data_loader_worker import DataLoaderWorker
 from src.workers.computation_worker import ComputationWorker
 from src.ionogramparser.mdxreader import MDreader
 from src.ionogramparser.sameerreader import SameerReader
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
-from src.utils.siteinfo import site_dict
+from src.utils.siteinfo import SiteInfo
+from time import perf_counter
 from src.utils.rawdatadiriterator import RawDataDirIterator
 
 class MainWidgetService(QObject):
     def __init__(self, main_widget):
         super().__init__()
         self.main_widget = main_widget
+        self.start_time = 0
+        self.end_time = 0
+        self.computation_start_time = 0
+        self.computation_end_time = 0
 
     def load_data(self, location):
         if self.main_widget.md3_checkbox.isChecked():
             extension = 'md3'
+            pandas_output_type = 'cadi'
             raw_reader = MDreader()
         elif self.main_widget.md4_checkbox.isChecked():
             extension = 'md4'
+            pandas_output_type = 'cadi'
             raw_reader = MDreader()
         elif self.main_widget.iono_checkbox.isChecked():
             extension = 'iono'
+            pandas_output_type = 'sameer'
             raw_reader = SameerReader()
-        
-        self.main_widget.extension = extension       
-        worker = DataLoaderWorker(location, extension, raw_reader)
+        else:
+            raise TypeError("Not the appropriate data type")
+        self.main_widget.extension = extension
+        worker = DataLoaderWorker(location, extension, raw_reader, pandas_output_type)
         worker.signals.finished.connect(self.data_loaded)
         worker.signals.error.connect(self.data_loading_error)
+        self.start_time = perf_counter()
+        print(f"Reading data from {location}, extension {extension}")
         self.main_widget.threadpool.start(worker)
 
-    def data_loaded(self, files_list, metadata, heights, freqs, freqs_list, dops, signals):
+    def data_loaded(self, files_list, metadata, heights, freqs, freqs_list, dops, signals, pandas_output_type):
         new_data = {
             'files_list': files_list,
             'metadata': metadata,
@@ -47,7 +59,9 @@ class MainWidgetService(QObject):
             'folder_path': self.main_widget._loading_folder_path,
             'file_paths': [self.main_widget._loading_folder_path / filename for filename in files_list]
         }
-
+        self.end_time = perf_counter()
+        print(f"Data successfully loaded in {self.end_time - self.start_time:.3f} seconds")
+        
         if self.main_widget.multi_folder_checkbox.isChecked():
             # Check if this folder is already in the list to avoid duplicates
             already_exists = False
@@ -67,7 +81,7 @@ class MainWidgetService(QObject):
                 self.main_widget.multi_folder_data.sort(key=lambda x: x['metadata']['datetime'])
             
             # Combine all data into unified structures
-            combined_df, combined_metadata = PandasUtils.combine_folder_data(self.main_widget.multi_folder_data)
+            combined_df, combined_metadata = PandasUtils.combine_folder_data(self.main_widget.multi_folder_data, radar_type=pandas_output_type)
             self.main_widget.combined_df = combined_df
             self.main_widget.combined_metadata = combined_metadata
             
@@ -75,7 +89,7 @@ class MainWidgetService(QObject):
             self.main_widget.switch_to_combined_data()
         else:
             self.main_widget.multi_folder_data = [new_data]
-            self.main_widget.combined_df = PandasUtils.create_pandas_from_arrays(metadata, freqs, heights, dops, signals)
+            self.main_widget.combined_df = PandasUtils.create_pandas_from_arrays(metadata, freqs, heights, dops, signals, radar_type=pandas_output_type)
             self.main_widget.combined_metadata = metadata
             
             self.main_widget.update_multi_folder_dropdown()
@@ -96,10 +110,12 @@ class MainWidgetService(QObject):
                 self.main_widget.multi_folder_data[0]['metadata']['datetime'],
                 self.main_widget.combined_df,
                 self.main_widget._selected_timestamp, self.main_widget._right_selected_timestamp, 
-                self.main_widget.multi_folder_data[0]['freqs_list']
+                self.main_widget.multi_folder_data[0]['freqs_list'],
+                site=self.main_widget.multi_folder_data[0]['metadata']['site']
             )
             worker.signals.finished.connect(self.computation_finished)
             worker.signals.error.connect(self.computation_error)
+            self.computation_start_time = perf_counter()
             self.main_widget.threadpool.start(worker)
             return True
         return False
@@ -108,6 +124,8 @@ class MainWidgetService(QObject):
         self.main_widget.df_all_outputs = df_all_outputs
         self.main_widget.all_output_freqs = all_output_freqs
         self.main_widget.has_handled_calculation = True
+        self.computation_end_time = perf_counter()
+        print(f"Computation ended in {self.computation_end_time - self.computation_start_time:.3f} seconds")
         self.main_widget._plot_helper()
 
     def computation_error(self, message):
@@ -115,109 +133,178 @@ class MainWidgetService(QObject):
         self.main_widget.dlg.exec()
         self.main_widget.label.setText("Computation error")
 
-    def run_polan(self, freqs, heights, ml_freqs, ml_heights):
+    def extract_numbers(self, line: str) -> list[float]:
+        matches = re.findall(r'(-?\d+\.?\d*)|\*+', line)
+        return [float(m) if m else 0.0 for m in matches]
+
+    def run_polan(self, freqs, heights) -> bool:
+        if len(freqs) == 0:
+            print("No drawn curve or ionogram data to match.")
+            return False
+
+        short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
+        short_datetime = short_datetime.replace(tzinfo=SiteInfo.from_file(self.main_widget.metadata['site']).get_tzinfo(short_datetime))
+        current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
+        
+        with open("a.a", 'w') as polan_input:
+            polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
+            polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}{SiteInfo.from_file(self.main_widget.metadata['site']).short_site}           {SiteInfo.from_file(self.main_widget.metadata['site']).FH:.2f}  {SiteInfo.from_file(self.main_widget.metadata['site']).dip:.1f}  {self.main_widget.polan_options['amode']} {self.main_widget.polan_options['valley']}    {self.main_widget.polan_options['list']}\n")
+            polan_input.write(f"{current_timestamp}                    {self.main_widget.polan_options['start']}\n")
+            for idx, (freq, height) in enumerate(zip(freqs, heights)):
+                if idx == len(freqs) - 1:
+                    height = 0.0
+                polan_input.write(f"{freq}, {float(round(height)):.2f}\n")
+            polan_input.write(f"0.0, 0.0")
+        
+        subprocess.run(['./polan.exe'])
+        return True
+
+    def read_polan(self, freqs, heights, ml_freqs, ml_heights, extra_required=False):
+        if len(freqs) == 0:
+            return [], [], [], [], [], [], {}
+
         real_freqs = []
         real_heights = []
         
-        if len(freqs) > 0:
+        if Path("POLOUT.T").exists():
             short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
-            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+            short_datetime = short_datetime.replace(tzinfo=SiteInfo.from_file(self.main_widget.metadata['site']).get_tzinfo(short_datetime))
             current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
-            
-            with open("a.a", 'w') as polan_input:
-                polan_input.write("OUTPUT MODE ==>          -9.00  0.0  0.0  0.0    0\n")
-                polan_input.write(f"Date = {short_datetime.year-2000}{short_datetime.month:02d}{short_datetime.day:02d}{site_dict[self.main_widget.metadata['site']].short_site}           {site_dict[self.main_widget.metadata['site']].FH:.2f}  {site_dict[self.main_widget.metadata['site']].dip:.1f}  0.0 0.00    0\n")
-                polan_input.write(f"{current_timestamp}                    0.0\n")
-                for idx, (freq, height) in enumerate(zip(freqs, heights)):
-                    if idx == len(freqs) - 1:
-                        height = 0.0
-                    polan_input.write(f"{freq}, {float(round(height)):.2f}\n")
-                polan_input.write(f"0.0, 0.0")
-            
-            subprocess.run(['./polan.exe'])
-            
-            if Path("POLOUT.T").exists():
-                with open("POLOUT.T", 'r') as polan_output:
-                    lines = polan_output.readlines()
-                    data_start_index = -1
-                    for i, line in enumerate(lines):
-                        if "Real Heights" in line:
-                            data_start_index = i + 1
+
+            with open("POLOUT.T", 'r') as polan_output:
+                lines = polan_output.readlines()
+                data_start_index = -1
+                for i, line in enumerate(lines):
+                    if "Real Heights" in line:
+                        data_start_index = i + 1
+                        break
+                
+                if data_start_index != -1:
+                    stop_reading = False
+                    for line in lines[data_start_index:]:
+                        if stop_reading or line.strip() == '' or '*' in line:
                             break
-                    
-                    if data_start_index != -1:
-                        stop_reading = False
-                        for line in lines[data_start_index:]:
-                            if stop_reading or line.strip() == '' or '*' in line:
-                                break
-                            try:
-                                floats = list(map(float, line.strip().split()))
-                                line_freqs = floats[::2]
-                                line_heights = floats[1::2]
-                                for f, h in zip(line_freqs, line_heights):
-                                    if h <= 50 or f <= 0.25:
-                                        stop_reading = True
-                                        break
-                                    real_freqs.append(f)
-                                    real_heights.append(h)
-                            except ValueError:
-                                break
-                # Get output filename in the format
-                # year(single last digit)month(letter A-L)day(0 padded)time(HH:MM)
-                new_timestamp = current_timestamp.replace(':', '')[:-2]
-                output_file_nominute_name = datetime.strftime(short_datetime, "%Y%m%d")
-                output_file_nominute_name = output_file_nominute_name[3:]
-                output_file_year, output_file_day = output_file_nominute_name[0], output_file_nominute_name[3:]
-                output_file_nominute_name = output_file_year + chr(short_datetime.month + 64) + output_file_day
-                new_output_file_name = output_file_nominute_name + new_timestamp
-                output_file_name = self.main_widget.polan_dir / f"{new_output_file_name}.pol"
-                shutil.copyfile("POLOUT.T", output_file_name)
-                self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights)
-        else:
-            print("No drawn curve or ionogram data to match.")
+                        try:
+                            floats = list(map(float, line.strip().split()))
+                            line_freqs = floats[::2]
+                            line_heights = floats[1::2]
+                            for f, h in zip(line_freqs, line_heights):
+                                if h <= 50 or f <= 0.25:
+                                    stop_reading = True
+                                    break
+                                real_freqs.append(f)
+                                real_heights.append(h)
+                        except ValueError:
+                            break
 
-    def polan_manual_helper(self):
-        from src.plot.realheightanalysis import RealHeightAnalysisCanvas
-        if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
-            freqs, heights, ml_freqs, ml_heights = self.main_widget.canvas_widget.draw_manual_curve()
-            self.run_polan(freqs, heights, ml_freqs, ml_heights)
-        else:
-            print("Current canvas is not RealHeightAnalysisCanvas. POLAN analysis skipped.")
+            if not real_freqs:
+                print("No real heights data parsed from POLOUT.T")
+                return [], [], [], [], [], [], {}
+            extra_data = {}
+            if extra_required:
+                numbers = self.extract_numbers(lines[data_start_index - 3])
+                if len(numbers) > 0:
+                    extra_data['hmF2'] = numbers[2]
+                    extra_data['hmF2 error'] = numbers[3]
+                    extra_data['ScaleHt'] = numbers[4]
+                    extra_data['ScaleHt error'] = numbers[5]
+                    extra_data['SlabT'] = numbers[6]
+            return freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data
+        return [], [], [], [], [], [], {}
 
-    def polan_auto_helper(self):
-        from src.plot.realheightanalysis import RealHeightAnalysisCanvas
-        if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
-            target_time_str = self.main_widget._selected_timestamp
-            date_of_obs = self.main_widget.combined_metadata['datetime']
-            if self.main_widget.multi_folder_checkbox.isChecked():
-                time_obj = datetime.strptime(target_time_str, "%Y-%m-%d %H:%M:%S")
-                target_dtime = time_obj
-            else:
-                time_obj = datetime.strptime(target_time_str.split(' ')[-1], "%H:%M:%S")
-                target_dtime = time_obj.replace(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day)
-            target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
-
-            df_at_time = self.main_widget.combined_df.loc[target_dtime]
-            signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
+    def save_polan(self, freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data):
+        if len(real_freqs) == 0:
+            return
+        
+        if Path("POLOUT.T").exists():
+            # Get output filename in the format
+            # year(single last digit)month(letter A-L)day(0 padded)time(HH:MM)
+            short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
+            short_datetime = short_datetime.replace(tzinfo=SiteInfo.from_file(self.main_widget.metadata['site']).get_tzinfo(short_datetime))
+            current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
+            new_timestamp = current_timestamp.replace(':', '')[:-2]
+            output_file_nominute_name = datetime.strftime(short_datetime, "%Y%m%d")
+            output_file_nominute_name = output_file_nominute_name[3:]
+            output_file_year, output_file_day = output_file_nominute_name[0], output_file_nominute_name[3:]
+            output_file_nominute_name = output_file_year + chr(short_datetime.month + 64) + output_file_day
+            new_output_file_name = output_file_nominute_name + new_timestamp
+            output_file_name = self.main_widget.polan_dir / f"{new_output_file_name}.pol"
             
-            freqs, heights, dops = df_at_time['freq (Hz)'].to_numpy(), df_at_time['height (km)'].to_numpy(), df_at_time['dopplershift'].to_numpy()
-            signals = df_at_time[signal_col_names].to_numpy()
-            if self.main_widget.extension == 'md4':
-                freqs_interp, heights_interp, ml_freqs, ml_heights = self.main_widget.canvas_widget.draw_auto_curve(freqs, heights, dops, signals)
-                self.run_polan(freqs_interp, heights_interp, ml_freqs, ml_heights)
+            if self.main_widget.save_clean_polan_format:
+                import numpy as np
+                first_idx = np.where(np.array(real_freqs) == freqs[0])[0]
+                first_idx = first_idx[0]
+                last_idx = np.where(np.array(real_freqs) == freqs[-1])[0]
+                if len(last_idx) == 0:
+                    last_idx = np.argmax(real_freqs)
+                else:
+                    last_idx = last_idx[0]
+                new_format_output_name = self.main_widget.polan_dir / f"{new_output_file_name}.dat"
+                with open(new_format_output_name, 'w+') as f:
+                    for freq, f_real, height, h_real in zip(freqs[:last_idx], real_freqs[first_idx:], heights[:last_idx], real_heights[first_idx:]):
+                        f.write((f"{short_datetime.strftime('%Y %m %d')} "
+                        f"{current_timestamp[0:2]} {current_timestamp[3:5]} {current_timestamp[7:9]} "
+                        f"{freq:.2f} "
+                        f"{height:.2f} "
+                        f"{f_real:.2f} "
+                        f"{h_real:.2f}\n"))
+                new_format_output_name.touch()
+            shutil.copyfile("POLOUT.T", output_file_name)
+            output_file_name.touch()
+            
+
+    def save_autoscale(self, freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data):
+        ...
+
+    def polan_helper(self, kind: str='manual', reload=False):
+        from src.plot.realheightanalysis import RealHeightAnalysisCanvas
+        from src.plot.autoscale import AutoScaleIonogramCanvas
+        target_time_str = self.main_widget._selected_timestamp
+        date_of_obs = self.main_widget.combined_metadata['datetime']
+        if self.main_widget.multi_folder_checkbox.isChecked():
+            time_obj = datetime.strptime(target_time_str, "%Y-%m-%d %H:%M:%S")
+            target_dtime = time_obj
+        else:
+            time_obj = datetime.strptime(target_time_str.split(' ')[-1], "%H:%M:%S")
+            target_dtime = time_obj.replace(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day)
+        target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
+        df_at_time = self.main_widget.combined_df.loc[target_dtime]
+        if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
+            if reload:
+                self.main_widget.canvas_widget.drawn_points = []
+            if 'auto' in kind.lower() and self.main_widget.md4_checkbox.isChecked():
+                generate_curve = self.main_widget.canvas_widget.draw_auto_curve
             else:
-                print("Automatic curvefitting for .iono files is not implemented yet")
+                generate_curve = self.main_widget.canvas_widget.draw_manual_curve
+            file_util = self.save_polan
+            extra_required = False
+        elif isinstance(self.main_widget.canvas_widget, AutoScaleIonogramCanvas) and self.main_widget.md4_checkbox.isChecked():
+            if reload:
+                self.main_widget.canvas_widget.drawn_points = []
+            if 'auto' in kind.lower():
+                generate_curve = self.main_widget.canvas_widget.draw_new_auto_curve
+            else:
+                generate_curve = self.main_widget.canvas_widget.draw_manual_curve
+            file_util = self.save_autoscale
+            extra_required = True
+        else:
+            return
+        freqs_interp, heights_interp, ml_freqs, ml_heights = generate_curve(df_at_time)
+        if self.run_polan(freqs_interp, heights_interp):
+            freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data = self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights, extra_required)
+            self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
+            file_util(freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
 
     def save_manual_scale(self):
         if self.main_widget.canvas_widget and self.main_widget.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
             short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
-            short_datetime = short_datetime.replace(tzinfo=site_dict[self.main_widget.metadata['site']].get_tzinfo(short_datetime))
+            short_datetime = short_datetime.replace(tzinfo=SiteInfo.from_file(self.main_widget.metadata['site']).get_tzinfo(short_datetime))
             current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
 
             timestamp_hour = int(current_timestamp.replace(':', '')[:2])
             timestamp_minute = int(current_timestamp.replace(':', '')[2:4])
             timestamp_second = int(current_timestamp.replace(':', '')[4:6])
-            output_filename = f"{short_datetime.strftime('%y%m%d')}{site_dict[self.main_widget.metadata['site']].short_site}_F.tfh"
+            output_filename = f"{short_datetime.strftime('%y%m%d')}{SiteInfo.from_file(self.main_widget.metadata['site']).short_site}_F.tfh"
             output_file_name = self.main_widget.polan_dir / output_filename
             
             scaled_values_state = self.main_widget.canvas_widget.scaled_values_lines
@@ -229,10 +316,12 @@ class MainWidgetService(QObject):
             f3, h3 = scaled_values_state.f, scaled_values_state.h
             
             with open(output_file_name, 'a') as f:
-                f.write((f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} "
-                         f"{'NaN ' if isnan(f1) else f'{f1:.2f}'} {'NaN ' if isnan(h1) else f'{h1:.2f}'} "
-                         f"{'NaN ' if isnan(f2) else f'{f2:.2f}'} {'NaN ' if isnan(h2) else f'{h2:.2f}'} "
-                         f"{'NaN ' if isnan(f3) else f'{f3:.2f}'} {'NaN ' if isnan(h3) else f'{h3:.2f}'} "
-                         f"{self.main_widget._es_scaling_mode}\n"))
+                f.write((f"{short_datetime.strftime("%Y %m %d")} "
+                        f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} "
+                        f"{'NaN ' if isnan(f1) else f'{f1:.2f}'} {'NaN ' if isnan(h1) else f'{h1:.2f}'} "
+                        f"{'NaN ' if isnan(f2) else f'{f2:.2f}'} {'NaN ' if isnan(h2) else f'{h2:.2f}'} "
+                        f"{'NaN ' if isnan(f3) else f'{f3:.2f}'} {'NaN ' if isnan(h3) else f'{h3:.2f}'} "
+                        f"{self.main_widget._es_scaling_mode} "
+                        f"{self.main_widget._spread_f_scaling_mode}\n"))
         else:
             print("Not scaling canvas! Use the appropriate canvas")
