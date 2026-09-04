@@ -1,3 +1,4 @@
+from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from src.utils.siteinfo import SiteInfo
@@ -104,9 +105,23 @@ class PandasUtils:
         return frequency, height, dop_shifts, complex_signal
 
     @staticmethod
-    def combine_folder_data(multi_folder_data, radar_type='cadi'):
+    def combine_folder_data(multi_folder_data: List, radar_type: str='cadi') -> Tuple[pd.DataFrame, Dict]:
         """
             Combines multiple folder data into a single DataFrame and unified metadata.
+
+            Parameters
+            ----------
+            multi_folder_data: `List`
+                List of dicts containing data from multiple folders, as given in mainwidgetservice.py
+            radar_type: `str`
+                Type of radar passed in as an str, can be `'cadi'` or `'sameer'`
+            
+            Returns
+            -------
+            combined_df: `pd.DataFrame`
+                The combined Pandas dataframe of the multi-folder output
+            combined_metadata: `dict`
+                The combined metadata dictionaries of the multi-folder output
         """
         dfs = []
         combined_timepartitions = {}

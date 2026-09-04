@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 class MainWidget(QWidget):
     md3_options = ['Range Time Frequency', 'Range Time Intensity', 'EW-NS timeseries', 'Drift velocity timeseries','Skymap']
     md4_options = ['Display ionogram', 'Autoscale Ionogram', 'Real height analysis', 'Scale ionogram', 'EW-NS vs Range', 'Range Time Intensity', 'Skymap']
-    sameer_options = ['Display ionogram', 'Scale ionogram']
+    sameer_options = ['Display ionogram', 'Scale ionogram', 'Real height analysis']
     
     def __init__(self, config: ConfigParser):
         super().__init__()
@@ -447,7 +447,7 @@ class MainWidget(QWidget):
             self.current_plot_state.update_canvas(self.canvas_widget)
         
         self.prev_checkbox = curr_checkbox
-        self.service.polan_helper(kind='auto')
+        self.service.polan_helper(kind='auto', reload=True)
         self.save_plot_button.setEnabled(True)
         self.save_plot_button.setVisible(True)
 
