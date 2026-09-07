@@ -1,8 +1,7 @@
 import subprocess
 import shutil
 from pathlib import Path
-from datetime import datetime, timedelta
-from math import isnan
+from datetime import datetime
 from PySide6.QtCore import QObject
 import re
 from src.utils.pandasutils import PandasUtils
@@ -10,10 +9,8 @@ from src.workers.data_loader_worker import DataLoaderWorker
 from src.workers.computation_worker import ComputationWorker
 from src.ionogramparser.mdxreader import MDreader
 from src.ionogramparser.sameerreader import SameerReader
-from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from src.utils.siteinfo import SiteInfo
 from time import perf_counter
-from src.utils.rawdatadiriterator import RawDataDirIterator
 
 class MainWidgetService(QObject):
     def __init__(self, main_widget):
@@ -273,61 +270,29 @@ class MainWidgetService(QObject):
             target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
             try:
                 df_at_time = self.main_widget.combined_df.loc[target_dtime]
+                if reload:
+                    self.main_widget.canvas_widget.drawn_points = []
+                if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
+                    if 'auto' in kind.lower() and self.main_widget.md4_checkbox.isChecked():
+                        generate_curve = self.main_widget.canvas_widget.draw_auto_curve
+                    else:
+                        generate_curve = self.main_widget.canvas_widget.draw_manual_curve
+                    file_util = self.save_polan
+                    extra_required = False
+                elif isinstance(self.main_widget.canvas_widget, AutoScaleIonogramCanvas) and self.main_widget.md4_checkbox.isChecked():
+                    if 'auto' in kind.lower():
+                        generate_curve = self.main_widget.canvas_widget.draw_new_auto_curve
+                    else:
+                        generate_curve = self.main_widget.canvas_widget.draw_manual_curve
+                    file_util = self.save_autoscale
+                    extra_required = True
+                else:
+                    return
+                freqs_interp, heights_interp, ml_freqs, ml_heights = generate_curve(df_at_time)
+                if self.run_polan(freqs_interp, heights_interp):
+                    freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data = self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights, extra_required)
+                    self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
+                    file_util(freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
             except KeyError:
                 pass
-            if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
-                if reload:
-                    self.main_widget.canvas_widget.drawn_points = []
-                if 'auto' in kind.lower() and self.main_widget.md4_checkbox.isChecked():
-                    generate_curve = self.main_widget.canvas_widget.draw_auto_curve
-                else:
-                    generate_curve = self.main_widget.canvas_widget.draw_manual_curve
-                file_util = self.save_polan
-                extra_required = False
-            elif isinstance(self.main_widget.canvas_widget, AutoScaleIonogramCanvas) and self.main_widget.md4_checkbox.isChecked():
-                if reload:
-                    self.main_widget.canvas_widget.drawn_points = []
-                if 'auto' in kind.lower():
-                    generate_curve = self.main_widget.canvas_widget.draw_new_auto_curve
-                else:
-                    generate_curve = self.main_widget.canvas_widget.draw_manual_curve
-                file_util = self.save_autoscale
-                extra_required = True
-            else:
-                return
-            freqs_interp, heights_interp, ml_freqs, ml_heights = generate_curve(df_at_time)
-            if self.run_polan(freqs_interp, heights_interp):
-                freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data = self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights, extra_required)
-                self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
-                file_util(freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
-
-    def save_manual_scale(self):
-        if self.main_widget.canvas_widget and self.main_widget.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
-            short_datetime: datetime = datetime.strptime(self.main_widget._selected_timestamp, "%Y-%m-%d %H:%M:%S")
-            short_datetime = short_datetime.replace(tzinfo=SiteInfo.from_file(self.main_widget.metadata['site']).get_tzinfo(short_datetime))
-            current_timestamp = self.main_widget._selected_timestamp.split(' ')[-1]
-
-            timestamp_hour = int(current_timestamp.replace(':', '')[:2])
-            timestamp_minute = int(current_timestamp.replace(':', '')[2:4])
-            timestamp_second = int(current_timestamp.replace(':', '')[4:6])
-            output_filename = f"{short_datetime.strftime('%y%m%d')}{SiteInfo.from_file(self.main_widget.metadata['site']).short_site}_F.tfh"
-            output_file_name = self.main_widget.polan_dir / output_filename
             
-            scaled_values_state = self.main_widget.canvas_widget.scaled_values_lines
-            scaled_values_state.set_region(self.main_widget.config.get('scaling','scalingoption1'))
-            f1, h1 = scaled_values_state.f, scaled_values_state.h
-            scaled_values_state.set_region(self.main_widget.config.get('scaling','scalingoption2'))
-            f2, h2 = scaled_values_state.f, scaled_values_state.h
-            scaled_values_state.set_region(self.main_widget.config.get('scaling','scalingoption3'))
-            f3, h3 = scaled_values_state.f, scaled_values_state.h
-            
-            with open(output_file_name, 'a') as f:
-                f.write((f"{short_datetime.strftime("%Y %m %d")} "
-                        f"{timestamp_hour:02d} {timestamp_minute:02d} {timestamp_second:02d} "
-                        f"{'NaN ' if isnan(f1) else f'{f1:.2f}'} {'NaN ' if isnan(h1) else f'{h1:.2f}'} "
-                        f"{'NaN ' if isnan(f2) else f'{f2:.2f}'} {'NaN ' if isnan(h2) else f'{h2:.2f}'} "
-                        f"{'NaN ' if isnan(f3) else f'{f3:.2f}'} {'NaN ' if isnan(h3) else f'{h3:.2f}'} "
-                        f"{self.main_widget._es_scaling_mode} "
-                        f"{self.main_widget._spread_f_scaling_mode}\n"))
-        else:
-            print("Not scaling canvas! Use the appropriate canvas")
