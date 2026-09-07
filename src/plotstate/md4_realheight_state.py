@@ -2,11 +2,12 @@
 #Handles POLAN input and output
 from src.plot.realheightanalysis import RealHeightAnalysisCanvas
 from src.plotstate.base import PlotState
+from src.plotstate.basescalingstate import BaseScalingState
 from src.utils.powerpreprocessing import convert_amplitude_to_power
 import numpy as np
 from datetime import datetime
 
-class Md4RealheightAnalysisState(PlotState):
+class Md4RealheightAnalysisState(PlotState, BaseScalingState):
     def create_canvas(self):
         canvas = RealHeightAnalysisCanvas(self.main)
         self.update_canvas(canvas)

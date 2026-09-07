@@ -35,16 +35,14 @@ class MdxSkymapState(PlotState):
         signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
         signals = df_at_time[signal_col_names].to_numpy()
 
-        if self.main.extension == 'iono':
-            power_prethres = signals[:, 1]
-            power = power_prethres[power_prethres >= 0]
-            freqs = freqs[power_prethres >= 0] * 1e6
-            heights = heights[power_prethres >= 0]
-            dops = dops[power_prethres >= 0]
-        elif self.main.extension in ['md3', 'md4']:
+        if self.main.extension in ['md3', 'md4']:
             power = convert_amplitude_to_power(signals)
         else:
             raise TypeError("Input data is not the correct type for this canvas")
+        try:
+            skymap_data = self.main.df_all_outputs.loc[target_dtime]
+        except KeyError:
+            skymap_data = pd.DataFrame({"azimuth": [], "zenith": [], 'dopplershift': []})
         ndops = self.main.metadata['ndops']
         npulses_avgd = self.main.metadata['npulses_avgd']
         pps = self.main.metadata['pps']
@@ -52,9 +50,9 @@ class MdxSkymapState(PlotState):
         mindopfreq = (0 - ndops/2) * dopsn2
         maxdopfreq = (ndops - ndops/2) * dopsn2
         canvas.plot_scatter(
-            self.main.df_all_outputs.loc[target_dtime, 'zenith'],
-            self.main.df_all_outputs.loc[target_dtime, 'azimuth'], 
-            self.main.df_all_outputs.loc[target_dtime,'dopplershift'],
+            skymap_data['zenith'],
+            skymap_data['azimuth'], 
+            skymap_data['dopplershift'],
             target_dtime,
             self.main.metadata['site'],
             ndops=self.main.metadata['ndops'],

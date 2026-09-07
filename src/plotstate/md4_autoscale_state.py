@@ -2,11 +2,12 @@
 #Handles plotting of raw ionograms with MD4
 from src.plot.autoscale import AutoScaleIonogramCanvas
 from src.plotstate.base import PlotState
+from src.plotstate.basescalingstate import BaseScalingState
 from src.utils.powerpreprocessing import convert_amplitude_to_power
 import numpy as np
 from datetime import datetime
 
-class Md4AutoScaleIonogramState(PlotState):
+class Md4AutoScaleIonogramState(PlotState, BaseScalingState):
     def create_canvas(self):
         canvas = AutoScaleIonogramCanvas(self.main)
         self.update_canvas(canvas)

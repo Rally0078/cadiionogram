@@ -257,43 +257,48 @@ class MainWidgetService(QObject):
         ...
 
     def polan_helper(self, kind: str='manual', reload=False):
-        from src.plot.realheightanalysis import RealHeightAnalysisCanvas
-        from src.plot.autoscale import AutoScaleIonogramCanvas
-        target_time_str = self.main_widget._selected_timestamp
-        date_of_obs = self.main_widget.combined_metadata['datetime']
-        if self.main_widget.multi_folder_checkbox.isChecked():
-            time_obj = datetime.strptime(target_time_str, "%Y-%m-%d %H:%M:%S")
-            target_dtime = time_obj
-        else:
-            time_obj = datetime.strptime(target_time_str.split(' ')[-1], "%H:%M:%S")
-            target_dtime = time_obj.replace(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day)
-        target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
-        df_at_time = self.main_widget.combined_df.loc[target_dtime]
-        if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
-            if reload:
-                self.main_widget.canvas_widget.drawn_points = []
-            if 'auto' in kind.lower() and self.main_widget.md4_checkbox.isChecked():
-                generate_curve = self.main_widget.canvas_widget.draw_auto_curve
+        from src.plotstate.basescalingstate import BaseScalingState
+        if isinstance(self.main_widget.current_plot_state, BaseScalingState):
+            from src.plot.realheightanalysis import RealHeightAnalysisCanvas
+            from src.plot.autoscale import AutoScaleIonogramCanvas
+            target_time_str = self.main_widget._selected_timestamp
+            date_of_obs = self.main_widget.combined_metadata['datetime']
+            if self.main_widget.multi_folder_checkbox.isChecked():
+                time_obj = datetime.strptime(target_time_str, "%Y-%m-%d %H:%M:%S")
+                target_dtime = time_obj
             else:
-                generate_curve = self.main_widget.canvas_widget.draw_manual_curve
-            file_util = self.save_polan
-            extra_required = False
-        elif isinstance(self.main_widget.canvas_widget, AutoScaleIonogramCanvas) and self.main_widget.md4_checkbox.isChecked():
-            if reload:
-                self.main_widget.canvas_widget.drawn_points = []
-            if 'auto' in kind.lower():
-                generate_curve = self.main_widget.canvas_widget.draw_new_auto_curve
+                time_obj = datetime.strptime(target_time_str.split(' ')[-1], "%H:%M:%S")
+                target_dtime = time_obj.replace(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day)
+            target_dtime = target_dtime.replace(tzinfo=date_of_obs.tzinfo)
+            try:
+                df_at_time = self.main_widget.combined_df.loc[target_dtime]
+            except KeyError:
+                pass
+            if isinstance(self.main_widget.canvas_widget, RealHeightAnalysisCanvas):
+                if reload:
+                    self.main_widget.canvas_widget.drawn_points = []
+                if 'auto' in kind.lower() and self.main_widget.md4_checkbox.isChecked():
+                    generate_curve = self.main_widget.canvas_widget.draw_auto_curve
+                else:
+                    generate_curve = self.main_widget.canvas_widget.draw_manual_curve
+                file_util = self.save_polan
+                extra_required = False
+            elif isinstance(self.main_widget.canvas_widget, AutoScaleIonogramCanvas) and self.main_widget.md4_checkbox.isChecked():
+                if reload:
+                    self.main_widget.canvas_widget.drawn_points = []
+                if 'auto' in kind.lower():
+                    generate_curve = self.main_widget.canvas_widget.draw_new_auto_curve
+                else:
+                    generate_curve = self.main_widget.canvas_widget.draw_manual_curve
+                file_util = self.save_autoscale
+                extra_required = True
             else:
-                generate_curve = self.main_widget.canvas_widget.draw_manual_curve
-            file_util = self.save_autoscale
-            extra_required = True
-        else:
-            return
-        freqs_interp, heights_interp, ml_freqs, ml_heights = generate_curve(df_at_time)
-        if self.run_polan(freqs_interp, heights_interp):
-            freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data = self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights, extra_required)
-            self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
-            file_util(freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
+                return
+            freqs_interp, heights_interp, ml_freqs, ml_heights = generate_curve(df_at_time)
+            if self.run_polan(freqs_interp, heights_interp):
+                freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data = self.read_polan(freqs_interp, heights_interp, ml_freqs, ml_heights, extra_required)
+                self.main_widget.canvas_widget.plot_polan(real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
+                file_util(freqs, heights, real_freqs, real_heights, ml_freqs, ml_heights, extra_data)
 
     def save_manual_scale(self):
         if self.main_widget.canvas_widget and self.main_widget.canvas_widget.__class__.__name__ == 'ScaleIonogramCanvas':
