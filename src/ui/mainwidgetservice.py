@@ -104,7 +104,8 @@ class MainWidgetService(QObject):
     def handle_computation(self, new_state):
         from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
         from src.plotstate.mdx_skymap_state import MdxSkymapState
-        if not self.main_widget.has_handled_calculation and isinstance(new_state, (MdxXYplotCanvasState, MdxSkymapState)):
+        from src.plotstate.md4_ewns_range_state import Md4EwnsRangeState
+        if not self.main_widget.has_handled_calculation and isinstance(new_state, (MdxXYplotCanvasState, MdxSkymapState, Md4EwnsRangeState)):
             self.main_widget.label.setText("Computing...")
             worker = ComputationWorker(
                 self.main_widget.multi_folder_data[0]['metadata']['datetime'],

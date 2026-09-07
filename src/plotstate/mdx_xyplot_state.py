@@ -18,13 +18,10 @@ class MdxXYplotCanvasState(PlotState):
         df = self.main.combined_df
         date_of_obs: datetime = self.main.metadata['datetime']
         
-        # Combined timestamps are "YYYY-MM-DD HH:MM:SS"
-        # We always want to parse the full string if it contains the date
         if ' ' in self.main._selected_timestamp:
             start_dtime = datetime.strptime(self.main._selected_timestamp, "%Y-%m-%d %H:%M:%S")
             end_dtime = datetime.strptime(self.main._right_selected_timestamp, "%Y-%m-%d %H:%M:%S")
         else:
-            # Fallback for old single-folder format if needed
             start_time = datetime.strptime(self.main._selected_timestamp, "%H:%M:%S")
             end_time = datetime.strptime(self.main._right_selected_timestamp, "%H:%M:%S")
             start_dtime = datetime(year=date_of_obs.year, month=date_of_obs.month, day=date_of_obs.day,
@@ -36,9 +33,6 @@ class MdxXYplotCanvasState(PlotState):
         end_dtime = end_dtime.replace(tzinfo=date_of_obs.tzinfo)
 
         df_selection = df.loc[start_dtime:end_dtime]
-        selected_frequencies = self.main.freq_selector.selectedItems()
-        selected_frequencies_decimals = [Decimal(freq) for freq in selected_frequencies]
-        selected_frequencies_rounded = [float(item.quantize(Decimal(f"1e-3"))) * 1e6 for item in selected_frequencies_decimals]
         signal_col_names = [f"sensor{i//2 + 1} {'real' if i%2 == 0 else 'imag'}" for i in range(8)]
         power = convert_amplitude_to_power(df_selection[signal_col_names].to_numpy())
         canvas.plot_scatter(
