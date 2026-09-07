@@ -342,13 +342,17 @@ class MainWidget(QWidget):
         self.table_widget.right_clicked.connect(self._next_option)
 
         self.has_handled_calculation = False
-        self._plot_helper()
-        
+        new_state = PlotStateFactory.get_state(self)
+        if not self.main_widget_service.handle_computation(new_state):
+            self._plot_helper()
+            self.update_status_label()
+            self.run_button.setEnabled(True)
+
+    def update_status_label(self):
         if self.multi_folder_checkbox.isChecked():
             self.label.setText(f"Combined data: {len(self.multi_folder_data)} folders")
-        else:
+        elif self.folder_path:
             self.label.setText(f"Selected: {self.folder_path.parent.parent.name}/{self.folder_path.parent.name}/{self.folder_path.name}")
-        self.run_button.setEnabled(True)
 
     def _on_freq_selector_updated(self, sel):
         if self.canvas_widget and self.canvas_widget.__class__.__name__ in ('XYPlotCanvas', 'RangeTimeFreqCanvas', 'RangeTimeIntensCanvas'):

@@ -81,16 +81,13 @@ class MainWidgetService(QObject):
             combined_df, combined_metadata = PandasUtils.combine_folder_data(self.main_widget.multi_folder_data, radar_type=pandas_output_type)
             self.main_widget.combined_df = combined_df
             self.main_widget.combined_metadata = combined_metadata
-            
-            self.main_widget.update_multi_folder_dropdown()
-            self.main_widget.switch_to_combined_data()
         else:
             self.main_widget.multi_folder_data = [new_data]
             self.main_widget.combined_df = PandasUtils.create_pandas_from_arrays(metadata, freqs, heights, dops, signals, radar_type=pandas_output_type)
             self.main_widget.combined_metadata = metadata
             
-            self.main_widget.update_multi_folder_dropdown()
-            self.main_widget.switch_to_combined_data()
+        self.main_widget.update_multi_folder_dropdown()
+        self.main_widget.switch_to_combined_data()
 
     def data_loading_error(self, message):
         self.main_widget.textbox_errormsg.setText(message)
@@ -98,11 +95,15 @@ class MainWidgetService(QObject):
         self.main_widget.run_button.setEnabled(False)
         self.main_widget.label.setText("No folder selected")
 
-    def handle_computation(self, new_state):
+    def handle_computation(self, new_state=None):
+        if new_state is None:
+            from src.plotstate.factory import PlotStateFactory
+            new_state = PlotStateFactory.get_state(self.main_widget)
         from src.plotstate.mdx_xyplot_state import MdxXYplotCanvasState
         from src.plotstate.mdx_skymap_state import MdxSkymapState
         from src.plotstate.md4_ewns_range_state import Md4EwnsRangeState
         if not self.main_widget.has_handled_calculation and isinstance(new_state, (MdxXYplotCanvasState, MdxSkymapState, Md4EwnsRangeState)):
+            self.main_widget.run_button.setEnabled(False)
             self.main_widget.label.setText("Computing...")
             worker = ComputationWorker(
                 self.main_widget.multi_folder_data[0]['metadata']['datetime'],
@@ -124,12 +125,15 @@ class MainWidgetService(QObject):
         self.main_widget.has_handled_calculation = True
         self.computation_end_time = perf_counter()
         print(f"Computation ended in {self.computation_end_time - self.computation_start_time:.3f} seconds")
+        self.main_widget.update_status_label()
+        self.main_widget.run_button.setEnabled(True)
         self.main_widget._plot_helper()
 
     def computation_error(self, message):
         self.main_widget.textbox_errormsg.setText(message)
         self.main_widget.dlg.exec()
         self.main_widget.label.setText("Computation error")
+        self.main_widget.run_button.setEnabled(True)
 
     def extract_numbers(self, line: str) -> list[float]:
         matches = re.findall(r'(-?\d+\.?\d*)|\*+', line)
