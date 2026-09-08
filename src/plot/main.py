@@ -1,7 +1,7 @@
 import sys
 from src.ui.mainwidget import MainWidget
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow
+    QApplication, QMainWindow, QMessageBox
 )
 from pathlib import Path
 import configparser
@@ -42,6 +42,11 @@ class MainWindow(QMainWindow):
                 'DefaultOutputDirectory': 'C:\\CADIoutput' if os_name == "Windows" else '~/CADIoutput',
                 'polanoutputdirectory': 'C:\\cdata' if os_name == "Windows" else '~/cdata',
                 'cachedir': 'C:\\cdata\\parquetcache' if os_name == "Windows" else '~/cdata/parquetcache'
+            },
+            'data': {
+                'defaultoutputformat': 'csv',
+                'sep': ',',
+                'filetype': 'whole'
             },
             'plotting': {
                 'powercolormap': 'jet_r',
@@ -93,7 +98,56 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.main_widget)
         self.resize(1366, 768)
         self.setMinimumSize(1280, 720)
+
+        self._build_menu_bar()
+
         self.showMaximized()
+
+    def _build_menu_bar(self):
+        main_widget = self.main_widget
+        menu_bar = self.menuBar()
+
+        # ── File ──────────────────────────────────────────────────────────
+        file_menu = menu_bar.addMenu("&File")
+
+        self.action_open_folder = file_menu.addAction("&Open Folder...")
+        self.action_open_folder.setShortcut("Ctrl+O")
+        self.action_open_folder.triggered.connect(main_widget.open_folder)
+
+        file_menu.addSeparator()
+
+        self.action_save_plot = file_menu.addAction("Save &Plot...")
+        self.action_save_plot.setShortcut("Ctrl+S")
+        self.action_save_plot.setEnabled(False)
+        self.action_save_plot.triggered.connect(main_widget._run_save_fig_callback)
+
+        self.action_save_data = file_menu.addAction("Save &Data...")
+        self.action_save_data.setShortcut("Ctrl+Shift+S")
+        self.action_save_data.triggered.connect(main_widget._run_save_data_callback)
+
+        file_menu.addSeparator()
+
+        action_exit = file_menu.addAction("E&xit")
+        action_exit.setShortcut("Ctrl+Q")
+        action_exit.triggered.connect(self.close)
+
+        # ── Help ──────────────────────────────────────────────────────────
+        help_menu = menu_bar.addMenu("&Help")
+
+        action_about = help_menu.addAction("&About")
+        action_about.triggered.connect(self._show_about)
+
+        # Expose menu actions on main_widget so it can enable/disable them
+        main_widget._menu_action_save_plot = self.action_save_plot
+        main_widget._menu_action_save_data = self.action_save_data
+
+    def _show_about(self):
+        QMessageBox.about(
+            self,
+            "About CADI Ionogram Tool",
+            "<b>CADI Ionogram Tool</b><br>"
+            "Ionogram analysis and visualisation tool developed at EGRL, Indian Institute of Geomagnetism under DECA Project."
+        )
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

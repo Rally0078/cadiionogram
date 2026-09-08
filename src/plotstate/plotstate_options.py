@@ -34,6 +34,10 @@ def get_md4_autoscale_state():
     from src.plotstate.md4_autoscale_state import Md4AutoScaleIonogramState
     return Md4AutoScaleIonogramState
 
+def get_md4_ewns_range_state():
+    from src.plotstate.md4_ewns_range_state import Md4EwnsRangeState
+    return Md4EwnsRangeState
+
 options_states_md4_dict = {
     'Scale ionogram': get_md4_manualscale_state,
     'Autoscale Ionogram': get_md4_autoscale_state,
@@ -42,7 +46,7 @@ options_states_md4_dict = {
     'Real height analysis': get_md4_realheight_state,
     'Range Time Intensity': get_mdx_rangetimeintens_state,
     'Skymap': get_mdx_skymap_state,
-    'EW-NS vs Range': NotImplementedError,
+    'EW-NS vs Range': get_md4_ewns_range_state,
 }
 
 options_states_md3_dict = {

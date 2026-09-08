@@ -4,6 +4,7 @@ from src.ui.metadatatable import MetadataTableWidget
 from src.ui.freq_list_dropdown import CheckableDropdown
 from src.plotstate.factory import PlotStateFactory
 from src.ui.mainwidgetservice import MainWidgetService
+from src.ui.filesavingservice import FileSavingService
 from src.ui.metadatakeys import cadi_keys_list, sameer_keys_list
 from PySide6.QtCore import Qt, QThreadPool
 from datetime import datetime
@@ -23,7 +24,8 @@ class MainWidget(QWidget):
     def __init__(self, config: ConfigParser):
         super().__init__()
         self.init_config(config)
-        self.service = MainWidgetService(self)
+        self.main_widget_service = MainWidgetService(self)
+        self.file_saving_service = FileSavingService(self)
         # Canvas parameters to be used later
         self.canvas_layout_row = 1
         self.canvas_layout_col = 4
@@ -36,7 +38,7 @@ class MainWidget(QWidget):
         # Folder selector buttons and label
         self.label = QLabel("No folder selected")
         self.button = QPushButton("Select Folder")
-        
+
         # Multi-folder selection
         self.multi_folder_checkbox = QCheckBox("multi-folder")
         self.multi_folder_checkbox.toggled.connect(self._on_multi_folder_toggled)
@@ -132,14 +134,9 @@ class MainWidget(QWidget):
         # Add mode selection dropdown and Run button to this layout
         self.run_button = QPushButton("Run")
         self.run_button.setEnabled(False)
-        self.save_plot_button = QPushButton("Save Plot")
-        self.save_plot_button.setVisible(False)
-        self.save_plot_button.setEnabled(False)
+        self.run_button.clicked.connect(self._run_button_callback)
         self.mode_dropdown_layout.addWidget(self.mode_dropdown)
         self.mode_dropdown_layout.addWidget(self.run_button)
-        self.mode_dropdown_layout.addWidget(self.save_plot_button)
-        self.save_plot_button.clicked.connect(self._run_save_fig_callback)
-        self.run_button.clicked.connect(self._run_button_callback)
 
         
         self.freq_selector = CheckableDropdown(text="Select Frequencies")
@@ -184,8 +181,8 @@ class MainWidget(QWidget):
         layout.addWidget(self.reset_zoom_button, 9, 2)
         layout.addWidget(self.save_scale_button, 9, 0)
         layout.addWidget(self.clear_scale_button, 9, 1)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(10, 2, 10, 2)
+        layout.setSpacing(5)
 
         # Initialize signal handling
         self.table_widget.dropdown_changed.connect(self._on_dropdown_changed)
@@ -250,38 +247,15 @@ class MainWidget(QWidget):
         if self.folder_path:
             self.run_button.setEnabled(False)
             self._loading_folder_path = self.folder_path
-            self.service.load_data(self.folder_path)
-
-    def _generate_filename(self, dt1, dt2):
-        if dt1 > dt2:
-            dt1, dt2 = dt2, dt1
-        base_format = "%y%m%d_%H%M%S"
-        if dt1.year != dt2.year:
-            suffix_format = "-%y%m%d_%H%M%S"
-        elif dt1.month != dt2.month:
-            suffix_format = "-%m%d_%H%M%S"
-        elif dt1.day != dt2.day:
-            suffix_format = "-%d_%H%M%S"
-        else:
-            suffix_format = "-%H%M%S"
-        return f"{dt1.strftime(base_format)}{dt2.strftime(suffix_format)}" 
+            self.main_widget_service.load_data(self.folder_path)
     
     def _run_save_fig_callback(self):
         if self.canvas_widget is not None:
-            from src.plotstate.plotstate_options import timeseries_options, plot_fig_save_names
-            option = self.mode_dropdown.currentText()
-            start_datetime = datetime.strptime(self._selected_timestamp,"%Y-%m-%d %H:%M:%S")
-            filename = f"{plot_fig_save_names[option]}"
-            if option in timeseries_options:     
-                end_datetime = datetime.strptime(self._right_selected_timestamp,"%Y-%m-%d %H:%M:%S")
-                filename += self._generate_filename(start_datetime, end_datetime)
-            else:
-                filename += start_datetime.strftime("%y%m%d_%H%M%S")
-            filename = self.output_dir / Path(filename)
+            filename = self.file_saving_service.get_plot_filename()
             file_path, selected_filter = QFileDialog.getSaveFileName(self, "Save plot to file", dir=str(filename),
                                                                     filter="PNG Image (*.png);;JPEG Image (*.jpg);;PDF Document (*.pdf);;SVG Vector (*.svg)")
             if file_path:
-                self.canvas_widget.figure.savefig(file_path, dpi=250, bbox_inches='tight')
+                self.file_saving_service.save_plot(self.canvas_widget, file_path)
 
     def _on_multi_folder_toggled(self, state):
         is_checked = self.multi_folder_checkbox.isChecked()
@@ -297,6 +271,13 @@ class MainWidget(QWidget):
     def _on_multi_folder_index_changed(self, index):
         # The folder_dropdown is only an indication of what folders were added
         pass
+    def _run_save_data_callback(self):
+        self.file_saving_service.save_data()
+
+    def _set_menu_action_enabled(self, action_name: str, enabled: bool):
+        action = getattr(self, action_name, None)
+        if action is not None:
+            action.setEnabled(enabled)
 
     def update_multi_folder_dropdown(self):
         self.multi_folder_dropdown.blockSignals(True)
@@ -361,13 +342,17 @@ class MainWidget(QWidget):
         self.table_widget.right_clicked.connect(self._next_option)
 
         self.has_handled_calculation = False
-        self._plot_helper()
-        
+        new_state = PlotStateFactory.get_state(self)
+        if not self.main_widget_service.handle_computation(new_state):
+            self._plot_helper()
+            self.update_status_label()
+            self.run_button.setEnabled(True)
+
+    def update_status_label(self):
         if self.multi_folder_checkbox.isChecked():
             self.label.setText(f"Combined data: {len(self.multi_folder_data)} folders")
-        else:
+        elif self.folder_path:
             self.label.setText(f"Selected: {self.folder_path.parent.parent.name}/{self.folder_path.parent.name}/{self.folder_path.name}")
-        self.run_button.setEnabled(True)
 
     def _on_freq_selector_updated(self, sel):
         if self.canvas_widget and self.canvas_widget.__class__.__name__ in ('XYPlotCanvas', 'RangeTimeFreqCanvas', 'RangeTimeIntensCanvas'):
@@ -394,8 +379,7 @@ class MainWidget(QWidget):
             self._plot_helper()
 
     def _plot_helper(self):
-        self.save_plot_button.setEnabled(False)
-        self.save_plot_button.setVisible(False)
+        self._set_menu_action_enabled('_menu_action_save_plot', False)
         
         new_state = PlotStateFactory.get_state(self)
         curr_checkbox = "md4" if self.md4_checkbox.isChecked() else ("md3" if self.md3_checkbox.isChecked() else "iono")
@@ -420,7 +404,7 @@ class MainWidget(QWidget):
 
         if self.folder_changed or need_new_canvas:
             if not self.has_handled_calculation:
-                is_computing = self.service.handle_computation(new_state)
+                is_computing = self.main_widget_service.handle_computation(new_state)
                 if is_computing:
                     return
             self.folder_changed = False
@@ -447,19 +431,18 @@ class MainWidget(QWidget):
             self.current_plot_state.update_canvas(self.canvas_widget)
         
         self.prev_checkbox = curr_checkbox
-        self.service.polan_helper(kind='auto', reload=True)
-        self.save_plot_button.setEnabled(True)
-        self.save_plot_button.setVisible(True)
+        self.main_widget_service.polan_helper(kind='auto', reload=True)
+        self._set_menu_action_enabled('_menu_action_save_plot', True)
 
     def _save_manual_scale(self):
-        self.service.save_manual_scale()
+        self.file_saving_service.save_manual_scale()
 
     def _clean_scaled_canvas(self):
         if self.canvas_widget and self.canvas_widget.__class__.__name__ in ['ScaleIonogramCanvas', 'AutoScaleIonogramCanvas']:
             self.canvas_widget.clean_canvas()
 
     def _polan_manual_helper(self):
-        self.service.polan_helper(kind='manual')
+        self.main_widget_service.polan_helper(kind='manual')
 
     def _reset_zoom_helper(self):
         if hasattr(self.canvas_widget, 'reset_zoom') and callable(self.canvas_widget.reset_zoom):
